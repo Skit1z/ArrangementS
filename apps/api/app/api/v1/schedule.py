@@ -12,8 +12,15 @@ from app.db.session import get_db
 from app.models.enums import PlanStatus, UserRole
 from app.models.user import User
 from app.schemas.auth import MessageOut
-from app.schemas.schedule import GenerateRequest, WeekView
-from app.services import schedule_service
+from app.schemas.schedule import (
+    CandidateOut,
+    ConflictOut,
+    DraftSaveRequest,
+    GenerateRequest,
+    WeekPersonOut,
+    WeekView,
+)
+from app.services import draft_service, schedule_service
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
@@ -41,6 +48,47 @@ def generate_week(
     summary = schedule_service.generate(db, week_start, actor.id, seed=payload.seed)
     db.commit()
     return summary
+
+
+@router.patch("/weeks/{week_start}/draft", response_model=WeekView)
+def save_draft(
+    week_start: date,
+    payload: DraftSaveRequest,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """拖拽保存：批量原子提交 + 乐观锁。时间重叠绝对拒绝；其他强制约束需 forced+原因。"""
+    plan = draft_service.apply_operations(
+        db,
+        week_start=week_start,
+        expected_version=payload.version,
+        operations=[op.model_dump(mode="json") for op in payload.operations],
+        actor_id=actor.id,
+    )
+    db.commit()
+    return schedule_service.serialize_week(db, plan)
+
+
+@router.post("/weeks/{week_start}/validate", response_model=list[ConflictOut])
+def validate_week(
+    week_start: date, _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> list:
+    return draft_service.validate_week(db, week_start)
+
+
+@router.get("/candidates", response_model=list[CandidateOut])
+def candidates(
+    slot_id: uuid.UUID, _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> list[dict]:
+    return draft_service.list_candidates(db, slot_id)
+
+
+@router.get("/weeks/{week_start}/people", response_model=list[WeekPersonOut])
+def week_people(
+    week_start: date, _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> list[dict]:
+    """人员抽屉：全周人员 + 当月工时 + 各自不可用岗位集合。"""
+    return draft_service.week_people(db, week_start)
 
 
 @router.post("/weeks/{week_start}/publish", response_model=MessageOut)

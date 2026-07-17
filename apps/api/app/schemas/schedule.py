@@ -11,6 +11,52 @@ class GenerateRequest(BaseModel):
     seed: int = 42
 
 
+class DraftOperation(BaseModel):
+    op: str  # assign | unassign
+    slot_id: uuid.UUID
+    position_index: int
+    person_id: uuid.UUID | None = None
+    forced: bool = False
+    forced_reason: str | None = None
+
+
+class DraftSaveRequest(BaseModel):
+    version: int
+    operations: list[DraftOperation]
+
+
+class ConflictOut(BaseModel):
+    slot_id: str
+    position_index: int
+    person_id: str | None
+    kind: str
+    message: str
+
+
+class CandidateOut(BaseModel):
+    person_id: str
+    full_name: str
+    class_name: str
+    student_no: str
+    month_balance_minutes: int
+    week_shift_count: int
+    in_scheduling_pool: bool
+    time_overlap: bool
+    available: bool
+    reasons: list[str]
+
+
+class WeekPersonOut(BaseModel):
+    person_id: str
+    full_name: str
+    class_name: str
+    student_no: str
+    month_balance_minutes: int
+    week_shift_count: int
+    in_scheduling_pool: bool
+    unavailable_slot_ids: list[str]
+
+
 class AssignmentView(BaseModel):
     id: uuid.UUID
     person_id: uuid.UUID | None
@@ -40,4 +86,5 @@ class WeekView(BaseModel):
     week_end: date
     status: str
     revision: int
+    version: int
     slots: list[SlotView]

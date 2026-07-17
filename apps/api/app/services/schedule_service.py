@@ -184,6 +184,7 @@ def serialize_week(db: Session, plan: WeeklyPlan) -> dict:
         "week_end": plan.week_end,
         "status": plan.status.value,
         "revision": plan.revision,
+        "version": plan.version,
         "slots": [
             {
                 "id": s.id,
