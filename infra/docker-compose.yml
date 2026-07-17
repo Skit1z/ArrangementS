@@ -1,0 +1,79 @@
+name: meeting-scheduler
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-scheduler}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scheduler}
+      POSTGRES_DB: ${POSTGRES_DB:-scheduler}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-scheduler}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../apps/api
+    env_file: ../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - filestore:/var/app/files
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.db.init_data &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../apps/api
+    env_file: ../.env
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - filestore:/var/app/files
+    # 阶段五接入 Celery 后替换为真实 worker 命令
+    command: ["sh", "-c", "echo 'worker placeholder' && tail -f /dev/null"]
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  filestore:
+  caddydata:
+  caddyconfig:

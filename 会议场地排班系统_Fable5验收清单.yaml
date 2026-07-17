@@ -1,0 +1,172 @@
+project:
+  name: 党政办公室会议场地排班系统
+  deployment: server_web
+  roles:
+  - admin
+  - user
+  out_of_scope:
+  - 工资金额计算
+  - 外部消息通知
+  - 签到签退
+  - 普通用户拖拽排班
+venues:
+  initial:
+  - 黄楼
+  - 蓝厅
+  - 图书馆报告厅
+  yellow_building:
+    shifts:
+    - start: 08:00
+      end: '10:00'
+      credited_hours: 2.0
+    - start: '10:00'
+      end: '12:00'
+      credited_hours: 2.0
+    - start: '12:00'
+      end: '14:00'
+      credited_hours: 2.0
+    - start: '14:00'
+      end: '16:00'
+      credited_hours: 2.0
+    - start: '16:00'
+      end: '17:30'
+      credited_hours: 2.0
+    - start: '17:30'
+      end: '19:00'
+      credited_hours: 2.0
+    weekday_required_people: 2
+    weekend_and_holiday_required_people: 1
+    adjusted_workday_required_people: 2
+  event_venues:
+    default_required_people: 2
+    minimum_required_people: 1
+    default_prep_minutes: 30
+    default_cleanup_minutes: 30
+    same_venue_overlap_forbidden: true
+hours:
+  unit_minutes: 30
+  rounding: ceil_after_total_weighting_per_assignment
+  default_multiplier_rules:
+  - start: 00:00
+    end: 08:00
+    multiplier: 2.0
+  - start: '19:00'
+    end: '24:00'
+    multiplier: 2.0
+  overlap_rule: highest_priority_wins_no_multiplication
+  metrics:
+    balance_hours: used_for_monthly_fairness
+    completed_hours: used_for_monthly_actual_statistics
+  absence:
+    completed_hours: 0
+    balance_hours_preserved: true
+    affects_future_scheduling: false
+semester:
+  weeks: 20
+  first_monday_entered_by_admin: true
+  course_buffer:
+    optional: true
+    default_minutes_when_enabled: 10
+  periods:
+  - period: 1-2
+    building: all
+    start: 08:00
+    end: 09:50
+  - period: 3-4
+    building: main
+    start: '10:05'
+    end: '11:55'
+  - period: 3-4
+    building: second
+    start: '10:20'
+    end: '12:10'
+  - period: 5-6
+    building: all
+    start: '14:00'
+    end: '15:50'
+  - period: 7-8
+    building: all
+    start: '16:05'
+    end: '17:55'
+  - period: 9-10
+    building: all
+    start: '19:00'
+    end: '20:50'
+  building_prefixes:
+    B: main
+    02-: second
+admin_bootstrap:
+  username: admin
+  initial_password: admin1234
+  can_create_other_admins: true
+  cannot_disable_self: true
+vacation:
+  created_manually_by_admin: true
+  semester_end_auto_expire_timetable_and_unavailability: true
+  duty_whitelist_manually_entered: true
+  non_whitelisted_people_excluded_from_auto_scheduling: true
+  yellow_building_default:
+    shifts_per_day: 1
+    people_per_shift: 1
+holidays:
+  network_sync_source: holiday-cn
+  admin_confirm_required_before_effective: true
+  manual_entry_fallback: true
+account_import:
+  required_columns:
+  - 学号
+  - 班级
+  - 姓名
+  - 手机号
+  - 困难等级
+  optional_columns:
+  - 身份证号
+  - 银行卡号
+  username: student_no
+  initial_password: student_no + lowercase_pinyin_initials(full_name)
+  force_password_change: false
+scheduling:
+  participant_pool_only_selected: true
+  generation_frequency: weekly
+  publication: admin_manual
+  fairness_period: calendar_month
+  solver: OR-Tools CP-SAT
+  hard_constraints:
+  - 人员时间不可重叠
+  - 课程冲突
+  - 审核通过不可值班时间
+  - 暂停排班
+  - 每周最多班次
+  - 禁止场地
+  - 禁止日期和时间
+  - 禁止同班人员
+  - 未参与自动排班的人员不排入
+  - 假期仅可值班名单人员
+  manual_force:
+    allowed_for_non_overlap_hard_constraints: true
+    reason_required: true
+    time_overlap_never_allowed: true
+workflow:
+  leave_admin_approval: true
+  swap_modes:
+  - targeted
+  - open
+  swap_admin_final_approval: true
+  auto_complete_after_end: true
+  admin_can_mark_absent: true
+statistics:
+  venue_hours_stored_per_venue_dimension: true
+  no_hardcoded_venue_columns: true
+acceptance_blockers:
+- 黄楼后两班被按1.5小时统计
+- 同一人员可以时间重叠
+- 倍率分段分别取整
+- 未到岗降低后续排班权重
+- 课表未经确认直接生效
+- 敏感字段明文保存
+- 普通用户可拖拽排班
+- 算法无解时违反强制约束
+- 学期结束后旧课表仍参与冲突计算
+- 未登记假期可值班时间的人员被自动排入假期班次
+- 节假日同步数据未经admin确认直接生效
+- 分场地统计硬编码具体场地列

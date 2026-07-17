@@ -1,0 +1,25 @@
+# 生产将 :80 改为实际域名以启用自动 HTTPS
+:80 {
+	encode gzip
+
+	# 前端静态资源（阶段六接入构建产物后启用）
+	# handle {
+	# 	root * /srv/web
+	# 	try_files {path} /index.html
+	# 	file_server
+	# }
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle /health {
+		reverse_proxy api:8000
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+	}
+}
