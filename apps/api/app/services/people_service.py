@@ -21,6 +21,13 @@ def get_person(db: Session, person_id: uuid.UUID) -> PersonProfile:
     return prof
 
 
+def get_person_by_user(db: Session, user_id: uuid.UUID) -> PersonProfile:
+    prof = db.scalar(select(PersonProfile).where(PersonProfile.user_id == user_id))
+    if prof is None:
+        raise HTTPException(status_code=404, detail="当前账号未关联人员档案")
+    return prof
+
+
 def list_people(
     db: Session,
     *,
