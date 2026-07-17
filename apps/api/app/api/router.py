@@ -11,6 +11,7 @@ from app.api.v1 import (
     people,
     schedule,
     semesters,
+    statistics,
     timetables,
     vacations,
     venues,
@@ -32,3 +33,4 @@ api_router.include_router(me.router)
 api_router.include_router(me.open_swaps_router)
 api_router.include_router(workflow_admin.router)
 api_router.include_router(workflow_admin.assignments_router)
+api_router.include_router(statistics.router)

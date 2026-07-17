@@ -12,6 +12,7 @@ from app.models.enums import (
     ExecutionStatus,
     ImportBatchStatus,
     LeaveStatus,
+    MonthlySummaryStatus,
     ParseStatus,
     PersonStatus,
     PlanAssignmentStatus,
@@ -33,6 +34,11 @@ from app.models.leave import LeaveRequest
 from app.models.multiplier import MultiplierRule
 from app.models.person import PersonProfile
 from app.models.schedule import Assignment, DutySlot, WeeklyPlan
+from app.models.statistics import (
+    HourAdjustment,
+    MonthlyHourSummary,
+    MonthlyVenueHourSummary,
+)
 from app.models.swap import SwapCandidate, SwapRequest
 from app.models.semester import BuildingCodeRule, CoursePeriodRule, Semester
 from app.models.special_date import SpecialDate
@@ -69,6 +75,10 @@ __all__ = [
     "LeaveRequest",
     "SwapRequest",
     "SwapCandidate",
+    "MonthlyHourSummary",
+    "MonthlyVenueHourSummary",
+    "HourAdjustment",
+    "MonthlySummaryStatus",
     "LeaveStatus",
     "SwapMode",
     "SwapStatus",

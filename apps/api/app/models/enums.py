@@ -159,3 +159,10 @@ class SwapCandidateStatus(str, enum.Enum):
     selected = "selected"
     rejected = "rejected"
     expired = "expired"
+
+
+class MonthlySummaryStatus(str, enum.Enum):
+    calculating = "calculating"
+    draft = "draft"
+    confirmed = "confirmed"
+    locked = "locked"
