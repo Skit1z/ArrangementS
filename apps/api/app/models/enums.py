@@ -19,3 +19,9 @@ class ImportBatchStatus(str, enum.Enum):
     previewing = "previewing"
     confirmed = "confirmed"
     failed = "failed"
+
+
+class BuildingType(str, enum.Enum):
+    all = "all"
+    main = "main"  # 主教学楼（B 开头）
+    second = "second"  # 第二教学楼（02- 开头）
