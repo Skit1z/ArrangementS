@@ -71,6 +71,24 @@ def test_generate_fills_weekday_slots(db_session):
     assert sat_shift1.required_people == 1
 
 
+def test_filled_slot_status_is_filled(db_session):
+    # 回归：assignment 经 duty_slot_id 创建不会回填 slot.assignments，
+    # 曾导致排满的岗位状态仍为 open。
+    _yellow(db_session, templates=1)
+    for i in range(3):
+        _person(db_session, i)
+    db_session.commit()
+    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    db_session.commit()
+
+    from app.models.enums import SlotStatus
+
+    slots = list(db_session.scalars(select(DutySlot)))
+    monday1 = next(s for s in slots if s.slot_start_at == datetime(2026, 3, 2, 8, 0))
+    assert monday1.required_people == 2
+    assert monday1.status == SlotStatus.filled
+
+
 def test_yellow_credited_fixed_120(db_session):
     _yellow(db_session, templates=1)
     _person(db_session, 0)

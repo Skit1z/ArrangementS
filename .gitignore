@@ -21,3 +21,7 @@ apps/web/dist/
 
 # 系统
 .DS_Store
+
+# 本地开发数据库
+*.db
+apps/api/dev.db

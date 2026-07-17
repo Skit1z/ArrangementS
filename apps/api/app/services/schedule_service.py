@@ -87,12 +87,16 @@ def _persist_assignments(db: Session, plan: WeeklyPlan, result, actor_id: uuid.U
     engine_rules = multiplier_service.load_engine_rules(db)
     slot_map = {str(s.id): s for s in db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))}
 
+    filled_counts: dict[str, int] = {}
+
     # 按岗位聚合 position -> person
     for pos_id, person in result.assignments.items():
         slot_id, pidx = pos_id.rsplit(":", 1)
         slot = slot_map[slot_id]
         position_index = int(pidx)
         raw, weighted, credited = _assignment_hours(slot, engine_rules)
+        if person is not None:
+            filled_counts[slot_id] = filled_counts.get(slot_id, 0) + 1
 
         if person is None:
             assignment = Assignment(
@@ -114,11 +118,10 @@ def _persist_assignments(db: Session, plan: WeeklyPlan, result, actor_id: uuid.U
             )
         db.add(assignment)
 
-    # 更新 slot 状态
-    for slot in slot_map.values():
-        filled = sum(
-            1 for a in slot.assignments if a.plan_status != PlanAssignmentStatus.vacant
-        )
+    # 更新 slot 状态。注意：assignment 通过 duty_slot_id 创建，不会回填 slot.assignments 关系，
+    # 因此这里用求解结果直接计数，不读关系集合。
+    for slot_id, slot in slot_map.items():
+        filled = filled_counts.get(slot_id, 0)
         slot.status = SlotStatus.filled if filled >= slot.required_people else SlotStatus.open
     db.flush()
 
