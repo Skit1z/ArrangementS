@@ -7,19 +7,27 @@ from app.models.enums import (
     AvailabilitySource,
     AvailabilityStatus,
     BuildingType,
+    DayType,
     ImportBatchStatus,
     ParseStatus,
     PersonStatus,
     RequestStatus,
     ReviewStatus,
+    SpecialDateSource,
+    TaskStatus,
     UserRole,
+    VenueType,
 )
 from app.models.import_batch import ImportBatch
+from app.models.multiplier import MultiplierRule
 from app.models.person import PersonProfile
 from app.models.semester import BuildingCodeRule, CoursePeriodRule, Semester
+from app.models.special_date import SpecialDate
 from app.models.timetable import CourseRule, TimetableUpload
 from app.models.user import User
 from app.models.vacation import VacationAvailability, VacationPeriod
+from app.models.venue import ShiftTemplate, Venue
+from app.models.venue_task import VenueTask
 
 __all__ = [
     "Base",
@@ -37,6 +45,11 @@ __all__ = [
     "CourseRule",
     "AvailabilityBlock",
     "AvailabilityRequest",
+    "Venue",
+    "ShiftTemplate",
+    "SpecialDate",
+    "VenueTask",
+    "MultiplierRule",
     "UserRole",
     "PersonStatus",
     "ImportBatchStatus",
@@ -46,4 +59,8 @@ __all__ = [
     "AvailabilitySource",
     "AvailabilityStatus",
     "RequestStatus",
+    "VenueType",
+    "DayType",
+    "SpecialDateSource",
+    "TaskStatus",
 ]

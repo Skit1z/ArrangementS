@@ -61,3 +61,29 @@ class RequestStatus(str, enum.Enum):
     rejected = "rejected"
     withdrawn = "withdrawn"
     expired = "expired"
+
+
+class VenueType(str, enum.Enum):
+    fixed_shift = "fixed_shift"  # 黄楼：固定班次
+    event_based = "event_based"  # 蓝厅 / 图书馆报告厅：按任务安排
+
+
+class DayType(str, enum.Enum):
+    workday = "workday"  # 调休工作日 -> 按工作日规则
+    weekend_rule = "weekend_rule"  # 法定节假日/周末 -> 按周末规则
+    closed = "closed"  # 停班
+    custom = "custom"  # 自定义人数
+
+
+class SpecialDateSource(str, enum.Enum):
+    manual = "manual"
+    holiday_sync = "holiday_sync"
+
+
+class TaskStatus(str, enum.Enum):
+    draft = "draft"
+    confirmed = "confirmed"
+    scheduled = "scheduled"
+    executing = "executing"
+    completed = "completed"
+    cancelled = "cancelled"
