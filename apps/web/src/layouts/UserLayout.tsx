@@ -2,6 +2,7 @@ import {
   CalendarOutlined,
   ClockCircleOutlined,
   HomeOutlined,
+  StopOutlined,
   SwapOutlined,
 } from "@ant-design/icons";
 import { Layout } from "antd";
@@ -10,7 +11,8 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 // 移动端底部导航
 const tabs = [
   { key: "/app/home", icon: <HomeOutlined />, label: "首页" },
-  { key: "/app/schedule", icon: <CalendarOutlined />, label: "我的排班" },
+  { key: "/app/schedule", icon: <CalendarOutlined />, label: "排班" },
+  { key: "/app/availability", icon: <StopOutlined />, label: "不可值班" },
   { key: "/app/swaps", icon: <SwapOutlined />, label: "换班" },
   { key: "/app/hours", icon: <ClockCircleOutlined />, label: "工时" },
 ];

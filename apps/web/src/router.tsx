@@ -7,7 +7,11 @@ import LoginPage from "@/pages/LoginPage";
 import Placeholder from "@/pages/Placeholder";
 import PeoplePage from "@/pages/admin/PeoplePage";
 import SchedulePage from "@/pages/admin/SchedulePage";
+import AvailabilityPage from "@/pages/user/AvailabilityPage";
 import HomePage from "@/pages/user/HomePage";
+import HoursPage from "@/pages/user/HoursPage";
+import MySchedulePage from "@/pages/user/MySchedulePage";
+import SwapsPage from "@/pages/user/SwapsPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -37,9 +41,10 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/app/home" replace /> },
           { path: "home", element: <HomePage /> },
-          { path: "schedule", element: <Placeholder title="我的排班" /> },
-          { path: "swaps", element: <Placeholder title="换班" /> },
-          { path: "hours", element: <Placeholder title="我的工时" /> },
+          { path: "schedule", element: <MySchedulePage /> },
+          { path: "availability", element: <AvailabilityPage /> },
+          { path: "swaps", element: <SwapsPage /> },
+          { path: "hours", element: <HoursPage /> },
         ],
       },
     ],

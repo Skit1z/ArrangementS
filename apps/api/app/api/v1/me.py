@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -22,7 +23,9 @@ from app.schemas.workflow import (
 from app.services import (
     availability_service,
     leave_service,
+    me_service,
     people_service,
+    schedule_stats,
     swap_service,
 )
 
@@ -31,6 +34,47 @@ router = APIRouter(prefix="/me", tags=["me"])
 
 def _person_id(db: Session, user: User) -> uuid.UUID:
     return people_service.get_person_by_user(db, user.id).id
+
+
+# --- 我的排班 / 工时 ---
+@router.get("/schedule")
+def my_schedule(
+    start: date | None = None,
+    end: date | None = None,
+    u: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    return me_service.my_assignments(db, _person_id(db, u), start=start, end=end)
+
+
+@router.get("/next-duty")
+def my_next_duty(u: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return {"next": me_service.next_duty(db, _person_id(db, u))}
+
+
+@router.get("/hours")
+def my_hours(month: str, u: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    person_id = _person_id(db, u)
+    try:
+        s = schedule_stats.get_summary(db, month, person_id)
+    except HTTPException:
+        return {"month": month, "balance_minutes": 0, "completed_minutes": 0, "venues": [], "calculated": False}
+    breakdown = schedule_stats.venue_breakdown(db, month, person_id)
+    return {
+        "month": month,
+        "balance_minutes": s.balance_minutes,
+        "completed_minutes": s.completed_minutes,
+        "multiplier_extra_minutes": s.multiplier_extra_minutes,
+        "leave_count": s.leave_count,
+        "swap_out_count": s.swap_out_count,
+        "absence_count": s.absence_count,
+        "status": s.status.value,
+        "calculated": True,
+        "venues": [
+            {"venue_id": str(v.venue_id), "completed_minutes": v.completed_minutes}
+            for v in breakdown
+        ],
+    }
 
 
 # --- 不可值班申请 ---
