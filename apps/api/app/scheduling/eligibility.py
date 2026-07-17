@@ -1,0 +1,233 @@
+"""可用性矩阵与求解输入构建（方案 5 / 8.2 / 8.4）。
+
+硬约束来源：审核通过的不可值班区间、暂停排班、禁止场地/星期/日期/时间、假期白名单、
+每周最多班次、禁止同班搭档。偏好约束不参与可行性（仅影响目标，后续可扩展）。
+"""
+from __future__ import annotations
+
+import uuid
+from datetime import time
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models.availability import AvailabilityBlock
+from app.models.constraint import PersonConstraint
+from app.models.enums import AvailabilityStatus, PersonStatus
+from app.models.person import PersonProfile
+from app.models.schedule import Assignment, DutySlot
+from app.models.vacation import VacationPeriod
+from app.scheduling.slots import _active_vacation
+from app.scheduling.solver import Position, SolverInput
+from app.services.intervals import overlaps
+from app.services.vacation_service import is_person_available
+
+
+def _hard_constraints(db: Session, person_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[PersonConstraint]]:
+    rows = db.scalars(
+        select(PersonConstraint).where(
+            PersonConstraint.person_id.in_(person_ids),
+            PersonConstraint.is_active.is_(True),
+            PersonConstraint.is_hard.is_(True),
+        )
+    )
+    out: dict[uuid.UUID, list[PersonConstraint]] = {}
+    for c in rows:
+        out.setdefault(c.person_id, []).append(c)
+    return out
+
+
+def _blocks(db: Session, person_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[tuple]]:
+    rows = db.scalars(
+        select(AvailabilityBlock).where(
+            AvailabilityBlock.person_id.in_(person_ids),
+            AvailabilityBlock.status == AvailabilityStatus.active,
+        )
+    )
+    out: dict[uuid.UUID, list[tuple]] = {}
+    for b in rows:
+        out.setdefault(b.person_id, []).append((b.start_at, b.end_at))
+    return out
+
+
+def _violates_constraint(c: PersonConstraint, slot: DutySlot) -> bool:
+    val = c.constraint_value or {}
+    t = c.constraint_type
+    if t == "suspend":
+        return True
+    if t == "forbid_venue":
+        return str(slot.venue_id) in {str(v) for v in val.get("venue_ids", [])}
+    if t == "only_venue":
+        allowed = {str(v) for v in val.get("venue_ids", [])}
+        return bool(allowed) and str(slot.venue_id) not in allowed
+    if t == "forbid_weekday":
+        return slot.slot_start_at.isoweekday() in val.get("weekdays", [])
+    if t == "forbid_date":
+        return slot.slot_start_at.date().isoformat() in val.get("dates", [])
+    if t == "forbid_time":
+        for r in val.get("ranges", []):
+            rs = time.fromisoformat(r["start"])
+            re = time.fromisoformat(r["end"])
+            if slot.slot_start_at.time() < re and rs < slot.slot_end_at.time():
+                return True
+    return False
+
+
+def _weekly_limit(constraints: list[PersonConstraint]) -> int | None:
+    for c in constraints:
+        if c.constraint_type == "weekly_limit":
+            return (c.constraint_value or {}).get("limit")
+    return None
+
+
+def _forbidden_pairs(constraints_by_person: dict[uuid.UUID, list[PersonConstraint]]) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    for pid, cs in constraints_by_person.items():
+        for c in cs:
+            if c.constraint_type == "no_pair_with":
+                for other in (c.constraint_value or {}).get("person_ids", []):
+                    pairs.append((str(pid), str(other)))
+    return pairs
+
+
+def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
+    slots = list(db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id)))
+
+    people = list(
+        db.scalars(
+            select(PersonProfile).where(
+                PersonProfile.status == PersonStatus.active,
+                PersonProfile.is_in_scheduling_pool.is_(True),
+            )
+        )
+    )
+    person_ids = [p.id for p in people]
+    blocks = _blocks(db, person_ids)
+    constraints = _hard_constraints(db, person_ids)
+
+    # 展开岗位并计算可用性
+    positions: list[Position] = []
+    available: dict[tuple[str, str], bool] = {}
+    locked: dict[str, str] = {}
+
+    # 预取锁定分配
+    locked_rows = db.scalars(
+        select(Assignment)
+        .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
+        .where(DutySlot.weekly_plan_id == plan.id, DutySlot.is_locked.is_(True))
+    )
+    locked_by_slot_pos = {
+        (str(a.duty_slot_id), a.position_index): str(a.person_id)
+        for a in locked_rows
+        if a.person_id is not None
+    }
+
+    for slot in slots:
+        vacation = _active_vacation(db, slot.slot_start_at.date())
+        for pidx in range(slot.required_people):
+            pos_id = f"{slot.id}:{pidx}"
+            positions.append(
+                Position(
+                    id=pos_id,
+                    slot_id=str(slot.id),
+                    month_key=slot.month_key,
+                    credited_minutes=slot.credited_minutes,
+                    venue_id=str(slot.venue_id),
+                    start_at=slot.slot_start_at,
+                    end_at=slot.slot_end_at,
+                )
+            )
+            lk = locked_by_slot_pos.get((str(slot.id), pidx))
+            if lk is not None:
+                locked[pos_id] = lk
+            for person in people:
+                available[(str(person.id), pos_id)] = _is_available(
+                    db, person, slot, blocks.get(person.id, []), constraints.get(person.id, []), vacation
+                )
+
+    weekly_limit = {str(p.id): _weekly_limit(constraints.get(p.id, [])) for p in people}
+    weekly_limit = {k: v for k, v in weekly_limit.items() if v is not None}
+
+    history = _month_history(db, plan)
+
+    return SolverInput(
+        positions=positions,
+        persons=[str(p.id) for p in people],
+        available=available,
+        weekly_limit=weekly_limit,
+        forbidden_pairs=_forbidden_pairs(constraints),
+        locked=locked,
+        history_minutes=history,
+        seed=seed,
+    )
+
+
+def _is_available(
+    db: Session,
+    person: PersonProfile,
+    slot: DutySlot,
+    person_blocks: list[tuple],
+    person_constraints: list[PersonConstraint],
+    vacation: VacationPeriod | None,
+) -> bool:
+    # 不可值班区间
+    for bs, be in person_blocks:
+        if overlaps(slot.slot_start_at, slot.slot_end_at, bs, be):
+            return False
+    # 硬约束
+    for c in person_constraints:
+        if _violates_constraint(c, slot):
+            return False
+    # 假期白名单：假期内仅登记时间段可用
+    if vacation is not None:
+        return is_person_available(db, vacation.id, person.id, slot.slot_start_at, slot.slot_end_at)
+    return True
+
+
+def check_person_available_for_slot(db: Session, person: PersonProfile, slot: DutySlot) -> bool:
+    """换班/补位审核复用：单人对单岗位的硬可用性校验。"""
+    person_blocks = _blocks(db, [person.id]).get(person.id, [])
+    person_constraints = _hard_constraints(db, [person.id]).get(person.id, [])
+    vacation = _active_vacation(db, slot.slot_start_at.date())
+    return _is_available(db, person, slot, person_blocks, person_constraints, vacation)
+
+
+def has_time_overlap_with_person(
+    db: Session, person_id: uuid.UUID, slot: DutySlot, exclude_assignment_id: uuid.UUID | None = None
+) -> bool:
+    """该人是否已有与目标岗位时间重叠的有效分配。"""
+    from app.models.enums import PlanAssignmentStatus
+
+    rows = db.execute(
+        select(Assignment, DutySlot)
+        .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
+        .where(
+            Assignment.person_id == person_id,
+            Assignment.plan_status.notin_(
+                [PlanAssignmentStatus.vacant, PlanAssignmentStatus.cancelled, PlanAssignmentStatus.replaced]
+            ),
+        )
+    ).all()
+    for a, other_slot in rows:
+        if exclude_assignment_id is not None and a.id == exclude_assignment_id:
+            continue
+        if overlaps(slot.slot_start_at, slot.slot_end_at, other_slot.slot_start_at, other_slot.slot_end_at):
+            return True
+    return False
+
+
+def _month_history(db: Session, plan) -> dict[str, int]:
+    """当月已存在分配的平衡工时（排除本周计划），用于公平性历史 H_p。"""
+    month_keys = {s.month_key for s in db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))}
+    if not month_keys:
+        return {}
+    rows = db.scalars(
+        select(Assignment)
+        .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
+        .where(DutySlot.month_key.in_(month_keys), DutySlot.weekly_plan_id != plan.id)
+    )
+    out: dict[str, int] = {}
+    for a in rows:
+        if a.person_id is not None:
+            out[str(a.person_id)] = out.get(str(a.person_id), 0) + a.balance_minutes
+    return out

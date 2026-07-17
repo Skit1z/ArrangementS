@@ -4,23 +4,36 @@ from app.models.audit import AuditLog
 from app.models.availability import AvailabilityBlock, AvailabilityRequest
 from app.models.constraint import PersonConstraint
 from app.models.enums import (
+    AssignmentSource,
     AvailabilitySource,
     AvailabilityStatus,
     BuildingType,
     DayType,
+    ExecutionStatus,
     ImportBatchStatus,
+    LeaveStatus,
     ParseStatus,
     PersonStatus,
+    PlanAssignmentStatus,
+    PlanStatus,
     RequestStatus,
     ReviewStatus,
+    SlotSourceType,
+    SlotStatus,
     SpecialDateSource,
+    SwapCandidateStatus,
+    SwapMode,
+    SwapStatus,
     TaskStatus,
     UserRole,
     VenueType,
 )
 from app.models.import_batch import ImportBatch
+from app.models.leave import LeaveRequest
 from app.models.multiplier import MultiplierRule
 from app.models.person import PersonProfile
+from app.models.schedule import Assignment, DutySlot, WeeklyPlan
+from app.models.swap import SwapCandidate, SwapRequest
 from app.models.semester import BuildingCodeRule, CoursePeriodRule, Semester
 from app.models.special_date import SpecialDate
 from app.models.timetable import CourseRule, TimetableUpload
@@ -50,6 +63,22 @@ __all__ = [
     "SpecialDate",
     "VenueTask",
     "MultiplierRule",
+    "WeeklyPlan",
+    "DutySlot",
+    "Assignment",
+    "LeaveRequest",
+    "SwapRequest",
+    "SwapCandidate",
+    "LeaveStatus",
+    "SwapMode",
+    "SwapStatus",
+    "SwapCandidateStatus",
+    "PlanStatus",
+    "SlotSourceType",
+    "SlotStatus",
+    "AssignmentSource",
+    "PlanAssignmentStatus",
+    "ExecutionStatus",
     "UserRole",
     "PersonStatus",
     "ImportBatchStatus",

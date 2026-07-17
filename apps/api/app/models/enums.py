@@ -87,3 +87,75 @@ class TaskStatus(str, enum.Enum):
     executing = "executing"
     completed = "completed"
     cancelled = "cancelled"
+
+
+class PlanStatus(str, enum.Enum):
+    draft = "draft"
+    published = "published"
+    archived = "archived"
+
+
+class SlotSourceType(str, enum.Enum):
+    fixed_shift = "fixed_shift"
+    venue_task = "venue_task"
+
+
+class SlotStatus(str, enum.Enum):
+    open = "open"
+    filled = "filled"
+    cancelled = "cancelled"
+
+
+class AssignmentSource(str, enum.Enum):
+    auto = "auto"
+    manual = "manual"
+    swap = "swap"
+    replacement = "replacement"
+    forced = "forced"
+
+
+class PlanAssignmentStatus(str, enum.Enum):
+    pending = "pending"  # 待发布
+    assigned = "assigned"  # 已安排
+    vacant = "vacant"  # 空缺
+    replaced = "replaced"  # 已替换
+    cancelled = "cancelled"  # 已取消
+
+
+class ExecutionStatus(str, enum.Enum):
+    pending = "pending"  # 待值班
+    completed = "completed"  # 已完成
+    absent = "absent"  # 未到岗
+    leave = "leave"  # 请假
+    swapped = "swapped"  # 已换班
+    task_cancelled = "task_cancelled"  # 任务取消
+
+
+class LeaveStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+    withdrawn = "withdrawn"
+    cancelled = "cancelled"
+
+
+class SwapMode(str, enum.Enum):
+    targeted = "targeted"  # 指定人员换班
+    open = "open"  # 公开征集替班
+
+
+class SwapStatus(str, enum.Enum):
+    awaiting_target = "awaiting_target"  # 待对方响应
+    open_collecting = "open_collecting"  # 公开征集中
+    pending_admin = "pending_admin"  # 待 admin 审核
+    approved = "approved"
+    rejected = "rejected"
+    withdrawn = "withdrawn"
+    expired = "expired"
+
+
+class SwapCandidateStatus(str, enum.Enum):
+    applied = "applied"
+    selected = "selected"
+    rejected = "rejected"
+    expired = "expired"
