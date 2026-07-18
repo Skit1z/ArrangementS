@@ -65,3 +65,22 @@ def test_generate_requires_admin(client, seed_admin, db_session):
     from app.core.cookies import CSRF_COOKIE_NAME
     tok = client.cookies.get(CSRF_COOKIE_NAME)
     assert client.post(f"/api/v1/schedule/weeks/{MONDAY}/generate", json={"seed": 1}, headers=csrf_headers(tok)).status_code == 403
+
+
+def test_slot_times_carry_beijing_timezone(client, seed_admin, db_session):
+    """生成的 slot 时间必须是北京时间 08:00，不能被偏移成 00:00 等。
+
+    注：SQLite 测试后端不保留 tz offset（存 aware 读出 naive），所以这里只验证
+    时间值正确。生产 Postgres 的 timestamptz 列会正确保留 +08:00。
+    """
+    _seed_yellow_and_people(db_session)
+    token = login(client, "admin", "admin1234")
+    h = csrf_headers(token)
+    client.post(f"/api/v1/schedule/weeks/{MONDAY}/generate", json={"seed": 1}, headers=h)
+    view = client.get(f"/api/v1/schedule/weeks/{MONDAY}")
+    slots = view.json()["slots"]
+    assert slots, "应有 slot"
+    # 第 1 班应为 08:00-10:00（若 tz 处理错误，会被偏移成 00:00 或 16:00）
+    first_start = slots[0]["slot_start_at"]
+    assert "T08:00:00" in first_start, f"slot 起始应为 08:00，实际: {first_start}"
+    assert "T10:00:00" in slots[0]["slot_end_at"]

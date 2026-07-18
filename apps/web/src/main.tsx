@@ -7,7 +7,11 @@ import { RouterProvider } from "react-router-dom";
 
 import { router } from "@/router";
 
+import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
+
+// 激活 dayjs 中文 locale，使 .format("ddd") 输出「周一」而非 "Mon"
+dayjs.locale("zh-cn");
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, staleTime: 30_000 } },

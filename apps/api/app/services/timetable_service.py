@@ -73,13 +73,15 @@ def create_upload_from_entries(
     period_rules = [period_time_from_rule(r) for r in orm_rules]
 
     for entry in entries:
-        upload.course_rules.append(_build_course_rule(db, semester_id, period_rules, entry))
+        upload.course_rules.append(
+            _build_course_rule(db, semester_id, period_rules, entry, max_week=semester.week_count)
+        )
     db.flush()
     return upload
 
 
 def _build_course_rule(
-    db: Session, semester_id: uuid.UUID, period_rules, entry: RawCourseEntry
+    db: Session, semester_id: uuid.UUID, period_rules, entry: RawCourseEntry, *, max_week: int = 20
 ) -> CourseRule:
     needs_review = False
     warnings: list[str] = []
@@ -95,7 +97,7 @@ def _build_course_rule(
     parity = "all"
     explicit_weeks: list[int] = []
     try:
-        spec = parse_weeks(entry.week_expr)
+        spec = parse_weeks(entry.week_expr, max_week=max_week)
         week_start, week_end, parity = spec.week_start, spec.week_end, spec.parity
         explicit_weeks = spec.explicit_weeks
         if spec.warnings:
@@ -174,8 +176,10 @@ def update_course_rule(
         needs_review = True
 
     if patch.get("week_expr"):
+        semester = db.get(Semester, upload.semester_id)
+        max_week = semester.week_count if semester else 20
         try:
-            spec = parse_weeks(patch["week_expr"])
+            spec = parse_weeks(patch["week_expr"], max_week=max_week)
             rule.week_start, rule.week_end = spec.week_start, spec.week_end
             rule.week_parity = spec.parity
             rule.explicit_weeks = spec.explicit_weeks

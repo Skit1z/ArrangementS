@@ -1,13 +1,17 @@
 """周岗位生成：黄楼固定班次（含特殊日期/假期规则）+ 场地任务（方案 8.2 / 4.8）。"""
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.enums import SlotSourceType, TaskStatus, VenueType
 from app.models.schedule import DutySlot, WeeklyPlan
+
+# 业务时间为北京时间；存入 timestamptz 列时必须带时区，否则 naive datetime 被
+# Postgres 当 UTC，导致 API 返回 Z 后缀、前端按本地时区渲染时错 8 小时。
+BEIJING_TZ = timezone(timedelta(hours=8))
 from app.models.special_date import SpecialDate
 from app.models.vacation import VacationPeriod
 from app.models.venue import ShiftTemplate, Venue
@@ -71,8 +75,8 @@ def _generate_yellow_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
                     venue_id=yellow.id,
                     source_type=SlotSourceType.fixed_shift,
                     source_id=tpl.id,
-                    slot_start_at=datetime.combine(day, tpl.start_time),
-                    slot_end_at=datetime.combine(day, tpl.end_time),
+                        slot_start_at=datetime.combine(day, tpl.start_time, tzinfo=BEIJING_TZ),
+                        slot_end_at=datetime.combine(day, tpl.end_time, tzinfo=BEIJING_TZ),
                     required_people=required,
                     credited_minutes=tpl.credited_minutes,
                     month_key=month_key(day),
@@ -96,8 +100,8 @@ def _templates_for_day(
 
 
 def _generate_task_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
-    week_start_dt = datetime.combine(plan.week_start, time.min)
-    week_end_dt = datetime.combine(plan.week_end + timedelta(days=1), time.min)
+    week_start_dt = datetime.combine(plan.week_start, time.min, tzinfo=BEIJING_TZ)
+    week_end_dt = datetime.combine(plan.week_end + timedelta(days=1), time.min, tzinfo=BEIJING_TZ)
     tasks = db.scalars(
         select(VenueTask).where(
             VenueTask.duty_start_at >= week_start_dt,

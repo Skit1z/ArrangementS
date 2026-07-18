@@ -1,0 +1,19 @@
+[Unit]
+Description=ArrangementS API (FastAPI/uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=root
+WorkingDirectory=/opt/ArrangementS/apps/api
+EnvironmentFile=/opt/ArrangementS/.env
+# uv run 会自动用 .venv,无需手动 source
+ExecStart=/root/.local/bin/uv run --project /opt/ArrangementS/apps/api uvicorn app.main:app --host 127.0.0.1 --port 8088
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/arrangements-api.log
+StandardError=append:/var/log/arrangements-api.log
+
+[Install]
+WantedBy=multi-user.target

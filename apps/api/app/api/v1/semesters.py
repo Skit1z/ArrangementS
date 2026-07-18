@@ -16,6 +16,7 @@ from app.schemas.semester import (
     PeriodRuleOut,
     SemesterCreate,
     SemesterOut,
+    SemesterUpdate,
 )
 from app.services import semester_service
 
@@ -51,6 +52,19 @@ def activate_semester(
 ) -> Semester:
     sem = semester_service.activate_semester(db, semester_id)
     db.commit()
+    return sem
+
+
+@router.patch("/{semester_id}", response_model=SemesterOut)
+def update_semester(
+    semester_id: uuid.UUID,
+    payload: SemesterUpdate,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Semester:
+    sem = semester_service.update_semester(db, semester_id, payload.model_dump(exclude_unset=True))
+    db.commit()
+    db.refresh(sem)
     return sem
 
 

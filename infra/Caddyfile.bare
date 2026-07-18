@@ -1,0 +1,29 @@
+# 裸机部署用:监听 :80,反代 API + 托管前端 SPA
+# 部署到 /etc/caddy/Caddyfile
+# 想加 HTTPS:把 :80 改成实际域名,Caddy 自动签发 Let's Encrypt 证书
+
+:80 {
+	encode gzip
+
+	# API 与健康检查优先反代
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8088
+	}
+
+	handle /health {
+		reverse_proxy 127.0.0.1:8088
+	}
+
+	# 前端 SPA 静态资源兜底
+	handle {
+		root * /opt/ArrangementS/apps/web/dist
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+	}
+}

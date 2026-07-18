@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -13,6 +13,14 @@ from app.models.venue import Venue
 from app.models.venue_task import VenueTask
 from app.services import multiplier_service
 from app.services.hours import compute_event_task_hours
+
+# 业务时间为北京时间（见 slots.py 同名常量说明）。
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def _ensure_tz(dt: datetime) -> datetime:
+    """naive datetime（前端未带时区的 ISO）按北京时间解释；aware 原样返回。"""
+    return dt.replace(tzinfo=BEIJING_TZ) if dt.tzinfo is None else dt
 from app.services.intervals import overlaps
 
 # list 默认隐藏的状态（已完成/已取消的任务默认不在管理列表里噪声）
@@ -118,6 +126,8 @@ def create_task(
     prep = venue.default_prep_minutes if prep_minutes is None else prep_minutes
     cleanup = venue.default_cleanup_minutes if cleanup_minutes is None else cleanup_minutes
     people = venue.default_required_people if required_people is None else required_people
+    booking_start_at = _ensure_tz(booking_start_at)
+    booking_end_at = _ensure_tz(booking_end_at)
     duty_start, duty_end = _duty_window(booking_start_at, booking_end_at, prep, cleanup)
 
     _validate_and_check_overlap(
@@ -159,8 +169,8 @@ def update_task(db: Session, task_id: uuid.UUID, patch: dict, expected_version: 
         if k in patch and patch[k] is not None:
             setattr(task, k, patch[k])
 
-    booking_start = patch.get("booking_start_at") or task.booking_start_at
-    booking_end = patch.get("booking_end_at") or task.booking_end_at
+    booking_start = _ensure_tz(patch.get("booking_start_at") or task.booking_start_at)
+    booking_end = _ensure_tz(patch.get("booking_end_at") or task.booking_end_at)
     prep = patch.get("prep_minutes") if patch.get("prep_minutes") is not None else task.prep_minutes
     cleanup = patch.get("cleanup_minutes") if patch.get("cleanup_minutes") is not None else task.cleanup_minutes
     people = patch.get("required_people") if patch.get("required_people") is not None else task.required_people

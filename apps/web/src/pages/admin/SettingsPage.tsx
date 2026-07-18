@@ -30,6 +30,9 @@ import {
   type HolidaySyncItem,
   type MultiplierRule,
   type MultiplierRuleIn,
+  type Semester,
+  type SemesterCreate,
+  type SemesterUpdate,
   type SpecialDate,
   type SpecialDateIn,
 } from "@/features/admin/api";
@@ -42,6 +45,7 @@ export default function SettingsPage() {
         items={[
           { key: "multipliers", label: "倍率规则", children: <MultipliersTab /> },
           { key: "special", label: "特殊日期", children: <SpecialDatesTab /> },
+          { key: "semester", label: "学期设置", children: <SemesterTab /> },
           { key: "audit", label: "审计日志", children: <AuditTab /> },
         ]}
       />
@@ -496,6 +500,175 @@ function HolidaySyncDrawer({
         )}
       </Space>
     </Drawer>
+  );
+}
+
+// ============ 学期设置 Tab ============
+function SemesterTab() {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<Semester[]>({
+    queryKey: ["admin", "semesters"],
+    queryFn: adminApi.semesters.list,
+  });
+
+  const [editing, setEditing] = useState<Semester | null>(null);
+  const [creating, setCreating] = useState(false);
+  // 表单 first_monday 用 Dayjs，提交时格式化；不直接绑定 SemesterCreate（其是字符串）
+  const [form] = Form.useForm<{
+    name: string;
+    first_monday: dayjs.Dayjs;
+    week_count: number;
+    course_buffer_enabled: boolean;
+    course_buffer_minutes: number;
+  }>();
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "semesters"] });
+
+  const createM = useMutation({
+    mutationFn: (v: SemesterCreate) => adminApi.semesters.create(v),
+    onSuccess: () => {
+      message.success("学期已创建");
+      setCreating(false);
+      form.resetFields();
+      invalidate();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const updateM = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: SemesterUpdate }) =>
+      adminApi.semesters.update(id, patch),
+    onSuccess: () => {
+      message.success("学期已更新");
+      setEditing(null);
+      invalidate();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const activateM = useMutation({
+    mutationFn: (id: string) => adminApi.semesters.activate(id),
+    onSuccess: () => {
+      message.success("已设为当前学期");
+      invalidate();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const openCreate = () => {
+    form.resetFields();
+    form.setFieldsValue({ week_count: 20, course_buffer_enabled: false, course_buffer_minutes: 10 });
+    setCreating(true);
+  };
+
+  const openEdit = (s: Semester) => {
+    form.setFieldsValue({
+      name: s.name,
+      first_monday: dayjs(s.first_monday),
+      week_count: s.week_count,
+      course_buffer_enabled: s.course_buffer_enabled,
+      course_buffer_minutes: s.course_buffer_minutes,
+    });
+    setEditing(s);
+  };
+
+  const submit = async () => {
+    const v = await form.validateFields();
+    const payload = {
+      name: v.name,
+      first_monday: (v.first_monday as dayjs.Dayjs).format("YYYY-MM-DD"),
+      week_count: v.week_count,
+      course_buffer_enabled: v.course_buffer_enabled,
+      course_buffer_minutes: v.course_buffer_minutes,
+    };
+    if (editing) updateM.mutate({ id: editing.id, patch: payload });
+    else createM.mutate({ ...payload, is_current: false });
+  };
+
+  return (
+    <>
+      <div style={{ marginBottom: 12 }}>
+        <Button type="primary" onClick={openCreate}>
+          新增学期
+        </Button>
+      </div>
+      <Table<Semester>
+        rowKey="id"
+        loading={isLoading}
+        dataSource={data}
+        pagination={false}
+        columns={[
+          { title: "名称", dataIndex: "name" },
+          { title: "首周周一", dataIndex: "first_monday", width: 120 },
+          { title: "周数", dataIndex: "week_count", width: 80 },
+          {
+            title: "当前",
+            dataIndex: "is_current",
+            width: 80,
+            render: (v: boolean) => (v ? <Tag color="green">当前</Tag> : <Tag>—</Tag>),
+          },
+          {
+            title: "课程缓冲",
+            width: 120,
+            render: (_, r) =>
+              r.course_buffer_enabled ? `启用 +${r.course_buffer_minutes}min` : "关闭",
+          },
+          {
+            title: "操作",
+            width: 200,
+            render: (_, r) => (
+              <Space>
+                <Button size="small" onClick={() => openEdit(r)}>
+                  编辑
+                </Button>
+                {!r.is_current && (
+                  <Popconfirm title="设为当前学期？" onConfirm={() => activateM.mutate(r.id)}>
+                    <Button size="small" type="primary">
+                      设为当前
+                    </Button>
+                  </Popconfirm>
+                )}
+              </Space>
+            ),
+          },
+        ]}
+      />
+
+      <Modal
+        title={editing ? "编辑学期" : "新增学期"}
+        open={creating || !!editing}
+        onOk={submit}
+        onCancel={() => {
+          setCreating(false);
+          setEditing(null);
+        }}
+        confirmLoading={createM.isPending || updateM.isPending}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item name="name" label="名称" rules={[{ required: true }]}>
+            <Input placeholder="如 2026 秋季" />
+          </Form.Item>
+          <Form.Item name="first_monday" label="首周周一" rules={[{ required: true }]}>
+            <DatePicker picker="date" format="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item
+            name="week_count"
+            label="周数（1-30，默认 20）"
+            rules={[{ required: true, type: "number", min: 1, max: 30 }]}
+          >
+            <InputNumber min={1} max={30} />
+          </Form.Item>
+          <Form.Item name="course_buffer_enabled" label="启用课程缓冲" valuePropName="checked">
+            <Checkbox>启用（课表时间前后加缓冲分钟）</Checkbox>
+          </Form.Item>
+          <Form.Item name="course_buffer_minutes" label="缓冲分钟">
+            <InputNumber min={0} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   );
 }
 

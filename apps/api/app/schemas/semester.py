@@ -18,6 +18,14 @@ class SemesterCreate(BaseModel):
     course_buffer_minutes: int = 10
 
 
+class SemesterUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    first_monday: date | None = None
+    week_count: int | None = Field(default=None, ge=1, le=30)
+    course_buffer_enabled: bool | None = None
+    course_buffer_minutes: int | None = None
+
+
 class SemesterOut(BaseModel):
     id: uuid.UUID
     name: str

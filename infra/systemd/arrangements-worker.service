@@ -1,0 +1,18 @@
+[Unit]
+Description=ArrangementS Worker (APScheduler 周期任务)
+After=arrangements-api.service
+Wants=arrangements-api.service
+
+[Service]
+Type=exec
+User=root
+WorkingDirectory=/opt/ArrangementS/apps/api
+EnvironmentFile=/opt/ArrangementS/.env
+ExecStart=/root/.local/bin/uv run --project /opt/ArrangementS/apps/api python -m app.tasks.runner
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/arrangements-worker.log
+StandardError=append:/var/log/arrangements-worker.log
+
+[Install]
+WantedBy=multi-user.target

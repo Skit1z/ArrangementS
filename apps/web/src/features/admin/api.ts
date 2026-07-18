@@ -208,6 +208,34 @@ export interface AuditLog {
   created_at: string;
 }
 
+// --- 学期 ---
+export interface Semester {
+  id: string;
+  name: string;
+  first_monday: string; // YYYY-MM-DD
+  week_count: number;
+  is_current: boolean;
+  course_buffer_enabled: boolean;
+  course_buffer_minutes: number;
+}
+
+export interface SemesterCreate {
+  name: string;
+  first_monday: string;
+  week_count?: number;
+  is_current?: boolean;
+  course_buffer_enabled?: boolean;
+  course_buffer_minutes?: number;
+}
+
+export interface SemesterUpdate {
+  name?: string;
+  first_monday?: string;
+  week_count?: number;
+  course_buffer_enabled?: boolean;
+  course_buffer_minutes?: number;
+}
+
 export const adminApi = {
   // 场地
   venues: {
@@ -280,6 +308,17 @@ export const adminApi = {
   auditLogs: {
     list: async (limit = 100) =>
       (await api.get<AuditLog[]>("/audit-logs", { params: { limit } })).data,
+  },
+
+  // 学期
+  semesters: {
+    list: async () => (await api.get<Semester[]>("/semesters")).data,
+    create: async (payload: SemesterCreate) =>
+      (await api.post<Semester>("/semesters", payload)).data,
+    update: async (id: string, payload: SemesterUpdate) =>
+      (await api.patch<Semester>(`/semesters/${id}`, payload)).data,
+    activate: async (id: string) =>
+      (await api.post<Semester>(`/semesters/${id}/activate`)).data,
   },
 };
 
