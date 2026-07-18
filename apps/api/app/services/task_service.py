@@ -15,6 +15,9 @@ from app.services import multiplier_service
 from app.services.hours import compute_event_task_hours
 from app.services.intervals import overlaps
 
+# list 默认隐藏的状态（已完成/已取消的任务默认不在管理列表里噪声）
+_HIDDEN_BY_DEFAULT = (TaskStatus.cancelled,)
+
 # 视为“占用场地”的有效状态（用于同场地重叠判定）
 ACTIVE_STATUSES = (
     TaskStatus.draft,
@@ -62,6 +65,34 @@ def _validate_and_check_overlap(
                 status_code=409,
                 detail=f"与同场地任务「{other.title}」完整值班时间重叠",
             )
+
+
+def list_tasks(
+    db: Session,
+    *,
+    venue_id: uuid.UUID | None = None,
+    status: TaskStatus | None = None,
+    from_date: datetime | None = None,
+    to_date: datetime | None = None,
+    include_hidden: bool = False,
+) -> list[tuple[VenueTask, Venue]]:
+    """列任务（带场地），按 duty_start_at 倒序。默认排除已取消。"""
+    stmt = (
+        select(VenueTask, Venue)
+        .join(Venue, VenueTask.venue_id == Venue.id)
+        .order_by(VenueTask.duty_start_at.desc())
+    )
+    if venue_id is not None:
+        stmt = stmt.where(VenueTask.venue_id == venue_id)
+    if status is not None:
+        stmt = stmt.where(VenueTask.status == status)
+    elif not include_hidden:
+        stmt = stmt.where(VenueTask.status.not_in(_HIDDEN_BY_DEFAULT))
+    if from_date is not None:
+        stmt = stmt.where(VenueTask.duty_start_at >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(VenueTask.duty_start_at < to_date)
+    return list(db.execute(stmt).all())
 
 
 def create_task(

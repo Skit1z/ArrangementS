@@ -25,3 +25,6 @@ apps/web/dist/
 # 本地开发数据库
 *.db
 apps/api/dev.db
+
+# ZCode 会话产物
+.zcode/

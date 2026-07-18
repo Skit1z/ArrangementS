@@ -21,7 +21,6 @@ from app.schemas.venue import (
     SpecialDateOut,
 )
 from app.services import multiplier_service, special_date_service
-
 router = APIRouter(tags=["config"])
 
 
@@ -90,16 +89,22 @@ def confirm_sync(payload: HolidaySyncConfirm, actor: User = Depends(require_admi
 # --- 审计日志 ---
 @router.get("/audit-logs")
 def list_audit_logs(limit: int = Query(100, le=500), _: User = Depends(require_admin), db: Session = Depends(get_db)) -> list[dict]:
-    rows = db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit))
+    rows = db.execute(
+        select(AuditLog, User)
+        .outerjoin(User, AuditLog.actor_user_id == User.id)
+        .order_by(AuditLog.created_at.desc())
+        .limit(limit)
+    ).all()
     return [
         {
-            "id": str(r.id),
-            "actor_user_id": str(r.actor_user_id) if r.actor_user_id else None,
-            "action": r.action,
-            "entity_type": r.entity_type,
-            "entity_id": r.entity_id,
-            "reason": r.reason,
-            "created_at": r.created_at.isoformat(),
+            "id": str(log.id),
+            "actor_user_id": str(log.actor_user_id) if log.actor_user_id else None,
+            "actor_username": user.username if user is not None else None,
+            "action": log.action,
+            "entity_type": log.entity_type,
+            "entity_id": log.entity_id,
+            "reason": log.reason,
+            "created_at": log.created_at.isoformat(),
         }
-        for r in rows
+        for log, user in rows
     ]

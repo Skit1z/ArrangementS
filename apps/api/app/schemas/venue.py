@@ -115,6 +115,15 @@ class TaskOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TaskListItem(TaskOut):
+    """列表项：附带场地名（脱敏风格一致），便于 admin 表格直接渲染。"""
+
+    venue_name: str
+    organization: str | None = None
+    contact_name: str | None = None
+    contact_phone: str | None = None
+
+
 # --- 特殊日期 ---
 class SpecialDateIn(BaseModel):
     date: date

@@ -110,7 +110,7 @@ def test_venue_breakdown_dynamic(db_session):
     db_session.commit()
     schedule_stats.recalculate(db_session, MONTH)
     db_session.commit()
-    breakdown = {b.venue_id: b.completed_minutes for b in schedule_stats.venue_breakdown(db_session, MONTH, p.id)}
+    breakdown = {b.venue_id: b.completed_minutes for b, _venue in schedule_stats.venue_breakdown(db_session, MONTH, p.id)}
     assert breakdown[v1.id] == 120
     assert breakdown[v2.id] == 90
 
@@ -164,3 +164,34 @@ def test_export_produces_xlsx_without_sensitive(db_session):
     content = stats_export.build_export(db_session, MONTH)
     assert content[:2] == b"PK"  # xlsx(zip) 魔数
     assert len(content) > 0
+
+
+# --- HTTP 层：admin 月度列表 / 个人明细应携带姓名（脱敏风格一致） ---
+def test_monthly_endpoint_returns_names(client, db_session, seed_admin):
+    """GET /statistics/monthly/{month} 与 .../people/{pid} 应返回 person_name/class_name/venue_name。"""
+    from tests.conftest import csrf_headers, login
+
+    plan = _plan(db_session)
+    v = _venue(db_session, "HL")
+    p = _person(db_session, 0)
+    _assignment(db_session, plan, v, p, ExecutionStatus.completed)
+    db_session.commit()
+    schedule_stats.recalculate(db_session, MONTH)
+    db_session.commit()
+
+    # 复用 client fixture 会覆盖 get_db，但同一 db_session；需重新注入
+    # client fixture 已在 conftest 注入 db_session，所以 seed_admin + 数据可见
+    token = login(client, "admin", "admin1234")
+    h = csrf_headers(token)
+
+    monthly = client.get(f"/api/v1/statistics/monthly/{MONTH}", headers=h).json()
+    assert monthly, "应有至少一条汇总"
+    row = monthly[0]
+    assert row["person_name"] == "人0"
+    assert row["student_no"] == "st0"
+    assert row["class_name"] == "一班"
+
+    detail = client.get(f"/api/v1/statistics/monthly/{MONTH}/people/{p.id}", headers=h).json()
+    assert detail["person_name"] == "人0"
+    assert detail["venues"], "应有场地明细"
+    assert detail["venues"][0]["venue_name"] == "HL"

@@ -2,18 +2,21 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, require_admin
 from app.db.session import get_db
+from app.models.enums import TaskStatus
 from app.models.user import User
 from app.schemas.auth import MessageOut
 from app.schemas.venue import (
     ShiftTemplateIn,
     ShiftTemplateOut,
     TaskCreate,
+    TaskListItem,
     TaskOut,
     TaskUpdate,
     VenueCreate,
@@ -69,6 +72,44 @@ def put_shift_templates(
 
 
 # --- 任务 ---
+@router.get("/venue-tasks", response_model=list[TaskListItem])
+def list_tasks(
+    venue_id: uuid.UUID | None = Query(None),
+    status: TaskStatus | None = Query(None),
+    from_date: datetime | None = Query(None, alias="from"),
+    to_date: datetime | None = Query(None, alias="to"),
+    include_cancelled: bool = Query(False),
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    rows = task_service.list_tasks(
+        db, venue_id=venue_id, status=status, from_date=from_date, to_date=to_date,
+        include_hidden=include_cancelled,
+    )
+    return [
+        {
+            "id": str(t.id),
+            "venue_id": str(t.venue_id),
+            "venue_name": v.name,
+            "title": t.title,
+            "booking_start_at": t.booking_start_at,
+            "booking_end_at": t.booking_end_at,
+            "prep_minutes": t.prep_minutes,
+            "cleanup_minutes": t.cleanup_minutes,
+            "duty_start_at": t.duty_start_at,
+            "duty_end_at": t.duty_end_at,
+            "required_people": t.required_people,
+            "is_temporary": t.is_temporary,
+            "status": t.status,
+            "version": t.version,
+            "organization": t.organization,
+            "contact_name": t.contact_name,
+            "contact_phone": t.contact_phone,
+        }
+        for t, v in rows
+    ]
+
+
 @router.get("/venue-tasks/{task_id}", response_model=TaskOut)
 def get_task(task_id: uuid.UUID, _: User = Depends(get_current_user), db: Session = Depends(get_db)) -> object:
     return task_service.get_task(db, task_id)

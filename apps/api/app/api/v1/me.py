@@ -71,8 +71,8 @@ def my_hours(month: str, u: User = Depends(get_current_user), db: Session = Depe
         "status": s.status.value,
         "calculated": True,
         "venues": [
-            {"venue_id": str(v.venue_id), "completed_minutes": v.completed_minutes}
-            for v in breakdown
+            {"venue_id": str(v.venue_id), "venue_name": venue.name, "completed_minutes": v.completed_minutes}
+            for v, venue in breakdown
         ],
     }
 

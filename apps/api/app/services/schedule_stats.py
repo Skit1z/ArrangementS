@@ -19,12 +19,14 @@ from app.models.enums import (
     SwapStatus,
 )
 from app.models.schedule import Assignment, DutySlot
+from app.models.person import PersonProfile
 from app.models.statistics import (
     HourAdjustment,
     MonthlyHourSummary,
     MonthlyVenueHourSummary,
 )
 from app.models.swap import SwapRequest
+from app.models.venue import Venue
 from app.services.audit_service import record_audit
 
 
@@ -173,26 +175,31 @@ def add_adjustment(
     return adj
 
 
-def list_monthly(db: Session, month_key: str) -> list[MonthlyHourSummary]:
+def list_monthly(db: Session, month_key: str) -> list[tuple[MonthlyHourSummary, PersonProfile]]:
+    """返回 (汇总, 人员档案) 元组列表，按 person_id 排序。"""
     month = month_to_date(month_key)
     return list(
-        db.scalars(
-            select(MonthlyHourSummary)
+        db.execute(
+            select(MonthlyHourSummary, PersonProfile)
+            .join(PersonProfile, MonthlyHourSummary.person_id == PersonProfile.id)
             .where(MonthlyHourSummary.month == month)
             .order_by(MonthlyHourSummary.person_id)
-        )
+        ).all()
     )
 
 
-def venue_breakdown(db: Session, month_key: str, person_id: uuid.UUID) -> list[MonthlyVenueHourSummary]:
+def venue_breakdown(db: Session, month_key: str, person_id: uuid.UUID) -> list[tuple[MonthlyVenueHourSummary, Venue]]:
+    """返回 (场地汇总, 场地) 元组列表，附带场地名。"""
     month = month_to_date(month_key)
     return list(
-        db.scalars(
-            select(MonthlyVenueHourSummary).where(
+        db.execute(
+            select(MonthlyVenueHourSummary, Venue)
+            .join(Venue, MonthlyVenueHourSummary.venue_id == Venue.id)
+            .where(
                 MonthlyVenueHourSummary.month == month,
                 MonthlyVenueHourSummary.person_id == person_id,
             )
-        )
+        ).all()
     )
 
 
