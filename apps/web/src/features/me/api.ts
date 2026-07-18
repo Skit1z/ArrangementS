@@ -93,6 +93,10 @@ export const meApi = {
     (await api.post<AvailabilityRequest>("/me/availability-requests", { start_at, end_at, reason })).data,
   withdrawAvailabilityRequest: async (id: string) =>
     (await api.post(`/me/availability-requests/${id}/withdraw`)).data,
+
+  overtime: async () => (await api.get<any[]>("/me/overtime")).data,
+  createOvertime: async (venue_id: string, start_at: string, end_at: string, reason: string) =>
+    (await api.post<any>("/me/overtime", { venue_id, start_at, end_at, reason })).data,
 };
 
 export const STATUS_LABEL: Record<string, string> = {

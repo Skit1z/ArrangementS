@@ -14,6 +14,7 @@ const tabs = [
   { key: "/app/schedule", icon: <CalendarOutlined />, label: "排班" },
   { key: "/app/availability", icon: <StopOutlined />, label: "不可值班" },
   { key: "/app/swaps", icon: <SwapOutlined />, label: "换班" },
+  { key: "/app/overtime", icon: <ClockCircleOutlined />, label: "加班" },
   { key: "/app/hours", icon: <ClockCircleOutlined />, label: "工时" },
 ];
 

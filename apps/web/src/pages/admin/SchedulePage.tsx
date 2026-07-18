@@ -1,5 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Alert, Button, Card, DatePicker, Empty, Space, Spin, Tag } from "antd";
+import {
+  App,
+  Alert,
+  Button,
+  Card,
+  DatePicker,
+  Empty,
+  Form,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Spin,
+  Tag,
+} from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 
@@ -27,6 +41,7 @@ export default function SchedulePage() {
   const [board, setBoard] = useState<Board>({});
   const [baseline, setBaseline] = useState<Board>({});
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
+  const [creatingManual, setCreatingManual] = useState(false);
 
   const weekQuery = useQuery<WeekView>({
     queryKey: ["week", week],
@@ -96,9 +111,6 @@ export default function SchedulePage() {
     mutationFn: async () => (await api.post(`/schedule/weeks/${week}/validate`)).data as Conflict[],
     onSuccess: (d) => {
       setConflicts(d);
-      if (d.length) {
-        message.warning(`发现 ${d.length} 处冲突`);
-      }
     },
     onError: (e) => message.error(errorMessage(e)),
   });
@@ -112,6 +124,9 @@ export default function SchedulePage() {
         <Space wrap>
           <DatePicker picker="week" value={dayjs(week)} onChange={(d) => d && setWeek(mondayOf(d))} />
           <Button onClick={() => setWeek(mondayOf(dayjs()))}>本周</Button>
+          <Button onClick={() => setCreatingManual(true)} disabled={!data}>
+            新增临时班次
+          </Button>
           <Button onClick={() => generate.mutate()} loading={generate.isPending}>
             自动生成
           </Button>
@@ -141,6 +156,83 @@ export default function SchedulePage() {
           saving={save.isPending}
         />
       )}
+
+      {creatingManual && (
+        <ManualSlotModal
+          weekStart={week}
+          venues={venuesQuery.data ?? []}
+          onClose={() => setCreatingManual(false)}
+          onSuccess={() => {
+            setCreatingManual(false);
+            weekQuery.refetch();
+          }}
+        />
+      )}
     </Card>
+  );
+}
+
+function ManualSlotModal({
+  weekStart,
+  venues,
+  onClose,
+  onSuccess,
+}: {
+  weekStart: string;
+  venues: Venue[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { message } = App.useApp();
+  const [form] = Form.useForm();
+  
+  const createM = useMutation({
+    mutationFn: async (values: any) => {
+      const range = values.time_range;
+      return (await api.post("/admin/duty-slots/manual", {
+        venue_id: values.venue_id,
+        start_at: range[0].toISOString(),
+        end_at: range[1].toISOString(),
+        required_people: values.required_people,
+      })).data;
+    },
+    onSuccess: () => {
+      message.success("临时班次已创建");
+      onSuccess();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  return (
+    <Modal
+      title="新增临时班次"
+      open
+      onOk={form.submit}
+      onCancel={onClose}
+      confirmLoading={createM.isPending}
+      destroyOnClose
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={(values) => createM.mutate(values)}
+        initialValues={{ required_people: 1 }}
+      >
+        <Form.Item name="venue_id" label="场地" rules={[{ required: true }]}>
+          <Select
+            options={venues.map((v) => ({ label: v.name, value: v.id }))}
+          />
+        </Form.Item>
+        <Form.Item name="time_range" label="时间 (半小时为颗粒度)" rules={[{ required: true }]}>
+          <DatePicker.RangePicker
+            showTime={{ format: "HH:mm", minuteStep: 30 }}
+            format="YYYY-MM-DD HH:mm"
+          />
+        </Form.Item>
+        <Form.Item name="required_people" label="所需人数" rules={[{ required: true }]}>
+          <InputNumber min={1} />
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 }

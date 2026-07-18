@@ -353,6 +353,13 @@ export const adminApi = {
   timetables: {
     active: async () => (await api.get<ActiveTimetableOut[]>("/timetables/active")).data,
   },
+
+  // 加班审批
+  overtime: {
+    list: async () => (await api.get<any[]>("/admin/overtime")).data,
+    approve: async (id: string) => (await api.post(`/admin/overtime/${id}/approve`)).data,
+    reject: async (id: string) => (await api.post(`/admin/overtime/${id}/reject`)).data,
+  },
 };
 
 // --- 展示常量 ---

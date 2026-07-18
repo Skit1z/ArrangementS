@@ -8,13 +8,16 @@ import PeoplePage from "@/pages/admin/PeoplePage";
 import SchedulePage from "@/pages/admin/SchedulePage";
 import SettingsPage from "@/pages/admin/SettingsPage";
 import StatisticsPage from "@/pages/admin/StatisticsPage";
+import TasksPage from "@/pages/admin/TasksPage";
 import TimetablesPage from "@/pages/admin/TimetablesPage";
 import VenuesPage from "@/pages/admin/VenuesPage";
+import AdminOvertimePage from "@/pages/admin/AdminOvertimePage";
 import AvailabilityPage from "@/pages/user/AvailabilityPage";
 import HomePage from "@/pages/user/HomePage";
 import HoursPage from "@/pages/user/HoursPage";
 import MySchedulePage from "@/pages/user/MySchedulePage";
 import SwapsPage from "@/pages/user/SwapsPage";
+import OvertimePage from "@/pages/user/OvertimePage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -30,6 +33,8 @@ export const router = createBrowserRouter([
           { path: "people", element: <PeoplePage /> },
           { path: "timetables", element: <TimetablesPage /> },
           { path: "venues", element: <VenuesPage /> },
+          { path: "tasks", element: <TasksPage /> },
+          { path: "overtime", element: <AdminOvertimePage /> },
           { path: "statistics", element: <StatisticsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
@@ -48,6 +53,7 @@ export const router = createBrowserRouter([
           { path: "schedule", element: <MySchedulePage /> },
           { path: "availability", element: <AvailabilityPage /> },
           { path: "swaps", element: <SwapsPage /> },
+          { path: "overtime", element: <OvertimePage /> },
           { path: "hours", element: <HoursPage /> },
         ],
       },

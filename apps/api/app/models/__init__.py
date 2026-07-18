@@ -40,6 +40,7 @@ from app.models.statistics import (
     MonthlyVenueHourSummary,
 )
 from app.models.swap import SwapCandidate, SwapRequest
+from app.models.overtime import OvertimeRequest
 from app.models.semester import BuildingCodeRule, CoursePeriodRule, Semester
 from app.models.special_date import SpecialDate
 from app.models.timetable import CourseRule, TimetableUpload
@@ -74,6 +75,7 @@ __all__ = [
     "Assignment",
     "LeaveRequest",
     "SwapRequest",
+    "OvertimeRequest",
     "SwapCandidate",
     "MonthlyHourSummary",
     "MonthlyVenueHourSummary",

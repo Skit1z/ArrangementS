@@ -98,6 +98,7 @@ class PlanStatus(str, enum.Enum):
 class SlotSourceType(str, enum.Enum):
     fixed_shift = "fixed_shift"
     venue_task = "venue_task"
+    manual = "manual"
 
 
 class SlotStatus(str, enum.Enum):
