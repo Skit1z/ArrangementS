@@ -4,9 +4,11 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminLayout from "@/layouts/AdminLayout";
 import UserLayout from "@/layouts/UserLayout";
 import LoginPage from "@/pages/LoginPage";
-import Placeholder from "@/pages/Placeholder";
 import PeoplePage from "@/pages/admin/PeoplePage";
 import SchedulePage from "@/pages/admin/SchedulePage";
+import SettingsPage from "@/pages/admin/SettingsPage";
+import StatisticsPage from "@/pages/admin/StatisticsPage";
+import VenuesPage from "@/pages/admin/VenuesPage";
 import AvailabilityPage from "@/pages/user/AvailabilityPage";
 import HomePage from "@/pages/user/HomePage";
 import HoursPage from "@/pages/user/HoursPage";
@@ -25,9 +27,9 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/admin/schedule" replace /> },
           { path: "schedule", element: <SchedulePage /> },
           { path: "people", element: <PeoplePage /> },
-          { path: "venues", element: <Placeholder title="场地与任务" /> },
-          { path: "statistics", element: <Placeholder title="月度统计" /> },
-          { path: "settings", element: <Placeholder title="系统配置" /> },
+          { path: "venues", element: <VenuesPage /> },
+          { path: "statistics", element: <StatisticsPage /> },
+          { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],
