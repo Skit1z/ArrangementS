@@ -43,6 +43,12 @@ services:
       sh -c "alembic upgrade head &&
              python -m app.db.init_data &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   worker:
@@ -50,23 +56,33 @@ services:
       context: ../apps/api
     env_file: ../.env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
     volumes:
       - filestore:/var/app/files
-    # 阶段五接入 Celery 后替换为真实 worker 命令
-    command: ["sh", "-c", "echo 'worker placeholder' && tail -f /dev/null"]
+    # 周期任务：班次自动完成（每 5 分钟）、学期结束旧课表失效（每日 02:00 UTC）
+    command: ["python", "-m", "app.tasks.runner"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'app.tasks.runner' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
   caddy:
     image: caddy:2-alpine
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../apps/web/dist:/srv/web:ro
       - caddydata:/data
       - caddyconfig:/config
     restart: unless-stopped

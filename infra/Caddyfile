@@ -1,20 +1,24 @@
-# 生产将 :80 改为实际域名以启用自动 HTTPS
+# 生产将 :80 改为实际域名，Caddy 会自动签发 Let's Encrypt 证书启用 HTTPS。
+# 详见 docs/deployment.md。
+#
+# 开发本地：保留 :80，前端 dev server 走 5173（vite.config.ts 已 proxy /api）。
 :80 {
 	encode gzip
 
-	# 前端静态资源（阶段六接入构建产物后启用）
-	# handle {
-	# 	root * /srv/web
-	# 	try_files {path} /index.html
-	# 	file_server
-	# }
-
+	# API 与健康检查反向代理（路径更具体，Caddy 优先于 SPA 兜底）
 	handle /api/* {
 		reverse_proxy api:8000
 	}
 
 	handle /health {
 		reverse_proxy api:8000
+	}
+
+	# 前端 SPA 静态资源兜底（apps/web/dist 挂载到 /srv/web）
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
 	}
 
 	header {
