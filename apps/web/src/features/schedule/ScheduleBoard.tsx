@@ -318,7 +318,7 @@ export default function ScheduleBoard({
                         <th style={{ width: 56 }} />
                         {days.map((d) => (
                           <th key={d.format()} style={{ fontSize: 12, fontWeight: 500, minWidth: 140 }}>
-                            {d.format("MM-DD ddd")}
+                            {d.format("MM-DD")} 周{"日一二三四五六"[d.day()]}
                           </th>
                         ))}
                       </tr>

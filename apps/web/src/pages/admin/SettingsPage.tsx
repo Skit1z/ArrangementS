@@ -24,7 +24,6 @@ import { useState } from "react";
 import { errorMessage } from "@/api/client";
 import {
   adminApi,
-  type AuditLog,
   DAY_TYPE_LABEL,
   type DayType,
   type HolidaySyncItem,
@@ -41,17 +40,29 @@ import {
 
 export default function SettingsPage() {
   return (
-    <Card title="系统配置">
+    <Card 
+      title={<span style={{ fontSize: '20px', fontWeight: 600 }}>系统配置与参数设置</span>} 
+      bordered={false}
+      style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 12 }}
+    >
       <Tabs
         defaultActiveKey="multipliers"
+        size="large"
         items={[
           { key: "multipliers", label: "倍率规则", children: <MultipliersTab /> },
           { key: "special", label: "特殊日期", children: <SpecialDatesTab /> },
           { key: "semester", label: "学期设置", children: <SemesterTab /> },
           { key: "vacations", label: "寒暑假管理", children: <VacationsTab /> },
-          { key: "audit", label: "审计日志", children: <AuditTab /> },
+          { key: "course_time", label: "课程时间", children: <CourseTimeTab /> },
+          { key: "buildings", label: "教学楼映射", children: <BuildingMappingTab /> },
         ]}
       />
+      <div style={{ marginTop: 40, textAlign: 'center', color: '#8c8c8c', fontSize: '13px' }}>
+        <Space size="large">
+          <span>当前版本：v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0'}</span>
+          <span>构建时间：{typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '未记录'}</span>
+        </Space>
+      </div>
     </Card>
   );
 }
@@ -803,32 +814,22 @@ function VacationsTab() {
   );
 }
 
-// ============ 审计日志 Tab（只读）============
-function AuditTab() {
-  const { data, isLoading } = useQuery<AuditLog[]>({
-    queryKey: ["admin", "audit-logs"],
-    queryFn: () => adminApi.auditLogs.list(200),
-  });
-
+// ============ 课程时间 Tab（占位）============
+function CourseTimeTab() {
   return (
-    <Table<AuditLog>
-      rowKey="id"
-      loading={isLoading}
-      dataSource={data}
-      pagination={{ pageSize: 50 }}
-      columns={[
-        {
-          title: "时间",
-          dataIndex: "created_at",
-          width: 160,
-          render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm:ss"),
-        },
-        { title: "操作人", dataIndex: "actor_username", width: 100 },
-        { title: "动作", dataIndex: "action", width: 180 },
-        { title: "实体", dataIndex: "entity_type", width: 120 },
-        { title: "实体 ID", dataIndex: "entity_id", width: 160 },
-        { title: "原因", dataIndex: "reason" },
-      ]}
-    />
+    <div style={{ padding: '40px 0', textAlign: 'center', color: '#8c8c8c' }}>
+      <p style={{ fontSize: '16px' }}>课程时间设置功能正在开发中，将支持配置不同节次的具体时间段。</p>
+      <Button type="primary" disabled>新增课程时间规则</Button>
+    </div>
+  );
+}
+
+// ============ 教学楼映射 Tab（占位）============
+function BuildingMappingTab() {
+  return (
+    <div style={{ padding: '40px 0', textAlign: 'center', color: '#8c8c8c' }}>
+      <p style={{ fontSize: '16px' }}>教学楼代码映射配置功能正在开发中，将支持识别课表中的教室代码。</p>
+      <Button type="primary" disabled>新增教学楼映射</Button>
+    </div>
   );
 }
