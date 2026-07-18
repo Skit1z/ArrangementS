@@ -45,6 +45,16 @@ pnpm dev                          # http://localhost:5173，已代理 /api → :
 pnpm typecheck && pnpm test && pnpm build
 ```
 
+## 部署更新命令
+
+```bash
+# 前端有变更：本地 build 后 tar 推送到 1Panel 的网站目录
+cd apps/web && pnpm build
+tar -czvf web_dist.tar.gz -C dist .
+scp web_dist.tar.gz aliyun:/opt/1panel/www/sites/arrangements/
+ssh aliyun 'cd /opt/1panel/www/sites/arrangements && tar -xzvf web_dist.tar.gz -C . && rm web_dist.tar.gz'
+```
+
 ## 容器部署
 
 ```bash
