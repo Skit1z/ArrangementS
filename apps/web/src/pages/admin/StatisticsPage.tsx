@@ -16,7 +16,7 @@ import {
   Space,
   Spin,
   Statistic,
-  Switch,
+  Checkbox,
   Table,
   Tag,
 } from "antd";
