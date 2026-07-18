@@ -1,10 +1,8 @@
 #!/bin/sh
 # 数据库 + 文件存储 + 字段加密密钥 备份脚本。
 #
-# 用法（容器外）：
-#   docker compose exec api sh /app/infra/scripts/backup.sh
-# 或挂载后在宿主机（需本地有 pg_dump / tar）：
-#   sh infra/scripts/backup.sh
+# 用法（服务器外壳直接运行）：
+#   sh /opt/ArrangementS/infra/scripts/backup.sh
 #
 # 环境变量：
 #   DATABASE_URL           postgres 连接串（必填）

@@ -2,8 +2,8 @@
 # 从 backup.sh 产生的备份包恢复。
 #
 # 用法：
-#   sh infra/scripts/restore.sh <backup_tarball>   # 仅解包 + 还原 DB
-#   RESTORE_FILES=1 sh infra/scripts/restore.sh <backup_tarball>  # 同时还原文件存储
+#   sh /opt/ArrangementS/infra/scripts/restore.sh <backup_tarball>   # 仅解包 + 还原 DB
+#   RESTORE_FILES=1 sh /opt/ArrangementS/infra/scripts/restore.sh <backup_tarball>  # 同时还原文件存储
 #
 # 警告：恢复 DB 会覆盖现有数据。务必先停掉 api/worker，并在测试环境验证后再上生产。
 #

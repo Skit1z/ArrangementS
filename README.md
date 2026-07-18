@@ -9,13 +9,13 @@
 ```
 apps/api/     FastAPI 后端（SQLAlchemy 2 + Alembic + OR-Tools）
 apps/web/     React 前端（阶段六接入）
-infra/        Docker Compose / Caddy / 备份脚本
+infra/        Systemd 配置 / 备份脚本
 docs/         API / 数据库 / 验收文档
 ```
 
 ## 实施进度
 
-- [x] 阶段一 基础工程：认证/角色/审计、配置、数据库迁移体系、工时计算引擎、Docker Compose
+- [x] 阶段一 基础工程：认证/角色/审计、配置、数据库迁移体系、工时计算引擎、基础设施配置
 - [x] 阶段二 人员与学期：Excel 导入与账号生成、人员管理与自动排班名单、学期/课程时间/教学楼映射、假期与可值班白名单
 - [x] 阶段三 课表识别：周次表达解析、节次时间解析、课程规则→不可值班区间（含缓冲）、审核后生效、旧课表逻辑失效；PDF/OCR 抽取层已抽象（待样例接入）
 - [x] 阶段四 场地与任务：三场地/黄楼六班次初始化、临时任务(值班时间/同场地重叠/工时预览)、特殊日期与 holiday-cn 同步(待确认)、倍率规则 CRUD 与工时引擎接入、每日人数规则
@@ -55,30 +55,19 @@ scp web_dist.tar.gz aliyun:/opt/1panel/www/sites/arrangements/
 ssh aliyun 'cd /opt/1panel/www/sites/arrangements && tar -xzvf web_dist.tar.gz -C . && rm web_dist.tar.gz'
 ```
 
-## 容器部署
-
-```bash
-cp .env.example .env              # 生成并填入密钥（详见 docs/deployment.md）
-cd apps/web && pnpm install && pnpm build && cd ../..   # 构建前端
-cd infra
-docker compose up -d --build      # 自动执行 alembic 迁移 + 初始化默认 admin + 启动 worker
-```
-
-默认管理员：`admin` / `admin1234`（首次登录后请立即修改）。
-
 ### 周期任务
 
-`worker` 容器跑 `app.tasks.runner`（APScheduler 单进程）：
+服务器上的 `arrangements-worker` 进程运行 `app.tasks.runner`（APScheduler 单进程）：
 - 每 5 分钟：班次结束后自动置「已完成」（`auto_complete_after_end`）
 - 每日 02:00 UTC：学期结束后旧课表与不可值班区间失效，置学期为非当前
 
 ### 备份
 
 ```bash
-# 每日 cron（在 api 容器内跑）
-docker compose exec api sh /app/infra/scripts/backup.sh
+# 每日 cron（在系统上运行）
+sh /opt/ArrangementS/infra/scripts/backup.sh
 # 恢复
-RESTORE_FILES=1 sh infra/scripts/restore.sh infra/backup/backup_YYYYMMDD_HHMMSS.tar.gz
+RESTORE_FILES=1 sh /opt/ArrangementS/infra/scripts/restore.sh infra/backup/backup_YYYYMMDD_HHMMSS.tar.gz
 ```
 
 备份含 Postgres 转储、上传文件、**字段加密密钥**（离线妥善保管，无密钥则身份证/银行卡密文不可恢复）。详见 `docs/deployment.md`「备份与恢复」章节。
