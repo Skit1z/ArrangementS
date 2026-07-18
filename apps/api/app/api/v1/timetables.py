@@ -16,6 +16,7 @@ from app.schemas.timetable import (
     CourseRulePatch,
     TimetablePreviewOut,
     TimetableUploadIn,
+    ActiveTimetableOut,
 )
 from app.services import people_service, timetable_service
 from app.timetable.extractor import ManualEntryExtractor
@@ -57,6 +58,43 @@ def upload(
         review_status=up.review_status,
         rules=[CourseRuleOut.model_validate(r) for r in up.course_rules],
     )
+
+
+@router.get("/active", response_model=list[ActiveTimetableOut])
+def get_active(
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list[ActiveTimetableOut]:
+    from app.services import semester_service
+    from app.models.timetable import TimetableUpload
+    from app.models.person import PersonProfile
+    from app.models.enums import ReviewStatus
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    current_sem = semester_service.get_current(db)
+    if not current_sem:
+        return []
+
+    stmt = (
+        select(TimetableUpload, PersonProfile)
+        .join(PersonProfile, TimetableUpload.person_id == PersonProfile.id)
+        .where(
+            TimetableUpload.semester_id == current_sem.id,
+            TimetableUpload.review_status == ReviewStatus.approved,
+        )
+        .options(selectinload(TimetableUpload.course_rules))
+    )
+    results = db.execute(stmt).all()
+    
+    out = []
+    for up, person in results:
+        out.append(ActiveTimetableOut(
+            person_id=person.id,
+            person_name=person.full_name,
+            rules=[CourseRuleOut.model_validate(r) for r in up.course_rules],
+        ))
+    return out
 
 
 def _load_owned(db: Session, current: User, upload_id: uuid.UUID):

@@ -27,7 +27,16 @@ export default function PersonChip({ id, personId, label, color, compact }: Prop
         display: "inline-block",
       }}
     >
-      <Tag color={color} style={{ margin: 2, fontSize: compact ? 12 : 13 }}>
+      <Tag 
+        color={color} 
+        style={{ 
+          margin: 2, 
+          fontSize: compact ? 13 : 14, 
+          fontWeight: 600,
+          padding: compact ? "2px 8px" : "4px 12px",
+          borderRadius: 6,
+        }}
+      >
         {label}
       </Tag>
     </div>

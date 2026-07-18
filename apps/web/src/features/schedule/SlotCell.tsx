@@ -58,7 +58,7 @@ function Position({
           compact
         />
       ) : (
-        <span style={{ fontSize: 11, color: "#ff4d4f", paddingLeft: 4 }}>空缺</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#ff4d4f", paddingLeft: 4 }}>空缺</span>
       )}
     </div>
   );
@@ -66,9 +66,12 @@ function Position({
 
 export default function SlotCell(props: Props) {
   const { slot } = props;
-  const filled = Array.from({ length: slot.required_people }).filter(
-    (_, i) => props.board[posKey(slot.id, i)],
-  ).length;
+  const occupiedIndices = Object.keys(props.board)
+    .filter((k) => k.startsWith(slot.id + ":") && props.board[k] !== null)
+    .map((k) => parseInt(k.split(":")[1], 10));
+  const maxIndex = occupiedIndices.length > 0 ? Math.max(...occupiedIndices) : -1;
+  const renderCount = Math.max(slot.required_people, maxIndex + 2);
+  const filled = occupiedIndices.length;
 
   return (
     <div style={{ border: "1px solid #f0f0f0", borderRadius: 6, padding: 6, background: "#fff" }}>
@@ -81,7 +84,7 @@ export default function SlotCell(props: Props) {
           {filled}/{slot.required_people}
         </span>
       </div>
-      {Array.from({ length: slot.required_people }).map((_, i) => (
+      {Array.from({ length: renderCount }).map((_, i) => (
         <Position key={i} {...props} index={i} />
       ))}
     </div>

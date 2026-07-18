@@ -8,6 +8,7 @@ import PeoplePage from "@/pages/admin/PeoplePage";
 import SchedulePage from "@/pages/admin/SchedulePage";
 import SettingsPage from "@/pages/admin/SettingsPage";
 import StatisticsPage from "@/pages/admin/StatisticsPage";
+import TimetablesPage from "@/pages/admin/TimetablesPage";
 import VenuesPage from "@/pages/admin/VenuesPage";
 import AvailabilityPage from "@/pages/user/AvailabilityPage";
 import HomePage from "@/pages/user/HomePage";
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/admin/schedule" replace /> },
           { path: "schedule", element: <SchedulePage /> },
           { path: "people", element: <PeoplePage /> },
+          { path: "timetables", element: <TimetablesPage /> },
           { path: "venues", element: <VenuesPage /> },
           { path: "statistics", element: <StatisticsPage /> },
           { path: "settings", element: <SettingsPage /> },

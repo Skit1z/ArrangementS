@@ -65,3 +65,10 @@ class TimetablePreviewOut(BaseModel):
     rules: list[CourseRuleOut]
 
     model_config = {"from_attributes": True}
+
+class ActiveTimetableOut(BaseModel):
+    person_id: uuid.UUID
+    person_name: str
+    rules: list[CourseRuleOut]
+
+    model_config = {"from_attributes": True}

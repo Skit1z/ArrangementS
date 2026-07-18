@@ -348,6 +348,11 @@ export const adminApi = {
     disable: async (id: string) =>
       (await api.post(`/admin/vacations/${id}/disable`)).data,
   },
+
+  // 课表
+  timetables: {
+    active: async () => (await api.get<ActiveTimetableOut[]>("/timetables/active")).data,
+  },
 };
 
 // --- 展示常量 ---
@@ -387,3 +392,27 @@ export const MONTHLY_STATUS_LABEL: Record<string, string> = {
   confirmed: "已确认",
   locked: "已锁定",
 };
+
+// --- 课表 ---
+export interface CourseRuleOut {
+  id: string;
+  course_name: string | null;
+  weekday: number;
+  period_start: number;
+  period_end: number;
+  week_start: number | null;
+  week_end: number | null;
+  week_parity: string;
+  explicit_weeks: number[] | null;
+  location_code: string | null;
+  building_type: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  needs_review: boolean;
+}
+
+export interface ActiveTimetableOut {
+  person_id: string;
+  person_name: string;
+  rules: CourseRuleOut[];
+}

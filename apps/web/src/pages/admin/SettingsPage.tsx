@@ -54,7 +54,6 @@ export default function SettingsPage() {
           { key: "semester", label: "学期设置", children: <SemesterTab /> },
           { key: "vacations", label: "寒暑假管理", children: <VacationsTab /> },
           { key: "course_time", label: "课程时间", children: <CourseTimeTab /> },
-          { key: "buildings", label: "教学楼映射", children: <BuildingMappingTab /> },
         ]}
       />
       <div style={{ marginTop: 40, textAlign: 'center', color: '#8c8c8c', fontSize: '13px' }}>
@@ -820,16 +819,6 @@ function CourseTimeTab() {
     <div style={{ padding: '40px 0', textAlign: 'center', color: '#8c8c8c' }}>
       <p style={{ fontSize: '16px' }}>课程时间设置功能正在开发中，将支持配置不同节次的具体时间段。</p>
       <Button type="primary" disabled>新增课程时间规则</Button>
-    </div>
-  );
-}
-
-// ============ 教学楼映射 Tab（占位）============
-function BuildingMappingTab() {
-  return (
-    <div style={{ padding: '40px 0', textAlign: 'center', color: '#8c8c8c' }}>
-      <p style={{ fontSize: '16px' }}>教学楼代码映射配置功能正在开发中，将支持识别课表中的教室代码。</p>
-      <Button type="primary" disabled>新增教学楼映射</Button>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { useAuth } from "@/stores/auth";
 const items = [
   { key: "/admin/schedule", icon: <CalendarOutlined />, label: "排班" },
   { key: "/admin/people", icon: <TeamOutlined />, label: "人员" },
+  { key: "/admin/timetables", icon: <CalendarOutlined />, label: "全员课表" },
   { key: "/admin/venues", icon: <ShopOutlined />, label: "场地与任务" },
   { key: "/admin/statistics", icon: <AuditOutlined />, label: "统计" },
   { key: "/admin/settings", icon: <SettingOutlined />, label: "系统配置" },
