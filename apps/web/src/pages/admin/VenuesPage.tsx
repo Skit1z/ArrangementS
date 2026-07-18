@@ -123,6 +123,7 @@ function VenuesTab() {
         id: editing.id,
         patch: {
           name: values.name,
+          venue_type: values.venue_type,
           address: values.address,
           default_required_people: values.default_required_people,
           default_prep_minutes: values.default_prep_minutes,
@@ -214,7 +215,6 @@ function VenuesTab() {
           </Form.Item>
           <Form.Item name="venue_type" label="类型" rules={[{ required: true }]}>
             <Select
-              disabled={!!editing}
               options={[
                 { value: "fixed_shift", label: VENUE_TYPE_LABEL.fixed_shift },
                 { value: "event_based", label: VENUE_TYPE_LABEL.event_based },

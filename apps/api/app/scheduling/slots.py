@@ -36,7 +36,7 @@ def _active_vacation(db: Session, day: date) -> VacationPeriod | None:
 def generate_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
     """为周计划生成岗位。清空已有未锁定岗位后重建（锁定岗位保留）。"""
     slots: list[DutySlot] = []
-    slots.extend(_generate_yellow_slots(db, plan))
+    slots.extend(_generate_fixed_slots(db, plan))
     slots.extend(_generate_task_slots(db, plan))
     for s in slots:
         db.add(s)
@@ -44,44 +44,46 @@ def generate_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
     return slots
 
 
-def _generate_yellow_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
-    yellow = db.scalar(select(Venue).where(Venue.venue_type == VenueType.fixed_shift, Venue.is_active.is_(True)))
-    if yellow is None:
+def _generate_fixed_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
+    venues = list(db.scalars(select(Venue).where(Venue.venue_type == VenueType.fixed_shift, Venue.is_active.is_(True))))
+    if not venues:
         return []
-    templates = list(
-        db.scalars(
-            select(ShiftTemplate)
-            .where(ShiftTemplate.venue_id == yellow.id, ShiftTemplate.is_active.is_(True))
-            .order_by(ShiftTemplate.sort_order)
-        )
-    )
+    
     result: list[DutySlot] = []
-    for offset in range(7):
-        day = plan.week_start + timedelta(days=offset)
-        special = db.scalar(select(SpecialDate).where(SpecialDate.date == day))
-        vacation = _active_vacation(db, day)
-        day_templates, required_override = _templates_for_day(templates, vacation)
-        for tpl in day_templates:
-            required = (
-                required_override
-                if required_override is not None
-                else resolve_required_people(day, tpl, special)
+    for venue in venues:
+        templates = list(
+            db.scalars(
+                select(ShiftTemplate)
+                .where(ShiftTemplate.venue_id == venue.id, ShiftTemplate.is_active.is_(True))
+                .order_by(ShiftTemplate.sort_order)
             )
-            if required <= 0:
-                continue
-            result.append(
-                DutySlot(
-                    weekly_plan_id=plan.id,
-                    venue_id=yellow.id,
-                    source_type=SlotSourceType.fixed_shift,
-                    source_id=tpl.id,
+        )
+        for offset in range(7):
+            day = plan.week_start + timedelta(days=offset)
+            special = db.scalar(select(SpecialDate).where(SpecialDate.date == day))
+            vacation = _active_vacation(db, day)
+            day_templates, required_override = _templates_for_day(templates, vacation)
+            for tpl in day_templates:
+                required = (
+                    required_override
+                    if required_override is not None
+                    else resolve_required_people(day, tpl, special)
+                )
+                if required <= 0:
+                    continue
+                result.append(
+                    DutySlot(
+                        weekly_plan_id=plan.id,
+                        venue_id=venue.id,
+                        source_type=SlotSourceType.fixed_shift,
+                        source_id=tpl.id,
                         slot_start_at=datetime.combine(day, tpl.start_time, tzinfo=BEIJING_TZ),
                         slot_end_at=datetime.combine(day, tpl.end_time, tzinfo=BEIJING_TZ),
-                    required_people=required,
-                    credited_minutes=tpl.credited_minutes,
-                    month_key=month_key(day),
+                        required_people=required,
+                        credited_minutes=tpl.credited_minutes,
+                        month_key=month_key(day),
+                    )
                 )
-            )
     return result
 
 

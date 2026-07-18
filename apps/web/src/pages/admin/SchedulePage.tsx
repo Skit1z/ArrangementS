@@ -10,9 +10,9 @@ import {
   boardFromWeek,
   type Conflict,
   type DraftOperation,
-  type WeekPerson,
   type WeekView,
 } from "@/features/schedule/types";
+import { adminApi, type Venue } from "@/features/admin/api";
 
 function mondayOf(d: Dayjs): string {
   const day = d.day() === 0 ? 7 : d.day();
@@ -40,6 +40,11 @@ export default function SchedulePage() {
     enabled: !!weekQuery.data,
   });
 
+  const venuesQuery = useQuery<Venue[]>({
+    queryKey: ["admin", "venues"],
+    queryFn: adminApi.venues.list,
+  });
+
   // 服务端数据变化时重置棋盘与基线
   useEffect(() => {
     if (weekQuery.data) {
@@ -47,6 +52,9 @@ export default function SchedulePage() {
       setBoard(b);
       setBaseline(b);
       setConflicts([]);
+      if (weekQuery.data.slots.length > 0) {
+        checkConflicts.mutate();
+      }
     }
   }, [weekQuery.data]);
 
@@ -87,7 +95,9 @@ export default function SchedulePage() {
     mutationFn: async () => (await api.post(`/schedule/weeks/${week}/validate`)).data as Conflict[],
     onSuccess: (d) => {
       setConflicts(d);
-      message[d.length ? "warning" : "success"](d.length ? `发现 ${d.length} 处冲突` : "无冲突");
+      if (d.length) {
+        message.warning(`发现 ${d.length} 处冲突`);
+      }
     },
     onError: (e) => message.error(errorMessage(e)),
   });
@@ -103,9 +113,6 @@ export default function SchedulePage() {
           <Button onClick={() => setWeek(mondayOf(dayjs()))}>本周</Button>
           <Button onClick={() => generate.mutate()} loading={generate.isPending}>
             自动生成
-          </Button>
-          <Button onClick={() => checkConflicts.mutate()} loading={checkConflicts.isPending}>
-            冲突检查
           </Button>
           <Button type="primary" onClick={() => publish.mutate()} loading={publish.isPending} disabled={!data}>
             发布
@@ -124,6 +131,7 @@ export default function SchedulePage() {
         <ScheduleBoard
           week={data}
           people={peopleQuery.data ?? []}
+          venues={venuesQuery.data ?? []}
           baseline={baseline}
           board={board}
           setBoard={setBoard}

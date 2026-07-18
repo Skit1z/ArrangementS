@@ -25,6 +25,7 @@ class VenueCreate(BaseModel):
 
 class VenueUpdate(BaseModel):
     name: str | None = None
+    venue_type: VenueType | None = None
     address: str | None = None
     default_required_people: int | None = None
     default_prep_minutes: int | None = None

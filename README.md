@@ -72,3 +72,11 @@ RESTORE_FILES=1 sh infra/scripts/restore.sh infra/backup/backup_YYYYMMDD_HHMMSS.
 ```
 
 备份含 Postgres 转储、上传文件、**字段加密密钥**（离线妥善保管，无密钥则身份证/银行卡密文不可恢复）。详见 `docs/deployment.md`「备份与恢复」章节。
+
+### 部署更新命令
+```bash
+ssh aliyun 'cd /opt/ArrangementS && git pull'
+# 若有新迁移,api 重启会自动跑 alembic upgrade
+ssh aliyun 'systemctl restart arrangements-api arrangements-worker'
+# 前端有变更:本地 build 后 tar 推送
+```

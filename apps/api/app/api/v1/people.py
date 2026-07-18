@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -47,6 +47,25 @@ def get_person(
     person_id: uuid.UUID, _: User = Depends(require_admin), db: Session = Depends(get_db)
 ) -> PersonOut:
     return PersonOut.from_profile(people_service.get_person(db, person_id))
+
+
+@router.get("/import/template")
+def download_import_template(_: User = Depends(require_admin)) -> Response:
+    import io
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["学号", "班级", "姓名", "手机号", "困难等级", "身份证号", "银行卡号"])
+    ws.append(["2023000001", "计科2301", "张三", "13800138000", "A", "110105200001011234", "6222021001112222"])
+    
+    bio = io.BytesIO()
+    wb.save(bio)
+    return Response(
+        content=bio.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="import_template.xlsx"'},
+    )
+
 
 
 @router.post("/import/preview", response_model=ImportPreviewOut)

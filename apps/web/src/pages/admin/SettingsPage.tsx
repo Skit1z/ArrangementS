@@ -33,8 +33,11 @@ import {
   type Semester,
   type SemesterCreate,
   type SemesterUpdate,
+  type SemesterUpdate,
   type SpecialDate,
   type SpecialDateIn,
+  type Vacation,
+  type VacationCreate,
 } from "@/features/admin/api";
 
 export default function SettingsPage() {
@@ -46,6 +49,7 @@ export default function SettingsPage() {
           { key: "multipliers", label: "倍率规则", children: <MultipliersTab /> },
           { key: "special", label: "特殊日期", children: <SpecialDatesTab /> },
           { key: "semester", label: "学期设置", children: <SemesterTab /> },
+          { key: "vacations", label: "寒暑假管理", children: <VacationsTab /> },
           { key: "audit", label: "审计日志", children: <AuditTab /> },
         ]}
       />
@@ -664,6 +668,134 @@ function SemesterTab() {
             <Checkbox>启用（课表时间前后加缓冲分钟）</Checkbox>
           </Form.Item>
           <Form.Item name="course_buffer_minutes" label="缓冲分钟">
+            <InputNumber min={0} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  );
+}
+
+// ============ 寒暑假管理 Tab ============
+function VacationsTab() {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<Vacation[]>({
+    queryKey: ["admin", "vacations"],
+    queryFn: adminApi.vacations.list,
+  });
+  const semestersQ = useQuery({
+    queryKey: ["admin", "semesters"],
+    queryFn: adminApi.semesters.list,
+  });
+
+  const [creating, setCreating] = useState(false);
+  const [form] = Form.useForm();
+  
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "vacations"] });
+
+  const createM = useMutation({
+    mutationFn: (v: VacationCreate) => adminApi.vacations.create(v),
+    onSuccess: () => {
+      message.success("寒暑假已创建");
+      setCreating(false);
+      form.resetFields();
+      invalidate();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const disableM = useMutation({
+    mutationFn: (id: string) => adminApi.vacations.disable(id),
+    onSuccess: () => {
+      message.success("寒暑假已停用");
+      invalidate();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const openCreate = () => {
+    form.resetFields();
+    setCreating(true);
+  };
+
+  const submit = async () => {
+    const v = await form.validateFields();
+    createM.mutate({
+      name: v.name,
+      start_date: v.dateRange[0].format("YYYY-MM-DD"),
+      end_date: v.dateRange[1].format("YYYY-MM-DD"),
+      semester_id: v.semester_id,
+      required_people: v.required_people,
+    });
+  };
+
+  return (
+    <>
+      <div style={{ marginBottom: 12 }}>
+        <Button type="primary" onClick={openCreate}>
+          新增寒暑假
+        </Button>
+      </div>
+      <Table<Vacation>
+        rowKey="id"
+        loading={isLoading}
+        dataSource={data}
+        pagination={false}
+        columns={[
+          { title: "名称", dataIndex: "name" },
+          { title: "开始日期", dataIndex: "start_date" },
+          { title: "结束日期", dataIndex: "end_date" },
+          {
+            title: "学期",
+            dataIndex: "semester_id",
+            render: (id) => semestersQ.data?.find((s) => s.id === id)?.name ?? id,
+          },
+          {
+            title: "状态",
+            dataIndex: "is_active",
+            width: 80,
+            render: (v: boolean) => (v ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>),
+          },
+          {
+            title: "操作",
+            width: 120,
+            render: (_, r) => (
+              <Space>
+                {r.is_active && (
+                  <Popconfirm title="确认停用？" onConfirm={() => disableM.mutate(r.id)}>
+                    <Button size="small" danger>
+                      停用
+                    </Button>
+                  </Popconfirm>
+                )}
+              </Space>
+            ),
+          },
+        ]}
+      />
+
+      <Modal
+        title="新增寒暑假"
+        open={creating}
+        onOk={submit}
+        onCancel={() => setCreating(false)}
+        confirmLoading={createM.isPending}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item name="name" label="名称" rules={[{ required: true }]}>
+            <Input placeholder="如 2026 寒假" />
+          </Form.Item>
+          <Form.Item name="dateRange" label="起止日期" rules={[{ required: true }]}>
+            <DatePicker.RangePicker format="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="semester_id" label="关联学期" rules={[{ required: true }]}>
+            <Select
+              options={(semestersQ.data ?? []).map((s) => ({ value: s.id, label: s.name }))}
+            />
+          </Form.Item>
+          <Form.Item name="required_people" label="默认需求人数">
             <InputNumber min={0} />
           </Form.Item>
         </Form>

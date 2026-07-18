@@ -27,9 +27,9 @@ import {
   parsePosKey,
   type PositionKey,
   type SlotView,
-  type WeekPerson,
   type WeekView,
 } from "./types";
+import { type Venue } from "@/features/admin/api";
 
 const MAX_HISTORY = 50;
 
@@ -47,6 +47,7 @@ const collisionDetection: CollisionDetection = (args) => {
 interface Props {
   week: WeekView;
   people: WeekPerson[];
+  venues: Venue[];
   baseline: Board;
   board: Board;
   setBoard: (b: Board) => void;
@@ -58,6 +59,7 @@ interface Props {
 export default function ScheduleBoard({
   week,
   people,
+  venues,
   baseline,
   board,
   setBoard,
@@ -96,20 +98,18 @@ export default function ScheduleBoard({
     [conflicts],
   );
 
-  const yellowSlots = week.slots.filter((s) => s.source_type === "fixed_shift");
+  const fixedSlots = week.slots.filter((s) => s.source_type === "fixed_shift");
   const taskSlots = week.slots.filter((s) => s.source_type === "venue_task");
+
+  const fixedVenues = useMemo(() => {
+    const venueIds = new Set(fixedSlots.map(s => s.venue_id));
+    return venues.filter(v => venueIds.has(v.id));
+  }, [fixedSlots, venues]);
 
   const days = useMemo(() => {
     const start = dayjs(week.week_start);
     return Array.from({ length: 7 }, (_, i) => start.add(i, "day"));
   }, [week.week_start]);
-
-  const shiftRows = useMemo(() => {
-    const times = Array.from(
-      new Set(yellowSlots.map((s) => dayjs(s.slot_start_at).format("HH:mm"))),
-    );
-    return times.sort();
-  }, [yellowSlots]);
 
   function pushHistory(next: Board) {
     history.current.push(board);
@@ -305,50 +305,56 @@ export default function ScheduleBoard({
 
       <Row gutter={12}>
         <Col flex="auto">
-          <Card size="small" title="黄楼" style={{ marginBottom: 12 }}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 1100 }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 56 }} />
-                    {days.map((d) => (
-                      <th key={d.format()} style={{ fontSize: 12, fontWeight: 500, minWidth: 140 }}>
-                        {d.format("MM-DD ddd")}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {shiftRows.map((t) => (
-                    <tr key={t}>
-                      <td style={{ fontSize: 11, color: "#888" }}>{t}</td>
-                      {days.map((d) => {
-                        const slot = yellowSlots.find(
-                          (s) =>
-                            dayjs(s.slot_start_at).format("YYYY-MM-DD") === d.format("YYYY-MM-DD") &&
-                            dayjs(s.slot_start_at).format("HH:mm") === t,
-                        );
-                        return (
-                          <td key={d.format() + t} style={{ verticalAlign: "top" }}>
-                            {slot ? (
-                              <SlotCell
-                                slot={slot}
-                                board={board}
-                                activeVerdict={activeVerdict}
-                                conflictKeys={conflictKeys}
-                              />
-                            ) : (
-                              <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          {fixedVenues.map((venue) => {
+            const vSlots = fixedSlots.filter(s => s.venue_id === venue.id);
+            const times = Array.from(new Set(vSlots.map(s => dayjs(s.slot_start_at).format("HH:mm")))).sort();
+            return (
+              <Card key={venue.id} size="small" title={venue.name} style={{ marginBottom: 12 }}>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 1100 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: 56 }} />
+                        {days.map((d) => (
+                          <th key={d.format()} style={{ fontSize: 12, fontWeight: 500, minWidth: 140 }}>
+                            {d.format("MM-DD ddd")}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {times.map((t) => (
+                        <tr key={t}>
+                          <td style={{ fontSize: 11, color: "#888" }}>{t}</td>
+                          {days.map((d) => {
+                            const slot = vSlots.find(
+                              (s) =>
+                                dayjs(s.slot_start_at).format("YYYY-MM-DD") === d.format("YYYY-MM-DD") &&
+                                dayjs(s.slot_start_at).format("HH:mm") === t,
+                            );
+                            return (
+                              <td key={d.format() + t} style={{ verticalAlign: "top" }}>
+                                {slot ? (
+                                  <SlotCell
+                                    slot={slot}
+                                    board={board}
+                                    activeVerdict={activeVerdict}
+                                    conflictKeys={conflictKeys}
+                                  />
+                                ) : (
+                                  <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            );
+          })}
 
           {taskSlots.length > 0 && (
             <Card size="small" title="场地任务（蓝厅 / 图书馆报告厅）">

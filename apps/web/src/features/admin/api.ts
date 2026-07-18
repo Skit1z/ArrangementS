@@ -236,6 +236,25 @@ export interface SemesterUpdate {
   course_buffer_minutes?: number;
 }
 
+// --- 寒暑假 ---
+export interface Vacation {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  semester_id: string;
+  is_active: boolean;
+}
+
+export interface VacationCreate {
+  name: string;
+  start_date: string;
+  end_date: string;
+  semester_id: string;
+  yellow_shift_template_ids?: string[];
+  required_people?: number;
+}
+
 export const adminApi = {
   // 场地
   venues: {
@@ -319,6 +338,15 @@ export const adminApi = {
       (await api.patch<Semester>(`/semesters/${id}`, payload)).data,
     activate: async (id: string) =>
       (await api.post<Semester>(`/semesters/${id}/activate`)).data,
+  },
+
+  // 假期
+  vacations: {
+    list: async () => (await api.get<Vacation[]>("/admin/vacations")).data,
+    create: async (payload: VacationCreate) =>
+      (await api.post<Vacation>("/admin/vacations", payload)).data,
+    disable: async (id: string) =>
+      (await api.post(`/admin/vacations/${id}/disable`)).data,
   },
 };
 
