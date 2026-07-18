@@ -10,6 +10,7 @@ import {
   boardFromWeek,
   type Conflict,
   type DraftOperation,
+  type WeekPerson,
   type WeekView,
 } from "@/features/schedule/types";
 import { adminApi, type Venue } from "@/features/admin/api";

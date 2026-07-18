@@ -80,7 +80,6 @@ export default function PeoplePage() {
 function ImportModal({ onClose }: { onClose: () => void }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
-  const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
 
   const previewM = useMutation({
@@ -110,7 +109,6 @@ function ImportModal({ onClose }: { onClose: () => void }) {
   });
 
   const handleUpload = (f: File) => {
-    setFile(f);
     previewM.mutate(f);
     return false;
   };

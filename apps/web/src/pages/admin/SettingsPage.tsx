@@ -33,7 +33,6 @@ import {
   type Semester,
   type SemesterCreate,
   type SemesterUpdate,
-  type SemesterUpdate,
   type SpecialDate,
   type SpecialDateIn,
   type Vacation,

@@ -27,6 +27,7 @@ import {
   parsePosKey,
   type PositionKey,
   type SlotView,
+  type WeekPerson,
   type WeekView,
 } from "./types";
 import { type Venue } from "@/features/admin/api";
