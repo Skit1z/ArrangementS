@@ -75,7 +75,7 @@ export default function PersonDrawer({ people, focusSlotId }: Props) {
         return (
           <div key={p.person_id} style={{ marginBottom: 4 }}>
             <Tooltip
-              title={`${p.class_name} · 当月平衡 ${hours(p.month_balance_minutes)}h · 本周 ${p.week_shift_count} 班${
+              title={`${p.class_name} · 本周 ${p.week_shift_count} 班${
                 unavailable ? " · 该岗位不可用" : ""
               }${p.in_scheduling_pool ? "" : " · 未参与自动排班"}`}
             >

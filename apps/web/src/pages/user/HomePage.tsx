@@ -51,7 +51,6 @@ export default function HomePage() {
         ) : (
           <div style={{ display: "flex", gap: 24 }}>
             <Statistic title="实际完成" value={hoursOf(hours.data?.completed_minutes ?? 0)} suffix="h" />
-            <Statistic title="排班平衡" value={hoursOf(hours.data?.balance_minutes ?? 0)} suffix="h" />
           </div>
         )}
       </Card>

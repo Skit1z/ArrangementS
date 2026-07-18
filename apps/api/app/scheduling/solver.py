@@ -37,7 +37,7 @@ class SolverInput:
     history_minutes: dict[str, int] = field(default_factory=dict)  # person -> 当月历史平衡工时
     allow_vacancy: bool = True
     seed: int = 42
-    max_time_seconds: float = 30.0
+    max_time_seconds: float = 10.0
 
 
 @dataclass

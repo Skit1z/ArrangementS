@@ -29,7 +29,6 @@ export default function HoursPage() {
         ) : (
           <div style={{ display: "flex", gap: 32 }}>
             <Statistic title="实际完成工时" value={hoursOf(d?.completed_minutes ?? 0)} suffix="h" />
-            <Statistic title="排班平衡工时" value={hoursOf(d?.balance_minutes ?? 0)} suffix="h" />
             <Statistic title="倍率增加" value={hoursOf(d?.multiplier_extra_minutes ?? 0)} suffix="h" />
           </div>
         )}

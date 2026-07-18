@@ -107,7 +107,6 @@ export default function StatisticsPage() {
       {data.length > 0 && (
         <Space size="large" style={{ marginBottom: 16 }}>
           <Statistic title="全员完成工时" value={hoursOf(totals.completed)} suffix="h" />
-          <Statistic title="全员平衡工时" value={hoursOf(totals.balance)} suffix="h" />
           <Statistic title="全员倍率增加" value={hoursOf(totals.extra)} suffix="h" />
           <Statistic title="人员数" value={data.length} />
         </Space>
@@ -126,12 +125,6 @@ export default function StatisticsPage() {
           {
             title: "完成(h)",
             dataIndex: "completed_minutes",
-            width: 90,
-            render: (v: number) => hoursOf(v),
-          },
-          {
-            title: "平衡(h)",
-            dataIndex: "balance_minutes",
             width: 90,
             render: (v: number) => hoursOf(v),
           },
@@ -239,8 +232,8 @@ function AdjustModal({
         >
           <InputNumber />
         </Form.Item>
-        <Form.Item name="affect_balance" label="同时影响排班平衡工时" valuePropName="checked">
-          <Switch />
+        <Form.Item name="affect_balance" valuePropName="checked" hidden>
+          <Checkbox>同时影响排班平衡工时</Checkbox>
         </Form.Item>
         <Form.Item name="reason" label="原因" rules={[{ required: true }]}>
           <Input.TextArea rows={2} placeholder="如：补录、误录修正" />
@@ -277,7 +270,6 @@ function DetailDrawer({
         <>
           <Descriptions column={2} size="small" bordered style={{ marginBottom: 16 }}>
             <Descriptions.Item label="完成工时">{hoursOf(data.completed_minutes)}h</Descriptions.Item>
-            <Descriptions.Item label="平衡工时">{hoursOf(data.balance_minutes)}h</Descriptions.Item>
             <Descriptions.Item label="倍率增加">{hoursOf(data.multiplier_extra_minutes)}h</Descriptions.Item>
             <Descriptions.Item label="状态">
               {MONTHLY_STATUS_LABEL[data.status] ?? data.status}
@@ -299,11 +291,6 @@ function DetailDrawer({
                 {
                   title: "完成(h)",
                   dataIndex: "completed_minutes",
-                  render: (v: number) => hoursOf(v),
-                },
-                {
-                  title: "平衡(h)",
-                  dataIndex: "balance_minutes",
                   render: (v: number) => hoursOf(v),
                 },
               ]}
