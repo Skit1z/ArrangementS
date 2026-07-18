@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.Column("end_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("reason", sa.String(500), nullable=False),
         # use the existing request_status enum
-        sa.Column("status", sa.Enum(name="request_status"), nullable=False, server_default="pending"),
+        sa.Column("status", sa.Enum(name="request_status", create_type=False), nullable=False, server_default="pending"),
         sa.Column("reviewed_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("generated_slot_id", sa.Uuid(), sa.ForeignKey("duty_slots.id", ondelete="SET NULL"), nullable=True),
