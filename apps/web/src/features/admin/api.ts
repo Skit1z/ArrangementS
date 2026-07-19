@@ -283,6 +283,8 @@ export const adminApi = {
     cancel: async (id: string) => (await api.post(`/venue-tasks/${id}/cancel`)).data,
     transition: async (id: string, targetStatus: string) =>
       (await api.post<TaskListItem>(`/venue-tasks/${id}/transition`, { target_status: targetStatus })).data,
+    addToPlan: async (id: string) =>
+      (await api.post<{ message: string }>(`/venue-tasks/${id}/add-to-plan`)).data,
     previewHours: async (id: string) =>
       (await api.get<TaskHoursPreview>(`/venue-tasks/${id}/hours-preview`)).data,
   },

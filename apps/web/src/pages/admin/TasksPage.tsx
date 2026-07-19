@@ -91,6 +91,15 @@ export default function TasksPage() {
     onError: (e) => message.error(errorMessage(e)),
   });
 
+  const addToPlanM = useMutation({
+    mutationFn: (id: string) => adminApi.tasks.addToPlan(id),
+    onSuccess: (data) => {
+      message.success(data.message);
+      qc.invalidateQueries({ queryKey: ["admin", "tasks"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
   // 编辑：复用 create form，按任务填充初值后切换到 update 模式
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -251,6 +260,16 @@ export default function TasksPage() {
                   >
                     <Button size="small" type="primary" ghost loading={transitionM.isPending}>
                       → {TASK_STATUS_LABEL[NEXT_STATUS[r.status as keyof typeof NEXT_STATUS] as keyof typeof TASK_STATUS_LABEL]}
+                    </Button>
+                  </Popconfirm>
+                )}
+                {(r.status === "confirmed" || r.status === "scheduled") && (
+                  <Popconfirm
+                    title="把这个任务加入本周排班（创建空缺岗位）？"
+                    onConfirm={() => addToPlanM.mutate(r.id)}
+                  >
+                    <Button size="small" loading={addToPlanM.isPending}>
+                      加入排班
                     </Button>
                   </Popconfirm>
                 )}

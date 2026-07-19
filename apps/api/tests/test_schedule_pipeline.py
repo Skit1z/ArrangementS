@@ -153,3 +153,100 @@ def test_reproducible_generate(db_session):
         for a in db_session.scalars(select(Assignment)) if a.person_id
     }
     assert set(first.values()) == set(second.values())
+
+
+# --- 增量排班：把新任务追加到已发布的当前周计划 ---
+def test_add_task_to_published_plan_creates_slot_and_vacant_assignments(db_session):
+    """已发布周计划创建后，再创建一个当天任务，调用增量服务应：
+    1) 在已发布计划上新增 DutySlot
+    2) 创建 required_people 个空缺 assignment（不破坏现有排班）
+    3) 提升已发布计划修订号
+    """
+    from datetime import timedelta, timezone
+    from app.models.enums import (
+        PlanAssignmentStatus,
+        SlotSourceType,
+        SlotStatus,
+        TaskStatus,
+    )
+    from app.models.venue_task import VenueTask
+    from app.services import schedule_service, task_service
+
+    # 场地：1 个固定班次 + 1 个事件场地
+    _yellow(db_session)
+    event_v = Venue(name="蓝厅", code="LT", venue_type=VenueType.event_based, default_required_people=2)
+    db_session.add(event_v); db_session.flush()
+    _person(db_session, 0); _person(db_session, 1)
+    db_session.commit()
+
+    # 生成并发布本周计划
+    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    plan = db_session.scalars(select(__import__("app.models.schedule", fromlist=["WeeklyPlan"]).WeeklyPlan)).first()
+    initial_revision = plan.revision
+    schedule_service.publish(db_session, MONDAY, actor_id=None)
+    db_session.commit()
+    initial_slot_count = len(list(db_session.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))))
+
+    # 创建一个属于本周三的任务
+    wed = datetime.combine(MONDAY + timedelta(days=2), time(14, 0), tzinfo=timezone.utc)
+    task = task_service.create_task(
+        db_session, venue_id=event_v.id, title="讲座",
+        booking_start_at=wed, booking_end_at=wed + timedelta(hours=2),
+    )
+    task_service.transition_task(db_session, task.id, TaskStatus.confirmed)  # 进排班池
+    db_session.commit()
+
+    # 增量追加
+    schedule_service.add_task_to_plan(db_session, task.id)
+    db_session.commit()
+
+    # 验证：新增了 1 个 venue_task slot
+    new_slots = list(db_session.scalars(select(DutySlot).where(
+        DutySlot.weekly_plan_id == plan.id,
+        DutySlot.source_type == SlotSourceType.venue_task,
+    )))
+    assert len(new_slots) == 1
+    assert new_slots[0].source_id == task.id
+
+    # 验证：创建了 required_people(=2) 个空缺 assignment
+    vacant_assignments = list(db_session.scalars(select(Assignment).where(
+        Assignment.duty_slot_id == new_slots[0].id,
+    )))
+    assert len(vacant_assignments) == 2
+    assert all(a.plan_status == PlanAssignmentStatus.vacant for a in vacant_assignments)
+    assert all(a.person_id is None for a in vacant_assignments)
+
+    # 验证：修订号提升（已发布计划的修改）
+    db_session.refresh(plan)
+    assert plan.revision == initial_revision + 1
+
+
+def test_add_task_to_draft_plan_no_revision_bump(db_session):
+    """草稿计划追加任务时不提升修订号（还没发布）。"""
+    from datetime import timedelta, timezone
+    from app.models.enums import SlotSourceType, TaskStatus
+    from app.models.venue_task import VenueTask
+    from app.models.schedule import WeeklyPlan
+    from app.services import schedule_service, task_service
+
+    event_v = Venue(name="蓝厅", code="LT", venue_type=VenueType.event_based, default_required_people=2)
+    db_session.add(event_v); db_session.flush()
+    db_session.commit()
+
+    # 直接造一个草稿计划
+    plan = WeeklyPlan(week_start=MONDAY, week_end=MONDAY + timedelta(days=6), revision=1, status=__import__("app.models.enums", fromlist=["PlanStatus"]).PlanStatus.draft)
+    db_session.add(plan); db_session.flush()
+
+    wed = datetime.combine(MONDAY + timedelta(days=2), time(14, 0), tzinfo=timezone.utc)
+    task = task_service.create_task(
+        db_session, venue_id=event_v.id, title="讲座",
+        booking_start_at=wed, booking_end_at=wed + timedelta(hours=2),
+    )
+    task_service.transition_task(db_session, task.id, TaskStatus.confirmed)
+    db_session.commit()
+
+    initial_revision = plan.revision
+    schedule_service.add_task_to_plan(db_session, task.id)
+    db_session.commit()
+    db_session.refresh(plan)
+    assert plan.revision == initial_revision  # 草稿不提升

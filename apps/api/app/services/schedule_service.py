@@ -163,7 +163,7 @@ def unpublish(db: Session, week_start: date, actor_id: uuid.UUID | None) -> Week
         raise HTTPException(status_code=404, detail="周计划不存在")
     if plan.status != PlanStatus.published:
         raise HTTPException(status_code=400, detail="周计划尚未发布或已是草稿状态")
-    
+
     plan.status = PlanStatus.draft
     db.flush()
     record_audit(
@@ -172,6 +172,88 @@ def unpublish(db: Session, week_start: date, actor_id: uuid.UUID | None) -> Week
         after_data={"revision": plan.revision},
     )
     return plan
+
+
+def add_task_to_plan(db: Session, task_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> DutySlot:
+    """把一个已确认的 VenueTask 增量追加到其所在周的周计划（不论已发布或草稿）。
+
+    场景：周计划已发布后，admin 又创建/确认了一个当天任务，调用本函数会在不破坏
+    现有排班的前提下新增 DutySlot，并为其每个 required_people 岗位创建空缺 assignment。
+    admin 随后可手动把人拖上去（draft_service.apply_operations）。
+
+    若计划已发布，会提升修订号以触发前端刷新。若该任务在此周已有 slot（重复调用），抛 409。
+    """
+    from app.models.enums import (
+        AssignmentSource,
+        ExecutionStatus,
+        PlanAssignmentStatus,
+        SlotSourceType,
+        SlotStatus,
+        TaskStatus,
+    )
+    from app.models.venue_task import VenueTask
+    from app.scheduling.slots import BEIJING_TZ, month_key
+
+    task = db.get(VenueTask, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if task.status not in (
+        TaskStatus.confirmed, TaskStatus.scheduled, TaskStatus.executing, TaskStatus.completed
+    ):
+        raise HTTPException(status_code=422, detail=f"任务状态「{task.status.value}」不可加入排班")
+
+    # 定位所在周（基于 duty_start_at 的北京时间日期）
+    duty_local = task.duty_start_at.astimezone(BEIJING_TZ) if task.duty_start_at.tzinfo else task.duty_start_at
+    week_start = duty_local.date() - timedelta(days=duty_local.weekday())
+    plan, _created = _get_or_create_plan(db, week_start)
+
+    # 防重复
+    exists = db.scalar(
+        select(DutySlot.id).where(
+            DutySlot.weekly_plan_id == plan.id,
+            DutySlot.source_type == SlotSourceType.venue_task,
+            DutySlot.source_id == task.id,
+        )
+    )
+    if exists:
+        raise HTTPException(status_code=409, detail="该任务已在此周计划中")
+
+    slot = DutySlot(
+        weekly_plan_id=plan.id,
+        venue_id=task.venue_id,
+        source_type=SlotSourceType.venue_task,
+        source_id=task.id,
+        slot_start_at=task.duty_start_at,
+        slot_end_at=task.duty_end_at,
+        required_people=task.required_people,
+        credited_minutes=0,  # 任务工时按倍率逐人计算，落到 assignment
+        month_key=month_key(duty_local.date()),
+        status=SlotStatus.open,
+    )
+    db.add(slot)
+    db.flush()
+
+    for pidx in range(task.required_people):
+        db.add(Assignment(
+            duty_slot_id=slot.id, person_id=None, position_index=pidx,
+            assignment_source=AssignmentSource.auto,
+            plan_status=PlanAssignmentStatus.vacant,
+            execution_status=ExecutionStatus.pending,
+            raw_minutes=0, weighted_minutes_before_round=Decimal(0),
+            credited_minutes=0, balance_minutes=0, created_by=actor_id,
+        ))
+
+    was_published = plan.status == PlanStatus.published
+    if was_published:
+        plan.revision += 1
+
+    db.flush()
+    record_audit(
+        db, actor_user_id=actor_id, action="schedule.add_task",
+        entity_type="weekly_plan", entity_id=plan.id,
+        after_data={"task_id": str(task.id), "slot_id": str(slot.id), "published": was_published},
+    )
+    return slot
 
 
 def get_plan(db: Session, week_start: date) -> WeeklyPlan:

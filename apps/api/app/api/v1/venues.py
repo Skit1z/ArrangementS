@@ -158,6 +158,19 @@ def transition_task(
     return task
 
 
+@router.post("/venue-tasks/{task_id}/add-to-plan", response_model=MessageOut)
+def add_task_to_plan(
+    task_id: uuid.UUID,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> MessageOut:
+    """把已确认任务增量追加到其所在周的周计划（创建 DutySlot + 空缺岗位）。"""
+    from app.services import schedule_service
+    schedule_service.add_task_to_plan(db, task_id, actor_id=actor.id)
+    db.commit()
+    return MessageOut(message="任务已加入周排班（请到排班页拖拽分配人员）")
+
+
 @router.get("/venue-tasks/{task_id}/hours-preview")
 def task_hours_preview(task_id: uuid.UUID, _: User = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
     task = task_service.get_task(db, task_id)
