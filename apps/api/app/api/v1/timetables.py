@@ -72,7 +72,7 @@ def get_active(
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
 
-    current_sem = semester_service.get_current(db)
+    current_sem = semester_service.get_current_semester(db)
     if not current_sem:
         return []
 
