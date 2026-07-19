@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import MessageOut
 from app.schemas.people import PeerOut
+from app.schemas.timetable import MyTimetableEntryOut, MyTimetableOut
 from app.schemas.workflow import (
     AvailabilityRequestIn,
     AvailabilityRequestOut,
@@ -201,3 +202,72 @@ def list_peers(u: User = Depends(get_current_user), db: Session = Depends(get_db
         .order_by(PersonProfile.full_name.asc())
     ).all()
     return [PeerOut(id=p.id, full_name=p.full_name, class_name=p.class_name) for p in people]
+
+
+@router.get("/timetable", response_model=MyTimetableOut | None)
+def get_my_timetable(
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MyTimetableOut | None:
+    """返回当前用户本学期已生效的课表（approved 状态），无则返回 null。"""
+    from app.models.enums import ReviewStatus
+    from app.models.timetable import TimetableUpload
+    from app.services import semester_service
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    prof = people_service.get_person_by_user(db, current.id)
+    if prof is None:
+        return None
+    sem = semester_service.get_current_semester(db)
+    if sem is None:
+        return None
+
+    stmt = (
+        select(TimetableUpload)
+        .where(
+            TimetableUpload.person_id == prof.id,
+            TimetableUpload.semester_id == sem.id,
+            TimetableUpload.review_status == ReviewStatus.approved,
+        )
+        .options(selectinload(TimetableUpload.course_rules))
+        .order_by(TimetableUpload.confirmed_at.desc().nulls_last())
+        .limit(1)
+    )
+    up = db.scalars(stmt).first()
+    if up is None:
+        return None
+    return MyTimetableOut(
+        upload_id=up.id,
+        uploaded_at=up.created_at,
+        review_status=up.review_status.value,
+        entries=[
+            MyTimetableEntryOut(
+                weekday=r.weekday,
+                period_start=r.period_start,
+                period_end=r.period_end,
+                week_expr=_rule_week_expr(r),
+                location_code=r.location_code,
+                course_name=r.course_name,
+            )
+            for r in up.course_rules
+        ],
+    )
+
+
+def _rule_week_expr(rule) -> str:
+    """从 CourseRule 反推展示用周次表达。"""
+    if rule.explicit_weeks:
+        ws = list(rule.explicit_weeks)
+        if len(ws) <= 1:
+            return f"{ws[0]}周"
+        # 简单连续区间
+        if ws == list(range(ws[0], ws[-1] + 1)):
+            base = f"{ws[0]}-{ws[-1]}周"
+            if rule.week_parity == "odd":
+                base += "(单)"
+            elif rule.week_parity == "even":
+                base += "(双)"
+            return base
+        return ",".join(str(w) for w in ws) + "周"
+    return ""

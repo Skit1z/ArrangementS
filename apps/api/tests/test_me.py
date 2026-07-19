@@ -114,3 +114,86 @@ def test_next_duty_returns_upcoming_only(db_session):
     nxt = me_service.next_duty(db_session, me.id)
     assert nxt is not None
     assert nxt["venue_name"] == "黄楼"
+
+
+def test_me_timetable_returns_active(client, seed_admin, db_session):
+    """登录用户调用 /me/timetable 返回本人当前学期的生效课表。"""
+    from app.services import semester_service, timetable_service
+    from app.timetable.extractor import RawCourseEntry
+    from tests.conftest import csrf_headers, login
+
+    sem = semester_service.create_semester(db_session, name="春", first_monday=date(2026, 2, 23))
+    u = User(
+        username="202301070410",
+        password_hash=hash_password("pw123456"),
+        role=UserRole.user,
+        is_active=True,
+    )
+    db_session.add(u)
+    db_session.flush()
+    p = PersonProfile(
+        user_id=u.id,
+        student_no="202301070410",
+        class_name="信管231",
+        full_name="王文博",
+        phone="13800000000",
+    )
+    db_session.add(p)
+    db_session.commit()
+
+    entries = [
+        RawCourseEntry(
+            weekday=1, period_start=1, period_end=2, week_expr="1-4周", location_code="B101"
+        )
+    ]
+    up = timetable_service.create_upload_from_entries(
+        db_session,
+        person_id=p.id,
+        semester_id=sem.id,
+        uploader_user_id=None,
+        file_name="t.pdf",
+        entries=entries,
+    )
+    timetable_service.approve(db_session, up.id, reviewer_id=None)
+    db_session.commit()
+
+    login(client, "202301070410", "pw123456")
+    resp = client.get("/api/v1/me/timetable")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body is not None
+    assert body["upload_id"] == str(up.id)
+    assert body["review_status"] == "approved"
+    assert len(body["entries"]) == 1
+    assert body["entries"][0]["weekday"] == 1
+
+
+def test_me_timetable_null_when_none(client, seed_admin, db_session):
+    """无课表时返回 null。"""
+    from app.services import semester_service
+    from tests.conftest import login
+
+    semester_service.create_semester(db_session, name="春", first_monday=date(2026, 2, 23))
+    u = User(
+        username="202301070410",
+        password_hash=hash_password("pw123456"),
+        role=UserRole.user,
+        is_active=True,
+    )
+    db_session.add(u)
+    db_session.flush()
+    db_session.add(
+        PersonProfile(
+            user_id=u.id,
+            student_no="202301070410",
+            class_name="信管231",
+            full_name="王文博",
+            phone="13800000000",
+        )
+    )
+    db_session.commit()
+
+    login(client, "202301070410", "pw123456")
+    resp = client.get("/api/v1/me/timetable")
+    assert resp.status_code == 200
+    assert resp.json() is None

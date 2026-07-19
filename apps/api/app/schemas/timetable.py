@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import time
+from datetime import datetime, time
 
 from pydantic import BaseModel, Field
 
@@ -90,3 +90,19 @@ class ParsedPdfOut(BaseModel):
     full_name: str | None = None
     entries: list[ParsedEntryOut]
     warnings: list[str]
+
+
+class MyTimetableEntryOut(BaseModel):
+    weekday: int
+    period_start: int
+    period_end: int
+    week_expr: str
+    location_code: str | None = None
+    course_name: str | None = None
+
+
+class MyTimetableOut(BaseModel):
+    upload_id: uuid.UUID
+    uploaded_at: datetime
+    review_status: str
+    entries: list[MyTimetableEntryOut]
