@@ -12,9 +12,10 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { App, Button, Card, Col, Input, Modal, Row, Space, Tag } from "antd";
+import { LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { App, Button, Card, Col, Input, Modal, Row, Space, Tag, Tabs } from "antd";
 import dayjs from "dayjs";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import PersonDrawer from "./PersonDrawer";
 import SlotCell from "./SlotCell";
@@ -75,6 +76,14 @@ export default function ScheduleBoard({
   const [activeVerdict, setActiveVerdict] = useState<{ key: string; verdict: DropVerdict } | null>(null);
   const [focusSlotId, setFocusSlotId] = useState<string | null>(null);
   const [forcedReasons, setForcedReasons] = useState<Record<PositionKey, string>>({});
+  const [drawerCollapsed, setDrawerCollapsed] = useState(false);
+  const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeVenues.length > 0 && !activeVenueId) {
+      setActiveVenueId(activeVenues[0].id);
+    }
+  }, [activeVenues, activeVenueId]);
 
   // 撤销 / 重做栈（至少 50 步）
   const history = useRef<Board[]>([]);
@@ -297,6 +306,7 @@ export default function ScheduleBoard({
   }
 
   const ops = diffBoard(baseline, board, forcedReasons);
+  const realConflicts = useMemo(() => conflicts.filter((c) => c.type !== "vacancy"), [conflicts]);
   const dirty = ops.length > 0;
 
   return (
@@ -328,66 +338,75 @@ export default function ScheduleBoard({
           保存草稿{dirty ? `（${ops.length} 项变更）` : ""}
         </Button>
         <Tag color={dirty ? "orange" : "green"}>{dirty ? "有未保存修改" : "已保存"}</Tag>
-        {conflicts.length > 0 && <Tag color="red">冲突 {conflicts.length}</Tag>}
+        {realConflicts.length > 0 && <Tag color="red">冲突 {realConflicts.length}</Tag>}
       </Space>
 
       <Row gutter={12}>
-        <Col flex="auto" style={{ marginRight: 292 }}>
-          {activeVenues.map((venue) => {
-            const vSlots = slotsByVenue[venue.id] || [];
-            const times = Array.from(new Set(vSlots.map(s => dayjs(s.slot_start_at).format("HH:mm")))).sort();
-            return (
-              <Card key={venue.id} size="small" title={venue.name} style={{ marginBottom: 12 }}>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 1100 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ width: 56 }} />
-                        {days.map((d) => (
-                          <th key={d.format()} style={{ fontSize: 12, fontWeight: 500, minWidth: 140 }}>
-                            {d.format("MM-DD")} 周{"日一二三四五六"[d.day()]}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {times.map((t) => (
-                        <tr key={t}>
-                          <td style={{ fontSize: 11, color: "#888" }}>{t}</td>
-                          {days.map((d) => {
-                            const slot = vSlots.find(
-                              (s) =>
-                                dayjs(s.slot_start_at).format("YYYY-MM-DD") === d.format("YYYY-MM-DD") &&
-                                dayjs(s.slot_start_at).format("HH:mm") === t,
-                            );
-                            return (
-                              <td key={d.format() + t} style={{ verticalAlign: "top" }}>
-                                {slot ? (
-                                  <SlotCell
-                                    slot={slot}
-                                    board={board}
-                                    activeVerdict={activeVerdict}
-                                    conflictKeys={conflictKeys}
-                                  />
-                                ) : (
-                                  <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            );
-          })}
+        <Col flex="auto" style={{ marginRight: drawerCollapsed ? 0 : 292, transition: "margin-right 0.2s" }}>
+          <Tabs
+            activeKey={activeVenueId || undefined}
+            onChange={(key) => setActiveVenueId(key)}
+            style={{ marginBottom: 16 }}
+            items={activeVenues.map((venue) => {
+              const vSlots = slotsByVenue[venue.id] || [];
+              const times = Array.from(new Set(vSlots.map(s => dayjs(s.slot_start_at).format("HH:mm")))).sort();
+              return {
+                key: venue.id,
+                label: venue.name,
+                children: (
+                  <Card size="small" bordered={false} style={{ marginBottom: 12 }}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 1100 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ width: 56 }} />
+                            {days.map((d) => (
+                              <th key={d.format()} style={{ fontSize: 12, fontWeight: 500, minWidth: 140 }}>
+                                {d.format("MM-DD")} 周{"日一二三四五六"[d.day()]}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {times.map((t) => (
+                            <tr key={t}>
+                              <td style={{ fontSize: 11, color: "#888" }}>{t}</td>
+                              {days.map((d) => {
+                                const slot = vSlots.find(
+                                  (s) =>
+                                    dayjs(s.slot_start_at).format("YYYY-MM-DD") === d.format("YYYY-MM-DD") &&
+                                    dayjs(s.slot_start_at).format("HH:mm") === t,
+                                );
+                                return (
+                                  <td key={d.format() + t} style={{ verticalAlign: "top" }}>
+                                    {slot ? (
+                                      <SlotCell
+                                        slot={slot}
+                                        board={board}
+                                        activeVerdict={activeVerdict}
+                                        conflictKeys={conflictKeys}
+                                      />
+                                    ) : (
+                                      <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                )
+              };
+            })}
+          />
         </Col>
         <div
           style={{
             position: "fixed",
-            right: 16,
+            right: drawerCollapsed ? -280 : 16,
             top: 80,
             bottom: 16,
             width: 260,
@@ -398,8 +417,24 @@ export default function ScheduleBoard({
             zIndex: 100,
             overflowY: "auto",
             boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+            transition: "right 0.2s",
           }}
         >
+          <Button
+            type="primary"
+            shape="circle"
+            icon={drawerCollapsed ? <LeftOutlined /> : <RightOutlined />}
+            size="small"
+            style={{
+              position: "absolute",
+              left: -12,
+              top: "50%",
+              transform: "translateY(-50%)",
+              zIndex: 110,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            }}
+            onClick={() => setDrawerCollapsed(!drawerCollapsed)}
+          />
           <PersonDrawer people={people} focusSlotId={focusSlotId} />
         </div>
       </Row>
