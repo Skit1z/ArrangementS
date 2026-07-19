@@ -175,6 +175,7 @@ export default function SchedulePage() {
           conflicts={conflicts}
           onSave={(ops) => save.mutate(ops)}
           saving={save.isPending}
+          checkingConflicts={checkConflicts.isPending}
         />
       )}
 

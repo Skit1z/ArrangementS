@@ -171,7 +171,6 @@ export default function TasksPage() {
               </Tag>
             ),
           },
-          { title: "v", dataIndex: "version", width: 50 },
           {
             title: "操作",
             width: 160,

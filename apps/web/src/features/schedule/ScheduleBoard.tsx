@@ -13,7 +13,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { LeftOutlined, RightOutlined } from "@ant-design/icons";
-import { App, Button, Card, Col, Input, Modal, Row, Space, Tag, Tabs } from "antd";
+import { App, Button, Card, Col, Empty, Input, Modal, Row, Space, Spin, Tag, Tabs } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -56,6 +56,7 @@ interface Props {
   conflicts: Conflict[];
   onSave: (ops: DraftOperation[]) => void;
   saving: boolean;
+  checkingConflicts?: boolean;
 }
 
 export default function ScheduleBoard({
@@ -68,6 +69,7 @@ export default function ScheduleBoard({
   conflicts,
   onSave,
   saving,
+  checkingConflicts,
 }: Props) {
   const { message } = App.useApp();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -77,6 +79,32 @@ export default function ScheduleBoard({
   const [focusSlotId, setFocusSlotId] = useState<string | null>(null);
   const [forcedReasons, setForcedReasons] = useState<Record<PositionKey, string>>({});
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
+  const [drawerWidth, setDrawerWidth] = useState(260);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = window.innerWidth - e.clientX - 16;
+      if (newWidth > 200 && newWidth < 600) {
+        setDrawerWidth(newWidth);
+      }
+    };
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
 
   // 撤销 / 重做栈（至少 50 步）
   const history = useRef<Board[]>([]);
@@ -111,8 +139,8 @@ export default function ScheduleBoard({
   }, [week.slots]);
 
   const activeVenues = useMemo(() => {
-    return venues.filter((v) => slotsByVenue[v.id] && slotsByVenue[v.id].length > 0);
-  }, [venues, slotsByVenue]);
+    return venues;
+  }, [venues]);
 
   const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
 
@@ -307,8 +335,10 @@ export default function ScheduleBoard({
   }
 
   const ops = diffBoard(baseline, board, forcedReasons);
-  const realConflicts = useMemo(() => conflicts.filter((c) => c.type !== "vacancy"), [conflicts]);
+  const realConflicts = useMemo(() => conflicts.filter((c) => c.kind !== "vacancy"), [conflicts]);
   const dirty = ops.length > 0;
+
+  const marginRightValue = drawerCollapsed ? 0 : drawerWidth + 12;
 
   return (
     <DndContext
@@ -339,11 +369,24 @@ export default function ScheduleBoard({
           保存草稿{dirty ? `（${ops.length} 项变更）` : ""}
         </Button>
         <Tag color={dirty ? "orange" : "green"}>{dirty ? "有未保存修改" : "已保存"}</Tag>
-        {realConflicts.length > 0 && <Tag color="red">冲突 {realConflicts.length}</Tag>}
+        {checkingConflicts ? (
+          <Tag color="blue">
+            <Spin size="small" style={{ marginRight: 6 }} />
+            正在检测冲突...
+          </Tag>
+        ) : (
+          realConflicts.length > 0 && <Tag color="red">冲突 {realConflicts.length}</Tag>
+        )}
       </Space>
 
-      <Row gutter={12}>
-        <Col flex="auto" style={{ marginRight: drawerCollapsed ? 0 : 292, transition: "margin-right 0.2s" }}>
+      <Row gutter={12} style={{ position: "relative" }}>
+        <Col
+          flex="auto"
+          style={{
+            marginRight: marginRightValue,
+            transition: isResizing ? "none" : "margin-right 0.2s",
+          }}
+        >
           <Tabs
             activeKey={activeVenueId || undefined}
             onChange={(key) => setActiveVenueId(key)}
@@ -355,50 +398,56 @@ export default function ScheduleBoard({
                 key: venue.id,
                 label: venue.name,
                 children: (
-                  <Card size="small" bordered={false} style={{ marginBottom: 12 }}>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 1100 }}>
-                        <thead>
-                          <tr>
-                            <th style={{ width: 56 }} />
-                            {days.map((d) => (
-                              <th key={d.format()} style={{ fontSize: 12, fontWeight: 500, minWidth: 140 }}>
-                                {d.format("MM-DD")} 周{"日一二三四五六"[d.day()]}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {times.map((t) => (
-                            <tr key={t}>
-                              <td style={{ fontSize: 11, color: "#888" }}>{t}</td>
-                              {days.map((d) => {
-                                const slot = vSlots.find(
-                                  (s) =>
-                                    dayjs(s.slot_start_at).format("YYYY-MM-DD") === d.format("YYYY-MM-DD") &&
-                                    dayjs(s.slot_start_at).format("HH:mm") === t,
-                                );
-                                return (
-                                  <td key={d.format() + t} style={{ verticalAlign: "top" }}>
-                                    {slot ? (
-                                      <SlotCell
-                                        slot={slot}
-                                        board={board}
-                                        activeVerdict={activeVerdict}
-                                        conflictKeys={conflictKeys}
-                                      />
-                                    ) : (
-                                      <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>
-                                    )}
-                                  </td>
-                                );
-                              })}
+                  times.length === 0 ? (
+                    <Card size="small" bordered={false} style={{ marginBottom: 12 }}>
+                      <Empty description="该场地本周暂无排班任务，您可以点击上方“新增临时值班”来添加" style={{ padding: "40px 0" }} />
+                    </Card>
+                  ) : (
+                    <Card size="small" bordered={false} style={{ marginBottom: 12 }}>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 1100 }}>
+                          <thead>
+                            <tr>
+                              <th style={{ width: 56 }} />
+                              {days.map((d) => (
+                                <th key={d.format()} style={{ fontSize: 12, fontWeight: 500, minWidth: 140 }}>
+                                  {d.format("MM-DD")} 周{"日一二三四五六"[d.day()]}
+                                </th>
+                              ))}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </Card>
+                          </thead>
+                          <tbody>
+                            {times.map((t) => (
+                              <tr key={t}>
+                                <td style={{ fontSize: 11, color: "#888" }}>{t}</td>
+                                {days.map((d) => {
+                                  const slot = vSlots.find(
+                                    (s) =>
+                                      dayjs(s.slot_start_at).format("YYYY-MM-DD") === d.format("YYYY-MM-DD") &&
+                                      dayjs(s.slot_start_at).format("HH:mm") === t,
+                                  );
+                                  return (
+                                    <td key={d.format() + t} style={{ verticalAlign: "top" }}>
+                                      {slot ? (
+                                        <SlotCell
+                                          slot={slot}
+                                          board={board}
+                                          activeVerdict={activeVerdict}
+                                          conflictKeys={conflictKeys}
+                                        />
+                                      ) : (
+                                        <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  )
                 )
               };
             })}
@@ -407,20 +456,31 @@ export default function ScheduleBoard({
         <div
           style={{
             position: "fixed",
-            right: drawerCollapsed ? -280 : 16,
+            right: drawerCollapsed ? -drawerWidth - 10 : 16,
             top: 80,
             bottom: 16,
-            width: 260,
-            background: "#fff",
-            border: "1px solid #f0f0f0",
-            borderRadius: 8,
-            padding: 12,
+            width: drawerWidth,
             zIndex: 100,
-            overflowY: "auto",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            transition: "right 0.2s",
+            transition: isResizing ? "none" : "right 0.2s, width 0.2s",
+            overflow: "visible",
           }}
         >
+          {!drawerCollapsed && (
+            <div
+              style={{
+                position: "absolute",
+                left: -3,
+                top: 0,
+                bottom: 0,
+                width: 6,
+                cursor: "col-resize",
+                zIndex: 120,
+                background: isResizing ? "#1890ff" : "transparent",
+                transition: "background 0.2s",
+              }}
+              onMouseDown={startResize}
+            />
+          )}
           <Button
             type="primary"
             shape="circle"
@@ -428,15 +488,32 @@ export default function ScheduleBoard({
             size="small"
             style={{
               position: "absolute",
-              left: -12,
+              left: -14,
               top: "50%",
               transform: "translateY(-50%)",
               zIndex: 110,
               boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              cursor: "pointer",
             }}
             onClick={() => setDrawerCollapsed(!drawerCollapsed)}
           />
-          <PersonDrawer people={people} focusSlotId={focusSlotId} />
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              background: "#fff",
+              border: "1px solid #f0f0f0",
+              borderRadius: 8,
+              padding: "12px 12px 12px 16px",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+            }}
+          >
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <PersonDrawer people={people} focusSlotId={focusSlotId} />
+            </div>
+          </div>
         </div>
       </Row>
 

@@ -3,6 +3,7 @@ import { App, Button, Card, Form, Input, InputNumber, List, Modal, Popconfirm, S
 import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useState } from "react";
 
+import { adminApi } from "@/features/admin/api";
 import { api, errorMessage } from "@/api/client";
 
 interface Person {
