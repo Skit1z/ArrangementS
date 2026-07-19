@@ -77,13 +77,6 @@ export default function ScheduleBoard({
   const [focusSlotId, setFocusSlotId] = useState<string | null>(null);
   const [forcedReasons, setForcedReasons] = useState<Record<PositionKey, string>>({});
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
-  const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (activeVenues.length > 0 && !activeVenueId) {
-      setActiveVenueId(activeVenues[0].id);
-    }
-  }, [activeVenues, activeVenueId]);
 
   // 撤销 / 重做栈（至少 50 步）
   const history = useRef<Board[]>([]);
@@ -120,6 +113,14 @@ export default function ScheduleBoard({
   const activeVenues = useMemo(() => {
     return venues.filter((v) => slotsByVenue[v.id] && slotsByVenue[v.id].length > 0);
   }, [venues, slotsByVenue]);
+
+  const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeVenues.length > 0 && !activeVenueId) {
+      setActiveVenueId(activeVenues[0].id);
+    }
+  }, [activeVenues, activeVenueId]);
 
   const days = useMemo(() => {
     const start = dayjs(week.week_start);
