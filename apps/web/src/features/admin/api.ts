@@ -352,6 +352,46 @@ export const adminApi = {
   // 课表
   timetables: {
     active: async () => (await api.get<ActiveTimetableOut[]>("/timetables/active")).data,
+    parsePdf: async (file: File, semesterId?: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (semesterId) form.append("semester_id", semesterId);
+      const res = await api.post<{
+        student_no: string | null;
+        entries: {
+          weekday: number;
+          period_start: number;
+          period_end: number;
+          week_expr: string;
+          location_code: string | null;
+          course_name: string | null;
+        }[];
+        warnings: string[];
+      }>("/timetables/parse-pdf", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data;
+    },
+    uploadFor: async (
+      personId: string,
+      fileName: string,
+      entries: {
+        weekday: number;
+        period_start: number;
+        period_end: number;
+        week_expr: string;
+        location_code: string | null;
+      }[]
+    ) =>
+      (
+        await api.post<{ id: string }>("/timetables/upload", {
+          person_id: personId,
+          file_name: fileName,
+          entries,
+        })
+      ).data,
+    approve: async (uploadId: string) =>
+      (await api.post<{ message: string }>(`/timetables/${uploadId}/approve`)).data,
   },
 
   // 加班审批

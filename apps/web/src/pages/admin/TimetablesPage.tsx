@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { Card, Select, Spin, Tag, Space } from "antd";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { UploadOutlined } from "@ant-design/icons";
+import { App, Button, Card, Modal, Select, Space, Spin, Table, Tag, Upload } from "antd";
 import { useState } from "react";
+import { errorMessage } from "@/api/client";
 import { adminApi, type ActiveTimetableOut } from "@/features/admin/api";
 
 const PERIOD_BLOCKS = [
@@ -19,32 +21,81 @@ const WEEKDAYS = [
   { label: "周六", value: 6 },
   { label: "周日", value: 7 },
 ];
+const WD_LABEL = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+interface ParsedEntry {
+  weekday: number;
+  period_start: number;
+  period_end: number;
+  week_expr: string;
+  location_code: string | null;
+  course_name: string | null;
+}
 
 export default function TimetablesPage() {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery<ActiveTimetableOut[]>({
     queryKey: ["admin", "timetables", "active"],
     queryFn: adminApi.timetables.active,
   });
 
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
-
   const [viewMode, setViewMode] = useState<"busy" | "free">("busy");
+
+  // admin 代传 state
+  const [proxyOpen, setProxyOpen] = useState(false);
+  const [proxyPersonId, setProxyPersonId] = useState<string | null>(null);
+  const [proxyParsed, setProxyParsed] = useState<ParsedEntry[] | null>(null);
+  const [proxyFileName, setProxyFileName] = useState("");
+
+  const parseMut = useMutation({
+    mutationFn: (file: File) => adminApi.timetables.parsePdf(file),
+    onSuccess: (d) => {
+      if (!d.entries.length) {
+        message.error("未识别到课程");
+        return;
+      }
+      setProxyParsed(d.entries);
+      message.success(`解析出 ${d.entries.length} 条`);
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const confirmMut = useMutation({
+    mutationFn: async () => {
+      const up = await adminApi.timetables.uploadFor(
+        proxyPersonId!,
+        proxyFileName,
+        proxyParsed!
+      );
+      await adminApi.timetables.approve(up.id);
+    },
+    onSuccess: () => {
+      message.success("代传课表已生效");
+      setProxyOpen(false);
+      setProxyParsed(null);
+      setProxyPersonId(null);
+      setProxyFileName("");
+      qc.invalidateQueries({ queryKey: ["admin", "timetables"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
 
   if (isLoading) {
     return <Spin style={{ display: "block", margin: "100px auto" }} />;
   }
 
   const allPeople = data ?? [];
-
   const peopleToDisplay = selectedPerson
     ? allPeople.filter((p) => p.person_id === selectedPerson)
     : allPeople;
 
   return (
-    <Card 
-      title={<span style={{ fontSize: '20px', fontWeight: 600 }}>全员课表</span>}
+    <Card
+      title={<span style={{ fontSize: "20px", fontWeight: 600 }}>全员课表</span>}
       bordered={false}
-      style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 12 }}
+      style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.05)", borderRadius: 12 }}
     >
       <div style={{ marginBottom: 16 }}>
         <Space wrap>
@@ -66,17 +117,17 @@ export default function TimetablesPage() {
             style={{ width: 200 }}
             value={selectedPerson}
             onChange={setSelectedPerson}
-            options={allPeople.map((p) => ({
-              label: p.person_name,
-              value: p.person_id,
-            }))}
+            options={allPeople.map((p) => ({ label: p.person_name, value: p.person_id }))}
             filterOption={(input, option) =>
               (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
             }
           />
+          <Button icon={<UploadOutlined />} onClick={() => setProxyOpen(true)}>
+            为某人代传课表
+          </Button>
           <span style={{ color: "#888", fontSize: 13, marginLeft: 8 }}>
-            {viewMode === "busy" 
-              ? "* 显示由于上课而不可排班的人员。" 
+            {viewMode === "busy"
+              ? "* 显示由于上课而不可排班的人员。"
               : "* 显示当前时段无课可排班的人员。"}
           </span>
         </Space>
@@ -86,11 +137,26 @@ export default function TimetablesPage() {
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 1000 }}>
           <thead>
             <tr>
-              <th style={{ border: "1px solid #f0f0f0", padding: "12px 8px", background: "#fafafa", width: 60 }}>
+              <th
+                style={{
+                  border: "1px solid #f0f0f0",
+                  padding: "12px 8px",
+                  background: "#fafafa",
+                  width: 60,
+                }}
+              >
                 节次
               </th>
               {WEEKDAYS.map((wd) => (
-                <th key={wd.value} style={{ border: "1px solid #f0f0f0", padding: "12px 8px", background: "#fafafa", width: "14%" }}>
+                <th
+                  key={wd.value}
+                  style={{
+                    border: "1px solid #f0f0f0",
+                    padding: "12px 8px",
+                    background: "#fafafa",
+                    width: "14%",
+                  }}
+                >
                   {wd.label}
                 </th>
               ))}
@@ -99,12 +165,18 @@ export default function TimetablesPage() {
           <tbody>
             {PERIOD_BLOCKS.map((block) => (
               <tr key={block.label}>
-                <td style={{ border: "1px solid #f0f0f0", padding: 8, textAlign: "center", background: "#fafafa" }}>
+                <td
+                  style={{
+                    border: "1px solid #f0f0f0",
+                    padding: 8,
+                    textAlign: "center",
+                    background: "#fafafa",
+                  }}
+                >
                   {block.label}
                 </td>
                 {WEEKDAYS.map((wd) => {
                   const busyPeopleInBlock: { personName: string; courseName: string }[] = [];
-                  
                   for (const person of peopleToDisplay) {
                     const overlappingRule = person.rules.find(
                       (rule) =>
@@ -120,15 +192,33 @@ export default function TimetablesPage() {
                   }
 
                   const busyNames = new Set(busyPeopleInBlock.map((b) => b.personName));
-                  const freePeople = peopleToDisplay.filter((p) => !busyNames.has(p.person_name));
-                  
-                  const displayPeople = viewMode === "busy" ? busyPeopleInBlock : freePeople.map(p => ({ personName: p.person_name, courseName: "" }));
-                  const cellBg = viewMode === "busy" 
-                    ? (displayPeople.length > 0 ? "#fff2f0" : "#fff")
-                    : (displayPeople.length > 0 ? "#f6ffed" : "#fff");
+                  const freePeople = peopleToDisplay.filter(
+                    (p) => !busyNames.has(p.person_name)
+                  );
+
+                  const displayPeople =
+                    viewMode === "busy"
+                      ? busyPeopleInBlock
+                      : freePeople.map((p) => ({ personName: p.person_name, courseName: "" }));
+                  const cellBg =
+                    viewMode === "busy"
+                      ? displayPeople.length > 0
+                        ? "#fff2f0"
+                        : "#fff"
+                      : displayPeople.length > 0
+                        ? "#f6ffed"
+                        : "#fff";
 
                   return (
-                    <td key={wd.value} style={{ border: "1px solid #f0f0f0", padding: 8, verticalAlign: "top", background: cellBg }}>
+                    <td
+                      key={wd.value}
+                      style={{
+                        border: "1px solid #f0f0f0",
+                        padding: 8,
+                        verticalAlign: "top",
+                        background: cellBg,
+                      }}
+                    >
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                         {displayPeople.map((b, idx) => (
                           <Tag key={idx} color={viewMode === "busy" ? "red" : "green"}>
@@ -145,6 +235,78 @@ export default function TimetablesPage() {
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={proxyOpen}
+        title="为某人代传课表"
+        onCancel={() => {
+          setProxyOpen(false);
+          setProxyParsed(null);
+          setProxyPersonId(null);
+          setProxyFileName("");
+        }}
+        onOk={proxyParsed ? () => confirmMut.mutate() : undefined}
+        okText={proxyParsed ? "确认生效" : undefined}
+        confirmLoading={confirmMut.isPending}
+        okButtonProps={proxyParsed ? {} : { disabled: true }}
+        footer={proxyParsed ? undefined : null}
+      >
+        {!proxyParsed ? (
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 6 }}>选择人员：</label>
+              <Select
+                showSearch
+                placeholder="输入姓名或选择人员"
+                optionFilterProp="label"
+                style={{ width: "100%" }}
+                value={proxyPersonId}
+                onChange={setProxyPersonId}
+                options={allPeople.map((p) => ({ label: p.person_name, value: p.person_id }))}
+              />
+            </div>
+            <Upload
+              accept=".pdf"
+              maxCount={1}
+              showUploadList={false}
+              beforeUpload={(file) => {
+                if (!proxyPersonId) {
+                  message.error("请先选择人员");
+                  return false;
+                }
+                setProxyFileName(file.name);
+                parseMut.mutate(file);
+                return false;
+              }}
+            >
+              <Button icon={<UploadOutlined />} loading={parseMut.isPending} disabled={!proxyPersonId}>
+                选择 PDF 文件
+              </Button>
+            </Upload>
+          </>
+        ) : (
+          <Table
+            size="small"
+            pagination={false}
+            scroll={{ y: 300 }}
+            dataSource={proxyParsed.map((e, i) => ({ ...e, key: i }))}
+            columns={[
+              {
+                title: "星期",
+                dataIndex: "weekday",
+                render: (v: number) => WD_LABEL[v],
+                width: 70,
+              },
+              {
+                title: "节次",
+                render: (_, r) => `第 ${r.period_start}-${r.period_end} 节`,
+                width: 100,
+              },
+              { title: "周次", dataIndex: "week_expr", width: 130 },
+            ]}
+          />
+        )}
+      </Modal>
     </Card>
   );
 }
