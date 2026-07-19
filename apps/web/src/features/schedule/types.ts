@@ -28,6 +28,7 @@ export interface WeekView {
   status: string;
   revision: number;
   version: number;
+  week_label: string;
   slots: SlotView[];
 }
 

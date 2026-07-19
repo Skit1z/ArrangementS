@@ -52,6 +52,7 @@ export default function SettingsPage() {
           { key: "multipliers", label: "倍率规则", children: <MultipliersTab /> },
           { key: "special", label: "特殊日期", children: <SpecialDatesTab /> },
           { key: "semester", label: "学期设置", children: <SemesterTab /> },
+          { key: "vacations", label: "寒暑假", children: <VacationsTab /> },
         ]}
       />
       <div style={{ marginTop: 40, textAlign: 'center', color: '#8c8c8c', fontSize: '13px' }}>

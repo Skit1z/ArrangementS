@@ -218,6 +218,8 @@ function ManualSlotModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  // weekStart 用作开始/结束时间选择器的默认值（当周周一 08:00）
+  const defaultStart = dayjs(weekStart).hour(8).minute(0).second(0);
   const { message } = App.useApp();
   const [form] = Form.useForm();
   
@@ -250,7 +252,12 @@ function ManualSlotModal({
         form={form}
         layout="vertical"
         onFinish={(values) => createM.mutate(values)}
-        initialValues={{ required_people: 1, venue_id: defaultVenueId || undefined }}
+        initialValues={{
+          required_people: 1,
+          venue_id: defaultVenueId || undefined,
+          start_at: defaultStart,
+          end_at: defaultStart.add(2, "hour"),
+        }}
       >
         <Form.Item name="venue_id" label="场地" rules={[{ required: true }]}>
           <Select

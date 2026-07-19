@@ -17,7 +17,7 @@ import { App, Button, Card, Col, DatePicker, Divider, Empty, Form, Input, InputN
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, errorMessage } from "@/api/client";
+import { errorMessage } from "@/api/client";
 
 import PersonDrawer from "./PersonDrawer";
 import SlotCell from "./SlotCell";

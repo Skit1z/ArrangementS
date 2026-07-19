@@ -3,7 +3,6 @@ import {
   App,
   Button,
   Card,
-  DatePicker,
   Drawer,
   Form,
   Input,
@@ -14,7 +13,6 @@ import {
   Space,
   Switch,
   Table,
-  Tabs,
   Tag,
   TimePicker,
   Typography,
@@ -25,14 +23,11 @@ import { useState } from "react";
 import { errorMessage } from "@/api/client";
 import {
   adminApi,
-  TASK_STATUS_COLOR,
-  TASK_STATUS_LABEL,
   VENUE_TYPE_LABEL,
   type Venue,
   type VenueCreate,
   type VenueType,
 } from "@/features/admin/api";
-import { hoursOf } from "@/features/me/api";
 
 export default function VenuesPage() {
   return (
