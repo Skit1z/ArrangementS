@@ -8,32 +8,27 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
-          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build frontend
+        working-directory: apps/web
         run: pnpm vite build
 
       - name: Setup SSH key
-        working-directory: .
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
@@ -41,7 +36,6 @@ jobs:
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy frontend (upload dist)
-        working-directory: .
         run: |
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/id_deploy" \
@@ -49,7 +43,6 @@ jobs:
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/1panel/www/sites/arrangements/
 
       - name: Deploy backend (pull & restart)
-        working-directory: .
         run: |
           ssh -i ~/.ssh/id_deploy ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd /opt/ArrangementS

@@ -1,0 +1,13 @@
+{
+  "name": "arrangements",
+  "private": true,
+  "version": "0.1.0",
+  "description": "会议场地排班管理系统",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev:web": "pnpm --filter meeting-scheduler-web dev",
+    "build:web": "pnpm --filter meeting-scheduler-web build",
+    "typecheck": "pnpm --filter meeting-scheduler-web typecheck",
+    "lint": "pnpm --filter meeting-scheduler-web lint"
+  }
+}
