@@ -80,5 +80,11 @@ class SwapOut(BaseModel):
     target_person_id: uuid.UUID | None
     selected_person_id: uuid.UUID | None
     status: SwapStatus
+    # Extra fields for UI:
+    requester_name: str | None = None
+    requester_phone: str | None = None
+    venue_name: str | None = None
+    slot_start_at: datetime | None = None
+    slot_end_at: datetime | None = None
 
     model_config = {"from_attributes": True}

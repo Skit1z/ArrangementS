@@ -51,6 +51,8 @@ def my_assignments(
             "plan_status": a.plan_status.value,
             "execution_status": a.execution_status.value,
             "teammates": _teammates(db, slot.id, person_id),
+            "previous_shift": _adjacent_shift_people(db, venue.id, slot.slot_start_at, find_next=False),
+            "next_shift": _adjacent_shift_people(db, venue.id, slot.slot_end_at, find_next=True),
         })
     return out
 
@@ -65,8 +67,38 @@ def _teammates(db: Session, slot_id: uuid.UUID, exclude_person_id: uuid.UUID) ->
             Assignment.plan_status.in_(VISIBLE_PLAN_STATUSES),
         )
     ).all()
-    # 仅姓名与班级，不含任何敏感字段
-    return [{"full_name": p.full_name, "class_name": p.class_name} for _a, p in rows]
+    return [{"full_name": p.full_name, "class_name": p.class_name, "phone": p.phone} for _a, p in rows]
+
+
+def _adjacent_shift_people(db: Session, venue_id: uuid.UUID, reference_time: datetime, find_next: bool) -> list[dict]:
+    if find_next:
+        stmt = (
+            select(DutySlot)
+            .where(DutySlot.venue_id == venue_id, DutySlot.slot_start_at >= reference_time)
+            .order_by(DutySlot.slot_start_at.asc())
+            .limit(1)
+        )
+    else:
+        stmt = (
+            select(DutySlot)
+            .where(DutySlot.venue_id == venue_id, DutySlot.slot_end_at <= reference_time)
+            .order_by(DutySlot.slot_end_at.desc())
+            .limit(1)
+        )
+    
+    slot = db.scalar(stmt)
+    if not slot or slot.id == uuid.UUID: # safety check
+        return []
+        
+    rows = db.execute(
+        select(PersonProfile)
+        .join(Assignment, Assignment.person_id == PersonProfile.id)
+        .where(
+            Assignment.duty_slot_id == slot.id,
+            Assignment.plan_status.in_(VISIBLE_PLAN_STATUSES),
+        )
+    ).all()
+    return [{"full_name": p.full_name, "class_name": p.class_name, "phone": p.phone} for p in rows]
 
 
 def next_duty(db: Session, person_id: uuid.UUID) -> dict | None:
@@ -94,5 +126,7 @@ def next_duty(db: Session, person_id: uuid.UUID) -> dict | None:
                 "slot_start_at": slot.slot_start_at.isoformat(),
                 "slot_end_at": slot.slot_end_at.isoformat(),
                 "teammates": _teammates(db, slot.id, person_id),
+                "previous_shift": _adjacent_shift_people(db, venue.id, slot.slot_start_at, find_next=False),
+                "next_shift": _adjacent_shift_people(db, venue.id, slot.slot_end_at, find_next=True),
             }
     return None

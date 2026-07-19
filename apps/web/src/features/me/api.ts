@@ -3,6 +3,7 @@ import { api } from "@/api/client";
 export interface Teammate {
   full_name: string;
   class_name: string;
+  phone: string;
 }
 
 export interface MyAssignment {
@@ -15,6 +16,8 @@ export interface MyAssignment {
   plan_status: string;
   execution_status: string;
   teammates: Teammate[];
+  previous_shift: Teammate[];
+  next_shift: Teammate[];
 }
 
 export interface NextDuty {
@@ -23,6 +26,8 @@ export interface NextDuty {
   slot_start_at: string;
   slot_end_at: string;
   teammates: Teammate[];
+  previous_shift: Teammate[];
+  next_shift: Teammate[];
 }
 
 export interface MyHours {
@@ -54,6 +59,11 @@ export interface SwapRequest {
   target_person_id: string | null;
   selected_person_id: string | null;
   status: string;
+  requester_name?: string | null;
+  requester_phone?: string | null;
+  venue_name?: string | null;
+  slot_start_at?: string | null;
+  slot_end_at?: string | null;
 }
 
 export interface AvailabilityRequest {
@@ -97,7 +107,14 @@ export const meApi = {
   overtime: async () => (await api.get<any[]>("/me/overtime")).data,
   createOvertime: async (venue_id: string, start_at: string, end_at: string, reason: string) =>
     (await api.post<any>("/me/overtime", { venue_id, start_at, end_at, reason })).data,
+  peers: async () => (await api.get<Peer[]>("/me/peers")).data,
 };
+
+export interface Peer {
+  id: string;
+  full_name: string;
+  class_name: string;
+}
 
 export const STATUS_LABEL: Record<string, string> = {
   pending: "待审核",

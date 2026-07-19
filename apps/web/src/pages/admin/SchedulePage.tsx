@@ -209,11 +209,10 @@ function ManualSlotModal({
   
   const createM = useMutation({
     mutationFn: async (values: any) => {
-      const range = values.time_range;
       return (await api.post("/admin/duty-slots/manual", {
         venue_id: values.venue_id,
-        start_at: range[0].toISOString(),
-        end_at: range[1].toISOString(),
+        start_at: values.start_at.toISOString(),
+        end_at: values.end_at.toISOString(),
         required_people: values.required_people,
       })).data;
     },
@@ -244,10 +243,20 @@ function ManualSlotModal({
             options={venues.map((v) => ({ label: v.name, value: v.id }))}
           />
         </Form.Item>
-        <Form.Item name="time_range" label="时间 (半小时为颗粒度)" rules={[{ required: true }]}>
-          <DatePicker.RangePicker
+        <Form.Item name="start_at" label="开始时间 (半小时为单位)" rules={[{ required: true }]}>
+          <DatePicker
             showTime={{ format: "HH:mm", minuteStep: 30 }}
             format="YYYY-MM-DD HH:mm"
+            style={{ width: "100%" }}
+            placeholder="选择开始时间"
+          />
+        </Form.Item>
+        <Form.Item name="end_at" label="结束时间 (半小时为单位)" rules={[{ required: true }]}>
+          <DatePicker
+            showTime={{ format: "HH:mm", minuteStep: 30 }}
+            format="YYYY-MM-DD HH:mm"
+            style={{ width: "100%" }}
+            placeholder="选择结束时间"
           />
         </Form.Item>
         <Form.Item name="required_people" label="所需人数" rules={[{ required: true }]}>

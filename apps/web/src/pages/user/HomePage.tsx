@@ -36,7 +36,17 @@ export default function HomePage() {
             <div style={{ color: "#555", marginTop: 4 }}>{nextDuty.data.venue_name}</div>
             {nextDuty.data.teammates.length > 0 && (
               <div style={{ marginTop: 6, fontSize: 12, color: "#888" }}>
-                同班：{nextDuty.data.teammates.map((t) => t.full_name).join("、")}
+                同班：{nextDuty.data.teammates.map((t) => `${t.full_name}(${t.phone})`).join("、")}
+              </div>
+            )}
+            {nextDuty.data.previous_shift && nextDuty.data.previous_shift.length > 0 && (
+              <div style={{ marginTop: 4, fontSize: 12, color: "#888" }}>
+                前一班：{nextDuty.data.previous_shift.map((t) => `${t.full_name}(${t.phone})`).join("、")}
+              </div>
+            )}
+            {nextDuty.data.next_shift && nextDuty.data.next_shift.length > 0 && (
+              <div style={{ marginTop: 4, fontSize: 12, color: "#888" }}>
+                下一班：{nextDuty.data.next_shift.map((t) => `${t.full_name}(${t.phone})`).join("、")}
               </div>
             )}
           </div>

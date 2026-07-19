@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field
 from app.models.enums import PersonStatus
 
 
+class PeerOut(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    class_name: str
+
+
 def _mask(last4: str | None, width: int) -> str | None:
     if not last4:
         return None

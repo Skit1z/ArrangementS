@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Card, Empty, List, Space, Tabs, Tag, Typography } from "antd";
+import dayjs from "dayjs";
 
 import { errorMessage } from "@/api/client";
 import { meApi, STATUS_COLOR, STATUS_LABEL, type SwapRequest } from "@/features/me/api";
@@ -49,10 +50,17 @@ export default function SwapsPage() {
                     renderItem={(s) => (
                       <List.Item>
                         <div style={{ width: "100%" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>有人邀请你接替其班次</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                            <span style={{ fontWeight: 600 }}>{s.requester_name} 邀请你接替其班次</span>
                             {statusTag(s)}
                           </div>
+                          {s.slot_start_at && (
+                            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                              班次：{dayjs(s.slot_start_at).format("MM-DD ddd HH:mm")}–{dayjs(s.slot_end_at).format("HH:mm")} ({s.venue_name})
+                              <br />
+                              联系电话：{s.requester_phone || "无"}
+                            </div>
+                          )}
                           <Space style={{ marginTop: 8 }}>
                             <Button size="small" type="primary" onClick={() => accept.mutate(s.id)}>
                               同意
@@ -82,10 +90,15 @@ export default function SwapsPage() {
                     renderItem={(s) => (
                       <List.Item>
                         <div style={{ width: "100%" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>{s.mode === "open" ? "公开替班" : "指定换班"}</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                            <span style={{ fontWeight: 600 }}>{s.mode === "open" ? "公开替班" : "指定换班"}</span>
                             {statusTag(s)}
                           </div>
+                          {s.slot_start_at && (
+                            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                              班次：{dayjs(s.slot_start_at).format("MM-DD ddd HH:mm")}–{dayjs(s.slot_end_at).format("HH:mm")} ({s.venue_name})
+                            </div>
+                          )}
                           {!["approved", "rejected", "withdrawn"].includes(s.status) && (
                             <Button size="small" style={{ marginTop: 8 }} onClick={() => withdraw.mutate(s.id)}>
                               撤回
@@ -112,10 +125,17 @@ export default function SwapsPage() {
                     renderItem={(s) => (
                       <List.Item>
                         <div style={{ width: "100%" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>有人征集替班</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                            <span style={{ fontWeight: 600 }}>{s.requester_name} 征集替班人员</span>
                             {statusTag(s)}
                           </div>
+                          {s.slot_start_at && (
+                            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                              班次：{dayjs(s.slot_start_at).format("MM-DD ddd HH:mm")}–{dayjs(s.slot_end_at).format("HH:mm")} ({s.venue_name})
+                              <br />
+                              联系电话：{s.requester_phone || "无"}
+                            </div>
+                          )}
                           <Button
                             size="small"
                             type="primary"

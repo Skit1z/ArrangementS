@@ -42,6 +42,29 @@ class SwapRequest(Base, TimestampMixin):
         back_populates="swap_request", cascade="all, delete-orphan"
     )
 
+    assignment = relationship("Assignment", foreign_keys=[assignment_id])
+    requester = relationship("PersonProfile", foreign_keys=[requester_person_id])
+
+    @property
+    def requester_name(self) -> str | None:
+        return self.requester.full_name if self.requester else None
+
+    @property
+    def requester_phone(self) -> str | None:
+        return self.requester.phone if self.requester else None
+
+    @property
+    def venue_name(self) -> str | None:
+        return self.assignment.slot.venue.name if (self.assignment and self.assignment.slot and self.assignment.slot.venue) else None
+
+    @property
+    def slot_start_at(self) -> datetime | None:
+        return self.assignment.slot.slot_start_at if (self.assignment and self.assignment.slot) else None
+
+    @property
+    def slot_end_at(self) -> datetime | None:
+        return self.assignment.slot.slot_end_at if (self.assignment and self.assignment.slot) else None
+
 
 class SwapCandidate(Base):
     __tablename__ = "swap_candidates"

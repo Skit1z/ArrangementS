@@ -11,6 +11,7 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import MessageOut
+from app.schemas.people import PeerOut
 from app.schemas.workflow import (
     AvailabilityRequestIn,
     AvailabilityRequestOut,
@@ -186,3 +187,17 @@ open_swaps_router = APIRouter(prefix="/swap-requests", tags=["me"])
 @open_swaps_router.get("/open", response_model=list[SwapOut])
 def list_open_swaps(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return swap_service.list_open(db)
+
+
+@router.get("/peers", response_model=list[PeerOut])
+def list_peers(u: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.models.person import PersonProfile
+    from app.models.enums import PersonStatus
+    from sqlalchemy import select
+    my_id = _person_id(db, u)
+    people = db.scalars(
+        select(PersonProfile)
+        .where(PersonProfile.id != my_id, PersonProfile.status == PersonStatus.active)
+        .order_by(PersonProfile.full_name.asc())
+    ).all()
+    return [PeerOut(id=p.id, full_name=p.full_name, class_name=p.class_name) for p in people]
