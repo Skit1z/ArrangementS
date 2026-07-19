@@ -1,6 +1,7 @@
 """普通用户自助视图：我的排班、我的工时（方案 10.2 / 10.7）。
 
-普通用户只能看到已发布计划中的本人排班；同班人员仅展示姓名与班级，
+普通用户只能看到已发布计划中的本人排班；同班/前班/后班人员展示
+``full_name`` + ``class_name`` + ``phone``（供移动端展示联系电话），
 绝不返回身份证号、银行卡号、困难等级等敏感字段。
 """
 from __future__ import annotations
@@ -70,26 +71,29 @@ def _teammates(db: Session, slot_id: uuid.UUID, exclude_person_id: uuid.UUID) ->
     return [{"full_name": p.full_name, "class_name": p.class_name, "phone": p.phone} for _a, p in rows]
 
 
-def _adjacent_shift_people(db: Session, venue_id: uuid.UUID, reference_time: datetime, find_next: bool) -> list[dict]:
-    if find_next:
-        stmt = (
-            select(DutySlot)
-            .where(DutySlot.venue_id == venue_id, DutySlot.slot_start_at >= reference_time)
-            .order_by(DutySlot.slot_start_at.asc())
-            .limit(1)
+def _adjacent_shift_people(
+    db: Session, venue_id: uuid.UUID, reference_time: datetime, find_next: bool
+) -> list[dict]:
+    """查找同场地的前/后一班已发布班次的在岗人员。
+
+    只看 ``WeeklyPlan.status == published`` 的班次，避免泄露草稿计划中的人员安排。
+    """
+    boundary = DutySlot.slot_start_at if find_next else DutySlot.slot_end_at
+    stmt = (
+        select(DutySlot)
+        .join(WeeklyPlan, DutySlot.weekly_plan_id == WeeklyPlan.id)
+        .where(
+            DutySlot.venue_id == venue_id,
+            WeeklyPlan.status == PlanStatus.published,  # 仅已发布计划
+            boundary >= reference_time if find_next else boundary <= reference_time,
         )
-    else:
-        stmt = (
-            select(DutySlot)
-            .where(DutySlot.venue_id == venue_id, DutySlot.slot_end_at <= reference_time)
-            .order_by(DutySlot.slot_end_at.desc())
-            .limit(1)
-        )
-    
+        .order_by(DutySlot.slot_start_at.asc() if find_next else DutySlot.slot_end_at.desc())
+        .limit(1)
+    )
     slot = db.scalar(stmt)
-    if not slot or slot.id == uuid.UUID: # safety check
+    if slot is None:
         return []
-        
+
     rows = db.execute(
         select(PersonProfile)
         .join(Assignment, Assignment.person_id == PersonProfile.id)

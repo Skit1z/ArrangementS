@@ -84,7 +84,11 @@ def test_unpublished_plan_hidden_from_user(db_session):
     assert me_service.my_assignments(db_session, me.id) == []
 
 
-def test_teammates_expose_only_name_and_class(db_session):
+def test_teammates_expose_name_class_and_phone(db_session):
+    """同班人员返回 full_name + class_name + phone（供移动端「同班/前班/后班」展示联系电话）。
+
+    绝不返回身份证号、银行卡号、困难等级等敏感字段。
+    """
     plan = _plan(db_session)
     me = _person(db_session, 0, "我")
     other = _person(db_session, 1, "同事")
@@ -94,9 +98,75 @@ def test_teammates_expose_only_name_and_class(db_session):
     rows = me_service.my_assignments(db_session, me.id)
     mates = rows[0]["teammates"]
     assert len(mates) == 1
-    assert mates[0] == {"full_name": "同事", "class_name": "一班"}
-    # 绝不泄露敏感字段
-    assert set(mates[0].keys()) == {"full_name", "class_name"}
+    assert mates[0] == {"full_name": "同事", "class_name": "一班", "phone": "13800000000"}
+    # 仅这三个字段，绝不泄露其它敏感字段
+    assert set(mates[0].keys()) == {"full_name", "class_name", "phone"}
+
+
+def test_adjacent_shift_excludes_draft_plan(db_session):
+    """前/后一班查询只看已发布计划，绝不返回草稿计划中的人员。"""
+    from datetime import datetime, timedelta, timezone
+    from app.models.enums import (
+        ExecutionStatus,
+        PlanAssignmentStatus,
+        SlotSourceType,
+        SlotStatus,
+        VenueType,
+    )
+    from app.models.schedule import Assignment, DutySlot
+    from app.models.venue import Venue
+    from app.services import me_service
+
+    me = _person(db_session, 0, "我")
+    draft_other = _person(db_session, 1, "草稿同事")
+
+    # 共用一个场地，便于「下一班」查询能命中
+    v = Venue(name="黄楼A", code="HLA1", venue_type=VenueType.fixed_shift, default_required_people=1)
+    db_session.add(v); db_session.flush()
+
+    # 草稿计划：未来 72h 有一班，含「草稿同事」
+    draft_plan = WeeklyPlan(
+        week_start=date(2026, 3, 16), week_end=date(2026, 3, 22), revision=1, status=PlanStatus.draft
+    )
+    db_session.add(draft_plan); db_session.flush()
+    start1 = datetime.now(timezone.utc) + timedelta(hours=72)
+    slot1 = DutySlot(
+        weekly_plan_id=draft_plan.id, venue_id=v.id, source_type=SlotSourceType.fixed_shift,
+        slot_start_at=start1, slot_end_at=start1 + timedelta(hours=2), required_people=1,
+        credited_minutes=120, month_key="2026-03", status=SlotStatus.filled,
+    )
+    db_session.add(slot1); db_session.flush()
+    db_session.add(Assignment(
+        duty_slot_id=slot1.id, person_id=draft_other.id, position_index=0,
+        plan_status=PlanAssignmentStatus.assigned, execution_status=ExecutionStatus.pending,
+        credited_minutes=120, balance_minutes=120,
+    ))
+
+    # 已发布计划：未来 48h 有一班，含「我」（同场地 v）
+    pub_plan = WeeklyPlan(
+        week_start=date(2026, 3, 2), week_end=date(2026, 3, 8), revision=1, status=PlanStatus.published
+    )
+    db_session.add(pub_plan); db_session.flush()
+    start2 = datetime.now(timezone.utc) + timedelta(hours=48)
+    slot2 = DutySlot(
+        weekly_plan_id=pub_plan.id, venue_id=v.id, source_type=SlotSourceType.fixed_shift,
+        slot_start_at=start2, slot_end_at=start2 + timedelta(hours=2), required_people=1,
+        credited_minutes=120, month_key="2026-03", status=SlotStatus.filled,
+    )
+    db_session.add(slot2); db_session.flush()
+    db_session.add(Assignment(
+        duty_slot_id=slot2.id, person_id=me.id, position_index=0,
+        plan_status=PlanAssignmentStatus.assigned, execution_status=ExecutionStatus.pending,
+        credited_minutes=120, balance_minutes=120,
+    ))
+    db_session.commit()
+
+    # 我的已发布班次（slot2），查「下一班」时：草稿计划的 slot1（同场地 v）应被忽略
+    rows = me_service.my_assignments(db_session, me.id)
+    my_row = next((r for r in rows if r["slot_id"] == str(slot2.id)), None)
+    assert my_row is not None, "应当看到自己在 slot2 的排班"
+    next_people = my_row["next_shift"]
+    assert all(p["full_name"] != "草稿同事" for p in next_people), next_people
 
 
 def test_next_duty_returns_upcoming_only(db_session):
