@@ -94,6 +94,8 @@ def apply_operations(
 
 def _do_unassign(db: Session, plan: WeeklyPlan, op: dict) -> None:
     slot = _slot_of(db, plan, uuid.UUID(op["slot_id"]))
+    if slot.is_locked:
+        raise HTTPException(status_code=422, detail="锁定岗位不可修改，请先解锁")
     a = _assignment_at(db, slot, int(op["position_index"]))
     if a is None:
         return
@@ -110,6 +112,8 @@ def _do_unassign(db: Session, plan: WeeklyPlan, op: dict) -> None:
 
 def _do_assign(db: Session, plan: WeeklyPlan, op: dict, actor_id: uuid.UUID | None, engine_rules) -> None:
     slot = _slot_of(db, plan, uuid.UUID(op["slot_id"]))
+    if slot.is_locked:
+        raise HTTPException(status_code=422, detail="锁定岗位不可修改，请先解锁")
     position_index = int(op["position_index"])
     person_id = uuid.UUID(op["person_id"])
     forced = bool(op.get("forced", False))
@@ -139,6 +143,12 @@ def _do_assign(db: Session, plan: WeeklyPlan, op: dict, actor_id: uuid.UUID | No
             status_code=422,
             detail=f"{person.full_name} 在该时间已有排班，时间重叠禁止安排（强制安排亦不可）",
         )
+
+    if eligibility.would_exceed_weekly_limit(db, person_id, slot, exclude_assignment_id=exclude_id):
+        if not forced:
+            raise HTTPException(status_code=422, detail=f"{person.full_name} 已达到每周排班上限")
+        if not forced_reason:
+            raise HTTPException(status_code=422, detail="强制安排必须填写原因")
 
     # 其他强制约束：可强制越过，但必须填原因
     if not eligibility.check_person_available_for_slot(db, person, slot):

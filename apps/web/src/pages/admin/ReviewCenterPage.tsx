@@ -9,6 +9,7 @@ import {
   Input,
   List,
   Modal,
+  Select,
   Space,
   Spin,
   Table,
@@ -184,8 +185,17 @@ function LeaveTab() {
     onError: (e) => message.error(errorMessage(e)),
   });
 
+  const revokeM = useMutation({
+    mutationFn: (id: string) => adminApi.review.revokeLeaveApproval(id),
+    onSuccess: () => {
+      message.success("已撤销请假批准并恢复原排班");
+      qc.invalidateQueries({ queryKey: ["admin", "review", "leave"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
   if (query.isLoading) return <Spin />;
-  const rows = (query.data ?? []).filter((r) => r.status === "pending");
+  const rows = query.data ?? [];
 
   return (
     <>
@@ -194,20 +204,27 @@ function LeaveTab() {
         dataSource={rows}
         renderItem={(r) => (
           <List.Item
-            actions={[
-              <Button type="primary" loading={approveM.isPending} onClick={() => approveM.mutate(r.id)}>
-                通过
-              </Button>,
-              <Button danger onClick={() => { setRejecting(r); setComment(""); }}>
-                驳回
-              </Button>,
-            ]}
+            actions={r.status === "approved"
+              ? [
+                  <Button danger loading={revokeM.isPending} onClick={() => revokeM.mutate(r.id)}>
+                    撤销批准
+                  </Button>,
+                ]
+              : [
+                  <Button type="primary" loading={approveM.isPending} onClick={() => approveM.mutate(r.id)}>
+                    通过
+                  </Button>,
+                  <Button danger onClick={() => { setRejecting(r); setComment(""); }}>
+                    驳回
+                  </Button>,
+                ]}
           >
             <List.Item.Meta
               title={
                 <Space>
                   <span>{r.reason}</span>
                   {r.is_emergency && <Tag color="red">紧急</Tag>}
+                  {r.status === "approved" && <Tag color="green">已批准</Tag>}
                 </Space>
               }
               description={<Text type="secondary">人员 ID：{r.applicant_person_id}</Text>}
@@ -286,8 +303,6 @@ function SwapTab() {
         onOk: () => approveM.mutate({ id: s.id, personId: s.target_person_id! }),
       });
     } else {
-      // 公开替班：弹窗让人选（目前后端 list_open 不返回 candidates 列表，
-      // admin 只能输入 personId；后续可扩展）
       setPickingSwap(s);
     }
   };
@@ -380,18 +395,20 @@ function SwapTab() {
   );
 }
 
-function PickPersonForSwap({ onSubmit }: { swap: SwapItem; onSubmit: (personId: string) => void }) {
+function PickPersonForSwap({ swap, onSubmit }: { swap: SwapItem; onSubmit: (personId: string) => void }) {
   const [pid, setPid] = useState<string>("");
-  // 直接粘贴 person_id（实际生产可换成人员搜索 Select）
+  const candidates = swap.candidates.filter((candidate) => candidate.status === "applied");
   return (
     <div>
-      <p style={{ color: "#888", fontSize: 12 }}>
-        当前接口未返回报名候选人列表，请直接输入或粘贴接替人员的 UUID。
-      </p>
-      <Input
-        placeholder="接替人员 person_id (UUID)"
+      <Select
+        style={{ width: "100%" }}
+        placeholder={candidates.length ? "请选择已报名人员" : "暂无有效报名人员"}
         value={pid}
-        onChange={(e) => setPid(e.target.value)}
+        onChange={setPid}
+        options={candidates.map((candidate) => ({
+          value: candidate.candidate_person_id,
+          label: candidate.candidate_name ?? candidate.candidate_person_id,
+        }))}
       />
       <div style={{ marginTop: 12, textAlign: "right" }}>
         <Button

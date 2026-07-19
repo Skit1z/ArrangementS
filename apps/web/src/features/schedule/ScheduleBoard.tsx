@@ -61,6 +61,8 @@ interface Props {
   checkingConflicts?: boolean;
   activeVenueId: string | null;
   setActiveVenueId: (id: string | null) => void;
+  onToggleLock: (slot: SlotView) => void;
+  lockPending?: boolean;
 }
 
 export default function ScheduleBoard({
@@ -76,6 +78,8 @@ export default function ScheduleBoard({
   checkingConflicts,
   activeVenueId,
   setActiveVenueId,
+  onToggleLock,
+  lockPending,
 }: Props) {
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -224,7 +228,8 @@ export default function ScheduleBoard({
       onOk: () => {
         const next = { ...board };
         for (const key of Object.keys(next)) {
-          next[key] = null;
+          const slot = slotsById[parsePosKey(key).slotId];
+          if (!slot?.is_locked) next[key] = null;
         }
         pushHistory(next);
       },
@@ -252,6 +257,10 @@ export default function ScheduleBoard({
     const { slotId } = parsePosKey(key);
     const slot = slotsById[slotId];
     if (!slot) return;
+    if (slot.is_locked) {
+      message.warning("该岗位已锁定，请先解锁再调整");
+      return;
+    }
     setFocusSlotId(slotId);
     const fromKey = activePerson.from.startsWith("pos:") ? activePerson.from.slice(4) : null;
     const { verdict } = evaluateDrop(
@@ -464,11 +473,13 @@ export default function ScheduleBoard({
                                     return (
                                       <td key={d.format() + t} style={{ verticalAlign: "top" }}>
                                         {slot ? (
-                                          <SlotCell
+                    <SlotCell
                                             slot={slot}
                                             board={board}
                                             activeVerdict={activeVerdict}
-                                            conflictKeys={conflictKeys}
+                      conflictKeys={conflictKeys}
+                      onToggleLock={onToggleLock}
+                      lockPending={lockPending}
                                           />
                                         ) : (
                                           <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>

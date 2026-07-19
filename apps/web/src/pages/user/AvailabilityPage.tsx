@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Card, DatePicker, Empty, Form, Input, List, Tag, Typography } from "antd";
+import { App, Button, Card, Checkbox, DatePicker, Empty, Form, Input, List, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 
@@ -9,6 +9,8 @@ import { meApi, STATUS_COLOR, STATUS_LABEL } from "@/features/me/api";
 interface FormValues {
   range: [Dayjs, Dayjs];
   reason: string;
+  weekly?: boolean;
+  recurrenceUntil?: Dayjs;
 }
 
 export default function AvailabilityPage() {
@@ -20,7 +22,14 @@ export default function AvailabilityPage() {
 
   const create = useMutation({
     mutationFn: (v: FormValues) =>
-      meApi.createAvailabilityRequest(v.range[0].toISOString(), v.range[1].toISOString(), v.reason.trim()),
+      meApi.createAvailabilityRequest(
+        v.range[0].toISOString(),
+        v.range[1].toISOString(),
+        v.reason.trim(),
+        v.weekly && v.recurrenceUntil
+          ? `FREQ=WEEKLY;UNTIL=${v.recurrenceUntil.endOf("day").toISOString()}`
+          : null,
+      ),
     onSuccess: () => {
       message.success("已提交，等待管理员审核");
       form.resetFields();
@@ -51,6 +60,26 @@ export default function AvailabilityPage() {
           </Form.Item>
           <Form.Item name="reason" label="原因" rules={[{ required: true, message: "原因必填" }]}>
             <Input.TextArea rows={2} placeholder="请说明原因" />
+          </Form.Item>
+          <Form.Item name="weekly" valuePropName="checked">
+            <Checkbox>每周重复</Checkbox>
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, next) => prev.weekly !== next.weekly}>
+            {({ getFieldValue }) =>
+              getFieldValue("weekly") ? (
+                <Form.Item
+                  name="recurrenceUntil"
+                  label="重复截止日期"
+                  rules={[{ required: true, message: "请选择重复截止日期" }]}
+                >
+                  <DatePicker
+                    format="YYYY-MM-DD"
+                    disabledDate={(d) => d.isBefore(dayjs().startOf("day"))}
+                    style={{ width: "100%" }}
+                  />
+                </Form.Item>
+              ) : null
+            }
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={create.isPending}>
             提交申请
@@ -84,6 +113,7 @@ export default function AvailabilityPage() {
                     </Tag>
                   </div>
                   <div style={{ fontSize: 12, color: "#888" }}>{r.reason}</div>
+                  {r.recurrence_rule && <div style={{ fontSize: 12, color: "#1677ff" }}>每周重复</div>}
                 </div>
               </List.Item>
             )}

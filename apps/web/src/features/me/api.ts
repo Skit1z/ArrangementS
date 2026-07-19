@@ -72,6 +72,7 @@ export interface AvailabilityRequest {
   start_at: string;
   end_at: string;
   reason: string;
+  recurrence_rule: string | null;
   status: string;
 }
 
@@ -123,8 +124,18 @@ export const meApi = {
 
   availabilityRequests: async () =>
     (await api.get<AvailabilityRequest[]>("/me/availability-requests")).data,
-  createAvailabilityRequest: async (start_at: string, end_at: string, reason: string) =>
-    (await api.post<AvailabilityRequest>("/me/availability-requests", { start_at, end_at, reason })).data,
+  createAvailabilityRequest: async (
+    start_at: string,
+    end_at: string,
+    reason: string,
+    recurrence_rule?: string | null,
+  ) =>
+    (await api.post<AvailabilityRequest>("/me/availability-requests", {
+      start_at,
+      end_at,
+      reason,
+      recurrence_rule,
+    })).data,
   withdrawAvailabilityRequest: async (id: string) =>
     (await api.post(`/me/availability-requests/${id}/withdraw`)).data,
 

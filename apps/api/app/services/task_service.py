@@ -8,11 +8,25 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.enums import TaskStatus, VenueType
+from app.models.enums import (
+    ExecutionStatus,
+    LeaveStatus,
+    PlanAssignmentStatus,
+    SlotSourceType,
+    SlotStatus,
+    SwapCandidateStatus,
+    SwapStatus,
+    TaskStatus,
+    VenueType,
+)
+from app.models.leave import LeaveRequest
+from app.models.schedule import DutySlot
+from app.models.swap import SwapRequest
 from app.models.venue import Venue
 from app.models.venue_task import VenueTask
 from app.services import multiplier_service
 from app.services.hours import compute_event_task_hours
+from app.services.intervals import overlaps
 
 # 业务时间为北京时间（见 slots.py 同名常量说明）。
 BEIJING_TZ = timezone(timedelta(hours=8))
@@ -21,7 +35,6 @@ BEIJING_TZ = timezone(timedelta(hours=8))
 def _ensure_tz(dt: datetime) -> datetime:
     """naive datetime（前端未带时区的 ISO）按北京时间解释；aware 原样返回。"""
     return dt.replace(tzinfo=BEIJING_TZ) if dt.tzinfo is None else dt
-from app.services.intervals import overlaps
 
 # list 默认隐藏的状态（已完成/已取消的任务默认不在管理列表里噪声）
 _HIDDEN_BY_DEFAULT = (TaskStatus.cancelled,)
@@ -157,8 +170,8 @@ def create_task(
 
 def update_task(db: Session, task_id: uuid.UUID, patch: dict, expected_version: int | None = None) -> VenueTask:
     task = get_task(db, task_id)
-    if task.status in (TaskStatus.completed, TaskStatus.cancelled):
-        raise HTTPException(status_code=422, detail="已完成或已取消任务不得直接修改")
+    if task.status not in (TaskStatus.draft, TaskStatus.confirmed):
+        raise HTTPException(status_code=422, detail="任务加入排班后不得直接修改，请先取消并新建任务")
     if expected_version is not None and task.version != expected_version:
         raise HTTPException(status_code=409, detail="任务已被他人修改，请刷新后重试")
 
@@ -194,8 +207,48 @@ def update_task(db: Session, task_id: uuid.UUID, patch: dict, expected_version: 
 
 def cancel_task(db: Session, task_id: uuid.UUID) -> VenueTask:
     task = get_task(db, task_id)
+    if task.status in (TaskStatus.completed, TaskStatus.cancelled, TaskStatus.executing):
+        raise HTTPException(status_code=422, detail="执行中、已完成或已取消任务不能取消")
     task.status = TaskStatus.cancelled
     task.version += 1
+
+    slots = list(db.scalars(select(DutySlot).where(
+        DutySlot.source_type == SlotSourceType.venue_task,
+        DutySlot.source_id == task.id,
+    )))
+    for slot in slots:
+        slot.status = SlotStatus.cancelled
+        assignment_ids: list[uuid.UUID] = []
+        for assignment in slot.assignments:
+            assignment_ids.append(assignment.id)
+            assignment.plan_status = PlanAssignmentStatus.cancelled
+            assignment.execution_status = ExecutionStatus.task_cancelled
+            assignment.credited_minutes = 0
+            assignment.balance_minutes = 0
+            assignment.version += 1
+        if assignment_ids:
+            leaves = db.scalars(select(LeaveRequest).where(
+                LeaveRequest.assignment_id.in_(assignment_ids),
+                LeaveRequest.status.in_((LeaveStatus.pending, LeaveStatus.approved)),
+            ))
+            for leave in leaves:
+                leave.status = LeaveStatus.cancelled
+                leave.review_comment = "关联任务已取消"
+            swaps = list(db.scalars(select(SwapRequest).where(
+                SwapRequest.assignment_id.in_(assignment_ids),
+                SwapRequest.status.in_((
+                    SwapStatus.awaiting_target,
+                    SwapStatus.open_collecting,
+                    SwapStatus.pending_admin,
+                )),
+            )))
+            for swap in swaps:
+                swap.status = SwapStatus.expired
+                for candidate in swap.candidates:
+                    if candidate.status == SwapCandidateStatus.applied:
+                        candidate.status = SwapCandidateStatus.expired
+        from app.services.schedule_service import mark_plan_changed
+        mark_plan_changed(db, slot.plan)
     db.flush()
     return task
 
@@ -223,6 +276,13 @@ def transition_task(db: Session, task_id: uuid.UUID, target: TaskStatus) -> Venu
             status_code=422,
             detail=f"任务当前状态「{task.status.value}」不能直接转到「{target.value}」",
         )
+    if target == TaskStatus.scheduled:
+        has_slot = db.scalar(select(DutySlot.id).where(
+            DutySlot.source_type == SlotSourceType.venue_task,
+            DutySlot.source_id == task.id,
+        ))
+        if has_slot is None:
+            raise HTTPException(status_code=422, detail="任务尚未加入周排班，不能标记为已排班")
     task.status = target
     task.version += 1
     db.flush()

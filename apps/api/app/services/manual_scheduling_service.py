@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -95,6 +95,8 @@ def assign_person_to_new_slot(
     # 2. 时间重叠
     if eligibility.has_time_overlap_with_person(db, person.id, probe):
         raise HTTPException(status_code=422, detail="该人员在此时段已有排班，时间重叠")
+    if eligibility.would_exceed_weekly_limit(db, person.id, probe):
+        raise HTTPException(status_code=422, detail="该人员已达到每周排班上限")
 
     # 3. 工时：倍率 + 半小时取整
     engine_rules = multiplier_service.load_engine_rules(db)
@@ -129,6 +131,7 @@ def assign_person_to_new_slot(
     )
     db.add(assignment)
     db.flush()
+    schedule_service.mark_plan_changed(db, plan)
 
     record_audit(
         db, actor_user_id=created_by, action=action,
@@ -192,6 +195,7 @@ def create_vacant_slot(
         ))
 
     db.flush()
+    schedule_service.mark_plan_changed(db, plan)
     record_audit(
         db, actor_user_id=created_by, action="manual.vacant_slot",
         entity_type="duty_slot", entity_id=slot.id,

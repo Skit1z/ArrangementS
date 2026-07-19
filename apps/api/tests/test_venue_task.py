@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from app.models.enums import VenueType
 from app.models.multiplier import MultiplierRule
 from app.models.venue import Venue
-from app.services import task_service
+from app.services import schedule_service, task_service
 
 
 def _event_venue(db):
@@ -101,7 +101,10 @@ def test_transition_task_valid_flow(db_session):
         booking_start_at=datetime(2026, 3, 2, 9, 0), booking_end_at=datetime(2026, 3, 2, 10, 0))
     db_session.commit()
 
-    for target in (TaskStatus.confirmed, TaskStatus.scheduled, TaskStatus.executing, TaskStatus.completed):
+    task_service.transition_task(db_session, task.id, TaskStatus.confirmed)
+    schedule_service.add_task_to_plan(db_session, task.id)
+    assert task.status == TaskStatus.scheduled
+    for target in (TaskStatus.executing, TaskStatus.completed):
         task_service.transition_task(db_session, task.id, target)
         db_session.flush()
         db_session.refresh(task)

@@ -30,6 +30,7 @@ def my_assignments(
         .join(WeeklyPlan, DutySlot.weekly_plan_id == WeeklyPlan.id)
         .where(
             Assignment.person_id == person_id,
+            Assignment.plan_status.in_(VISIBLE_PLAN_STATUSES),
             WeeklyPlan.status == PlanStatus.published,  # 仅已发布
         )
         .order_by(DutySlot.slot_start_at)

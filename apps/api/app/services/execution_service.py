@@ -31,10 +31,21 @@ def _get(db: Session, assignment_id: uuid.UUID) -> Assignment:
 
 def mark_completed(db: Session, *, actor_id: uuid.UUID | None, assignment_id: uuid.UUID) -> Assignment:
     a = _get(db, assignment_id)
-    if a.person_id is None:
-        raise HTTPException(status_code=422, detail="空缺岗位不能标记完成")
+    if (
+        a.person_id is None
+        or a.plan_status != PlanAssignmentStatus.assigned
+        or a.execution_status != ExecutionStatus.pending
+    ):
+        raise HTTPException(status_code=422, detail="仅待执行的有效分配可标记完成")
     a.execution_status = ExecutionStatus.completed
     db.flush()
+    slot = db.get(DutySlot, a.duty_slot_id)
+    if slot.source_type == SlotSourceType.venue_task and slot.source_id is not None:
+        _maybe_complete_task(db, slot.source_id)
+    record_audit(
+        db, actor_user_id=actor_id, action="assignment.mark_completed",
+        entity_type="assignment", entity_id=a.id,
+    )
     return a
 
 
@@ -43,8 +54,12 @@ def mark_absent(
     reason: str | None = None, ip: str | None = None, ua: str | None = None,
 ) -> Assignment:
     a = _get(db, assignment_id)
-    if a.person_id is None:
-        raise HTTPException(status_code=422, detail="空缺岗位不能标记未到岗")
+    if (
+        a.person_id is None
+        or a.plan_status != PlanAssignmentStatus.assigned
+        or a.execution_status != ExecutionStatus.pending
+    ):
+        raise HTTPException(status_code=422, detail="仅待执行的有效分配可标记未到岗")
     a.execution_status = ExecutionStatus.absent
     a.credited_minutes = 0  # 实际完成工时 0
     # balance_minutes 保持不变：未到岗不降低后续自动排班权重
@@ -53,6 +68,9 @@ def mark_absent(
         db, actor_user_id=actor_id, action="assignment.mark_absent",
         entity_type="assignment", entity_id=a.id, reason=reason, ip_address=ip, user_agent=ua,
     )
+    slot = db.get(DutySlot, a.duty_slot_id)
+    if slot.source_type == SlotSourceType.venue_task and slot.source_id is not None:
+        _maybe_complete_task(db, slot.source_id)
     return a
 
 
@@ -90,9 +108,9 @@ def auto_complete_ended(db: Session, now: datetime | None = None) -> int:
 
 
 def _maybe_complete_task(db: Session, task_id: uuid.UUID) -> None:
-    """若该任务的所有 assigned 分配都已完成，则把任务从 executing 推进到 completed。"""
+    """若该任务的所有 assigned 分配都已终结，则同步完成任务。"""
     task = db.get(VenueTask, task_id)
-    if task is None or task.status != TaskStatus.executing:
+    if task is None or task.status not in (TaskStatus.scheduled, TaskStatus.executing):
         return
     slot_ids = [
         sid for (sid,) in db.execute(
@@ -108,7 +126,7 @@ def _maybe_complete_task(db: Session, task_id: uuid.UUID) -> None:
         select(Assignment).where(
             Assignment.duty_slot_id.in_(slot_ids),
             Assignment.plan_status == PlanAssignmentStatus.assigned,
-            Assignment.execution_status != ExecutionStatus.completed,
+            Assignment.execution_status.notin_((ExecutionStatus.completed, ExecutionStatus.absent)),
         ).limit(1)
     )
     if pending is None:

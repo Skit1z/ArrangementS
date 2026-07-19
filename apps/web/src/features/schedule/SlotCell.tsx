@@ -1,5 +1,6 @@
 import { useDroppable, useDndContext } from "@dnd-kit/core";
-import { LockOutlined } from "@ant-design/icons";
+import { LockOutlined, UnlockOutlined } from "@ant-design/icons";
+import { Button, Tooltip } from "antd";
 import dayjs from "dayjs";
 
 import PersonChip from "./PersonChip";
@@ -11,6 +12,8 @@ interface Props {
   board: Board;
   activeVerdict: { key: string; verdict: DropVerdict } | null;
   conflictKeys: Set<string>;
+  onToggleLock: (slot: SlotView) => void;
+  lockPending?: boolean;
 }
 
 function Position({
@@ -22,7 +25,11 @@ function Position({
 }: Props & { index: number }) {
   const key = posKey(slot.id, index);
   const occupant = board[key] ?? null;
-  const { setNodeRef, isOver } = useDroppable({ id: `pos:${key}`, data: { positionKey: key } });
+  const { setNodeRef, isOver } = useDroppable({
+    id: `pos:${key}`,
+    data: { positionKey: key },
+    disabled: slot.is_locked,
+  });
 
   const verdict = activeVerdict?.key === key ? activeVerdict.verdict : null;
   const hasConflict = conflictKeys.has(key);
@@ -45,6 +52,7 @@ function Position({
           label={occupant.person_name}
           color={hasConflict ? "red" : "blue"}
           compact
+          disabled={slot.is_locked}
         />
       </div>
     );
@@ -116,8 +124,19 @@ export default function SlotCell(props: Props) {
           {dayjs(slot.slot_start_at).format("HH:mm")}-{dayjs(slot.slot_end_at).format("HH:mm")}
         </span>
         <span>
-          {slot.is_locked && <LockOutlined style={{ marginRight: 4 }} />}
           {filled}/{slot.required_people}
+          <Tooltip title={slot.is_locked ? "解锁岗位" : filled ? "锁定当前分配" : "空缺岗位不能锁定"}>
+            <Button
+              type="text"
+              size="small"
+              aria-label={slot.is_locked ? "解锁岗位" : "锁定岗位"}
+              icon={slot.is_locked ? <UnlockOutlined /> : <LockOutlined />}
+              disabled={!slot.is_locked && filled === 0}
+              loading={props.lockPending}
+              onClick={() => props.onToggleLock(slot)}
+              style={{ marginLeft: 2, width: 24, height: 22 }}
+            />
+          </Tooltip>
         </span>
       </div>
       {Array.from({ length: renderCount }).map((_, i) => (

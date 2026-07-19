@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.models.vacation import VacationAvailability, VacationPeriod
 from app.services.intervals import merge_intervals
+
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 def create_vacation(
@@ -56,7 +58,14 @@ def set_availabilities(
     intervals: list[tuple[datetime, datetime]],
 ) -> list[VacationAvailability]:
     """整体覆盖某人在该假期的可值班时间段，保存时自动合并重叠区间。"""
-    get_vacation(db, vacation_id)
+    vacation = get_vacation(db, vacation_id)
+    for start, end in intervals:
+        if end <= start:
+            raise HTTPException(status_code=422, detail="可值班时段的结束时间必须晚于开始时间")
+        start_date = start.astimezone(BEIJING_TZ).date() if start.tzinfo else start.date()
+        end_date = end.astimezone(BEIJING_TZ).date() if end.tzinfo else end.date()
+        if start_date < vacation.start_date or end_date > vacation.end_date:
+            raise HTTPException(status_code=422, detail="可值班时段必须完全位于该假期日期范围内")
     existing = db.scalars(
         select(VacationAvailability).where(
             VacationAvailability.vacation_period_id == vacation_id,

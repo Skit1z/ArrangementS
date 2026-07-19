@@ -155,6 +155,47 @@ def test_reproducible_generate(db_session):
     assert set(first.values()) == set(second.values())
 
 
+def test_generate_preserves_locked_slot_and_assignment(db_session):
+    _yellow(db_session, templates=1)
+    for i in range(3):
+        _person(db_session, i)
+    db_session.commit()
+    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    db_session.commit()
+
+    locked_slot = db_session.scalar(select(DutySlot).order_by(DutySlot.slot_start_at))
+    locked_assignment = next(a for a in locked_slot.assignments if a.person_id is not None)
+    original_slot_id = locked_slot.id
+    original_assignment_id = locked_assignment.id
+    original_person_id = locked_assignment.person_id
+    schedule_service.set_lock(db_session, locked_assignment.id, True)
+    db_session.commit()
+
+    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=9)
+    db_session.commit()
+    assert db_session.get(DutySlot, original_slot_id).is_locked is True
+    preserved = db_session.get(Assignment, original_assignment_id)
+    assert preserved.person_id == original_person_id
+    matching = list(db_session.scalars(select(DutySlot).where(
+        DutySlot.source_id == locked_slot.source_id,
+        DutySlot.slot_start_at == locked_slot.slot_start_at,
+    )))
+    assert len(matching) == 1
+
+
+def test_republish_after_unpublish_bumps_revision(db_session):
+    _yellow(db_session, templates=1)
+    _person(db_session, 0)
+    _person(db_session, 1)
+    db_session.commit()
+    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    plan = schedule_service.publish(db_session, MONDAY, actor_id=None)
+    initial_revision = plan.revision
+    schedule_service.unpublish(db_session, MONDAY, actor_id=None)
+    plan = schedule_service.publish(db_session, MONDAY, actor_id=None)
+    assert plan.revision == initial_revision + 1
+
+
 # --- 增量排班：把新任务追加到已发布的当前周计划 ---
 def test_add_task_to_published_plan_creates_slot_and_vacant_assignments(db_session):
     """已发布周计划创建后，再创建一个当天任务，调用增量服务应：

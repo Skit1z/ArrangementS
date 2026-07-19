@@ -9,14 +9,19 @@ P1.4 修复：所有约束都尊重 ``effective_start``/``effective_end`` ——
 from __future__ import annotations
 
 import uuid
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.availability import AvailabilityBlock
 from app.models.constraint import PersonConstraint
-from app.models.enums import AvailabilityStatus, PersonStatus
+from app.models.enums import (
+    AvailabilityStatus,
+    PersonStatus,
+    PlanAssignmentStatus,
+    SlotSourceType,
+)
 from app.models.person import PersonProfile
 from app.models.schedule import Assignment, DutySlot
 from app.models.vacation import VacationPeriod
@@ -91,11 +96,22 @@ def _violates_constraint(c: PersonConstraint, slot: DutySlot) -> bool:
     return False
 
 
-def _weekly_limit(constraints: list[PersonConstraint]) -> int | None:
+def _weekly_limit(constraints: list[PersonConstraint], on_dates: set[date] | None = None) -> int | None:
+    """Return the strictest applicable weekly limit.
+
+    Multiple effective-dated rules may overlap.  Taking the minimum avoids making
+    the result depend on database row order.
+    """
+    limits: list[int] = []
     for c in constraints:
-        if c.constraint_type == "weekly_limit":
-            return (c.constraint_value or {}).get("limit")
-    return None
+        if c.constraint_type != "weekly_limit":
+            continue
+        if on_dates is not None and not any(_is_constraint_in_effect(c, day) for day in on_dates):
+            continue
+        value = (c.constraint_value or {}).get("limit")
+        if isinstance(value, int) and value >= 0:
+            limits.append(value)
+    return min(limits) if limits else None
 
 
 def _forbidden_pairs(constraints_by_person: dict[uuid.UUID, list[PersonConstraint]]) -> list[tuple[str, str]]:
@@ -136,7 +152,11 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
     locked_rows = db.scalars(
         select(Assignment)
         .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
-        .where(DutySlot.weekly_plan_id == plan.id, DutySlot.is_locked.is_(True))
+        .where(
+            DutySlot.weekly_plan_id == plan.id,
+            or_(DutySlot.is_locked.is_(True), DutySlot.source_type == SlotSourceType.manual),
+            Assignment.person_id.is_not(None),
+        )
     )
     locked_by_slot_pos = {
         (str(a.duty_slot_id), a.position_index): str(a.person_id)
@@ -181,7 +201,15 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
                     db, person, slot, blocks.get(person.id, []), constraints.get(person.id, []), vacation
                 )
 
-    weekly_limit = {str(p.id): _weekly_limit(constraints.get(p.id, [])) for p in people}
+    slot_dates = {
+        s.slot_start_at.date()
+        if s.slot_start_at.tzinfo is None
+        else s.slot_start_at.astimezone(BEIJING_TZ).date()
+        for s in slots
+    }
+    weekly_limit = {
+        str(p.id): _weekly_limit(constraints.get(p.id, []), slot_dates) for p in people
+    }
     weekly_limit = {k: v for k, v in weekly_limit.items() if v is not None}
 
     history = _month_history(db, plan)
@@ -258,6 +286,58 @@ def has_time_overlap_with_person(
     return False
 
 
+def would_exceed_weekly_limit(
+    db: Session,
+    person_id: uuid.UUID,
+    slot: DutySlot,
+    exclude_assignment_id: uuid.UUID | None = None,
+) -> bool:
+    """Whether adding ``slot`` would exceed the person's effective weekly cap.
+
+    The count is based on the slot's local Monday-Sunday week and includes all
+    active assignments, not merely assignments in one WeeklyPlan.  This matters
+    for manual/overtime slots and for data imported into a neighbouring plan.
+    """
+    local_start = (
+        slot.slot_start_at
+        if slot.slot_start_at.tzinfo is None
+        else slot.slot_start_at.astimezone(BEIJING_TZ)
+    )
+    on_date = local_start.date()
+    constraints = _hard_constraints(db, [person_id]).get(person_id, [])
+    limit = _weekly_limit(constraints, {on_date})
+    if limit is None:
+        return False
+
+    week_start = on_date - timedelta(days=on_date.weekday())
+    week_end = week_start + timedelta(days=7)
+    rows = db.execute(
+        select(Assignment, DutySlot)
+        .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
+        .where(
+            Assignment.person_id == person_id,
+            Assignment.plan_status.notin_([
+                PlanAssignmentStatus.vacant,
+                PlanAssignmentStatus.cancelled,
+                PlanAssignmentStatus.replaced,
+            ]),
+        )
+    ).all()
+    count = 0
+    for assignment, other_slot in rows:
+        if exclude_assignment_id is not None and assignment.id == exclude_assignment_id:
+            continue
+        other_start: datetime = other_slot.slot_start_at
+        other_date = (
+            other_start.date()
+            if other_start.tzinfo is None
+            else other_start.astimezone(BEIJING_TZ).date()
+        )
+        if week_start <= other_date < week_end:
+            count += 1
+    return count + 1 > limit
+
+
 def violates_no_pair_with_existing(
     db: Session, person_id: uuid.UUID, slot: DutySlot, exclude_assignment_id: uuid.UUID | None = None
 ) -> bool:
@@ -269,8 +349,8 @@ def violates_no_pair_with_existing(
 
     # 同 slot 其它人员
     other_person_ids = [
-        pid for (pid,) in db.execute(
-            select(Assignment.person_id).where(
+        pid for assignment_id, pid in db.execute(
+            select(Assignment.id, Assignment.person_id).where(
                 Assignment.duty_slot_id == slot.id,
                 Assignment.person_id.is_not(None),
                 Assignment.plan_status.notin_(
@@ -278,7 +358,7 @@ def violates_no_pair_with_existing(
                 ),
             )
         )
-        if pid is not None and (exclude_assignment_id is None or pid != person_id)
+        if pid is not None and assignment_id != exclude_assignment_id
     ]
     if not other_person_ids:
         return False

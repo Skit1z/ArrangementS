@@ -100,6 +100,26 @@ def test_leave_only_own_assignment(db_session):
     assert ei.value.status_code == 403
 
 
+def test_duplicate_leave_rejected_and_approval_can_be_revoked(db_session):
+    p = _person(db_session, 0)
+    a, slot = _future_assignment(db_session, p)
+    leave = leave_service.create_leave(
+        db_session, applicant_person_id=p.id, assignment_id=a.id, reason="病假"
+    )
+    with pytest.raises(HTTPException) as duplicate:
+        leave_service.create_leave(
+            db_session, applicant_person_id=p.id, assignment_id=a.id, reason="重复"
+        )
+    assert duplicate.value.status_code == 409
+    leave_service.approve(db_session, actor_id=None, leave_id=leave.id)
+    leave_service.revoke_approval(db_session, actor_id=None, leave_id=leave.id)
+    assert leave.status == LeaveStatus.cancelled
+    assert a.execution_status == ExecutionStatus.pending
+    assert a.plan_status == PlanAssignmentStatus.assigned
+    assert a.credited_minutes == 120
+    assert slot.status == SlotStatus.filled
+
+
 def test_emergency_flag_within_24h(db_session):
     p = _person(db_session, 0)
     a, _ = _future_assignment(db_session, p, hours_ahead=10)
@@ -155,6 +175,20 @@ def test_open_swap_flow_and_other_candidates_expire(db_session):
     assert cands[p2.id] == SwapCandidateStatus.expired
 
 
+def test_swap_creation_rejects_started_shift(db_session):
+    p0 = _person(db_session, 0)
+    p1 = _person(db_session, 1)
+    a, _ = _future_assignment(db_session, p0, hours_ahead=-1)
+    with pytest.raises(HTTPException) as exc:
+        swap_service.create_targeted(
+            db_session,
+            requester_person_id=p0.id,
+            assignment_id=a.id,
+            target_person_id=p1.id,
+        )
+    assert exc.value.status_code == 422
+
+
 def test_swap_approve_revalidates_time_overlap(db_session):
     p0 = _person(db_session, 0)
     p1 = _person(db_session, 1)
@@ -186,6 +220,25 @@ def test_availability_request_approve_creates_block(db_session):
     db_session.commit()
     blocks = list(db_session.scalars(select(AvailabilityBlock).where(AvailabilityBlock.person_id == p.id, AvailabilityBlock.status == AvailabilityStatus.active)))
     assert len(blocks) == 1
+
+
+def test_weekly_availability_request_expands_until_date(db_session):
+    p = _person(db_session, 0)
+    start = datetime.now(timezone.utc) + timedelta(days=1)
+    until = start + timedelta(weeks=2)
+    req = availability_service.create_request(
+        db_session,
+        person_id=p.id,
+        start_at=start,
+        end_at=start + timedelta(hours=2),
+        reason="每周有事",
+        recurrence_rule=f"FREQ=WEEKLY;UNTIL={until.isoformat()}",
+    )
+    availability_service.approve(db_session, actor_id=None, request_id=req.id)
+    blocks = list(db_session.scalars(select(AvailabilityBlock).where(
+        AvailabilityBlock.source_ref_id == req.id
+    )))
+    assert len(blocks) == 3
 
 
 def test_availability_request_past_rejected(db_session):

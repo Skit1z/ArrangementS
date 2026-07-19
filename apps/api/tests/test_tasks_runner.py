@@ -200,3 +200,55 @@ def test_job_expire_semesters_deactivates_past_without_uploads(db_session):
     db_session.flush()  # 把 runner 对 sem 的修改写库，便于 refresh 校验
     db_session.refresh(sem)
     assert sem.is_current is False
+
+
+def test_job_expire_workflows_closes_started_requests(db_session):
+    from app.models.enums import LeaveStatus, SwapMode, SwapStatus
+    from app.models.leave import LeaveRequest
+    from app.models.swap import SwapRequest
+
+    p = _person(db_session)
+    venue = _venue(db_session)
+    plan = WeeklyPlan(
+        week_start=date(2026, 3, 2), week_end=date(2026, 3, 8),
+        revision=1, status=PlanStatus.published,
+    )
+    db_session.add(plan)
+    db_session.flush()
+    start = datetime.now(timezone.utc) - timedelta(hours=1)
+    slot = DutySlot(
+        weekly_plan_id=plan.id, venue_id=venue.id,
+        source_type=SlotSourceType.fixed_shift,
+        slot_start_at=start, slot_end_at=start + timedelta(hours=2),
+        required_people=1, credited_minutes=120, month_key="2026-03",
+        status=SlotStatus.filled,
+    )
+    db_session.add(slot)
+    db_session.flush()
+    assignment = Assignment(
+        duty_slot_id=slot.id, person_id=p.id, position_index=0,
+        plan_status=PlanAssignmentStatus.assigned,
+        execution_status=ExecutionStatus.pending,
+        raw_minutes=120, weighted_minutes_before_round=Decimal(120),
+        credited_minutes=120, balance_minutes=120,
+    )
+    db_session.add(assignment)
+    db_session.flush()
+    leave = LeaveRequest(
+        assignment_id=assignment.id,
+        applicant_person_id=p.id,
+        reason="待审",
+        status=LeaveStatus.pending,
+    )
+    swap = SwapRequest(
+        assignment_id=assignment.id,
+        requester_person_id=p.id,
+        mode=SwapMode.open,
+        status=SwapStatus.open_collecting,
+    )
+    db_session.add_all([leave, swap])
+    db_session.flush()
+    result = runner.job_expire_workflows(db=db_session)
+    assert result == {"leaves": 1, "swaps": 1}
+    assert leave.status == LeaveStatus.cancelled
+    assert swap.status == SwapStatus.expired

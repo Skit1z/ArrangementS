@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { UploadOutlined } from "@ant-design/icons";
-import { App, Button, Card, Modal, Select, Space, Spin, Table, Tag, Upload } from "antd";
+import { App, Button, Card, Modal, Select, Space, Spin, Tag, Upload } from "antd";
 import { useState } from "react";
 import { errorMessage } from "@/api/client";
+import { TimetableEntryEditor } from "@/components/TimetableEntryEditor";
 import { adminApi, type ActiveTimetableOut } from "@/features/admin/api";
+import type { ParsedEntry } from "@/features/me/api";
 
 const PERIOD_BLOCKS = [
   { label: "1-2 节", start: 1, end: 2 },
@@ -21,16 +23,6 @@ const WEEKDAYS = [
   { label: "周六", value: 6 },
   { label: "周日", value: 7 },
 ];
-const WD_LABEL = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
-
-interface ParsedEntry {
-  weekday: number;
-  period_start: number;
-  period_end: number;
-  week_expr: string;
-  location_code: string | null;
-  course_name: string | null;
-}
 
 export default function TimetablesPage() {
   const { message } = App.useApp();
@@ -38,6 +30,10 @@ export default function TimetablesPage() {
   const { data, isLoading } = useQuery<ActiveTimetableOut[]>({
     queryKey: ["admin", "timetables", "active"],
     queryFn: adminApi.timetables.active,
+  });
+  const peopleQuery = useQuery({
+    queryKey: ["admin", "people", "timetable-picker"],
+    queryFn: adminApi.people.list,
   });
 
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
@@ -64,6 +60,11 @@ export default function TimetablesPage() {
 
   const confirmMut = useMutation({
     mutationFn: async () => {
+      if (!proxyParsed?.length || proxyParsed.some((entry) =>
+        entry.period_start > entry.period_end || !entry.week_expr.trim()
+      )) {
+        throw new Error("请检查节次范围和周次，至少保留一条有效课程时段");
+      }
       const up = await adminApi.timetables.uploadFor(
         proxyPersonId!,
         proxyFileName,
@@ -87,6 +88,7 @@ export default function TimetablesPage() {
   }
 
   const allPeople = data ?? [];
+  const selectablePeople = (peopleQuery.data ?? []).filter((person) => person.status === "active");
   const peopleToDisplay = selectedPerson
     ? allPeople.filter((p) => p.person_id === selectedPerson)
     : allPeople;
@@ -117,7 +119,7 @@ export default function TimetablesPage() {
             style={{ width: 200 }}
             value={selectedPerson}
             onChange={setSelectedPerson}
-            options={allPeople.map((p) => ({ label: p.person_name, value: p.person_id }))}
+            options={selectablePeople.map((p) => ({ label: p.full_name, value: p.id }))}
             filterOption={(input, option) =>
               (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
             }
@@ -262,7 +264,7 @@ export default function TimetablesPage() {
                 style={{ width: "100%" }}
                 value={proxyPersonId}
                 onChange={setProxyPersonId}
-                options={allPeople.map((p) => ({ label: p.person_name, value: p.person_id }))}
+                options={selectablePeople.map((p) => ({ label: p.full_name, value: p.id }))}
               />
             </div>
             <Upload
@@ -285,26 +287,7 @@ export default function TimetablesPage() {
             </Upload>
           </>
         ) : (
-          <Table
-            size="small"
-            pagination={false}
-            scroll={{ y: 300 }}
-            dataSource={proxyParsed.map((e, i) => ({ ...e, key: i }))}
-            columns={[
-              {
-                title: "星期",
-                dataIndex: "weekday",
-                render: (v: number) => WD_LABEL[v],
-                width: 70,
-              },
-              {
-                title: "节次",
-                render: (_, r) => `第 ${r.period_start}-${r.period_end} 节`,
-                width: 100,
-              },
-              { title: "周次", dataIndex: "week_expr", width: 130 },
-            ]}
-          />
+          <TimetableEntryEditor value={proxyParsed} onChange={setProxyParsed} maxHeight={300} />
         )}
       </Modal>
     </Card>

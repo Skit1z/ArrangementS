@@ -6,7 +6,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import LeaveStatus, RequestStatus, SwapMode, SwapStatus
+from app.models.enums import (
+    LeaveStatus,
+    RequestStatus,
+    SwapCandidateStatus,
+    SwapMode,
+    SwapStatus,
+)
 
 
 # --- 不可值班申请 ---
@@ -23,6 +29,7 @@ class AvailabilityRequestOut(BaseModel):
     start_at: datetime
     end_at: datetime
     reason: str
+    recurrence_rule: str | None
     status: RequestStatus
 
     model_config = {"from_attributes": True}
@@ -72,6 +79,15 @@ class SwapApproveIn(BaseModel):
     selected_person_id: uuid.UUID | None = None
 
 
+class SwapCandidateOut(BaseModel):
+    id: uuid.UUID
+    candidate_person_id: uuid.UUID
+    candidate_name: str | None = None
+    status: SwapCandidateStatus
+
+    model_config = {"from_attributes": True}
+
+
 class SwapOut(BaseModel):
     id: uuid.UUID
     assignment_id: uuid.UUID
@@ -86,5 +102,6 @@ class SwapOut(BaseModel):
     venue_name: str | None = None
     slot_start_at: datetime | None = None
     slot_end_at: datetime | None = None
+    candidates: list[SwapCandidateOut] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}

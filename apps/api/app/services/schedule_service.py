@@ -40,6 +40,14 @@ def _get_or_create_plan(db: Session, week_start: date) -> tuple[WeeklyPlan, bool
     return plan, True
 
 
+def mark_plan_changed(db: Session, plan: WeeklyPlan) -> None:
+    """Record an in-place content change to a weekly plan."""
+    plan.version += 1
+    if plan.status == PlanStatus.published:
+        plan.revision += 1
+    db.flush()
+
+
 def generate(
     db: Session, week_start: date, actor_id: uuid.UUID | None, seed: int = 42
 ) -> dict:
@@ -50,14 +58,23 @@ def generate(
     if plan.status == PlanStatus.published:
         raise HTTPException(status_code=409, detail="已发布计划请使用重新优化或增量排班")
 
-    # 清空旧岗位与分配（草稿重建）
+    # 草稿重建只清除自动生成且未锁定的岗位；手工岗位和锁定岗位必须保留。
     for s in list(db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))):
-        db.delete(s)
+        if not s.is_locked and s.source_type != SlotSourceType.manual:
+            db.delete(s)
     db.flush()
 
     slots.generate_slots(db, plan)
     solver_input = eligibility.build_solver_input(db, plan, seed=seed)
-    result = solve(solver_input)
+    try:
+        result = solve(solver_input)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if result.status not in {"OPTIMAL", "FEASIBLE"}:
+        raise HTTPException(
+            status_code=409,
+            detail="锁定分配与当前排班约束冲突，请先解锁冲突岗位后再生成",
+        )
 
     _persist_assignments(db, plan, result, actor_id)
 
@@ -98,25 +115,38 @@ def _persist_assignments(db: Session, plan: WeeklyPlan, result, actor_id: uuid.U
         if person is not None:
             filled_counts[slot_id] = filled_counts.get(slot_id, 0) + 1
 
+        assignment = db.scalar(
+            select(Assignment).where(
+                Assignment.duty_slot_id == slot.id,
+                Assignment.position_index == position_index,
+            )
+        )
+        # 锁定岗位复用原 assignment，未锁定岗位通常走创建分支。
+        if assignment is None:
+            assignment = Assignment(duty_slot_id=slot.id, position_index=position_index)
+            db.add(assignment)
+
         if person is None:
-            assignment = Assignment(
-                duty_slot_id=slot.id, person_id=None, position_index=position_index,
-                assignment_source=AssignmentSource.auto,
-                plan_status=PlanAssignmentStatus.vacant,
-                execution_status=ExecutionStatus.pending,
-                raw_minutes=0, weighted_minutes_before_round=Decimal(0),
-                credited_minutes=0, balance_minutes=0, created_by=actor_id,
-            )
+            assignment.person_id = None
+            assignment.assignment_source = AssignmentSource.auto
+            assignment.plan_status = PlanAssignmentStatus.vacant
+            assignment.execution_status = ExecutionStatus.pending
+            assignment.raw_minutes = 0
+            assignment.weighted_minutes_before_round = Decimal(0)
+            assignment.credited_minutes = 0
+            assignment.balance_minutes = 0
+            assignment.created_by = assignment.created_by or actor_id
         else:
-            assignment = Assignment(
-                duty_slot_id=slot.id, person_id=uuid.UUID(person), position_index=position_index,
-                assignment_source=AssignmentSource.auto,
-                plan_status=PlanAssignmentStatus.pending,
-                execution_status=ExecutionStatus.pending,
-                raw_minutes=raw, weighted_minutes_before_round=weighted,
-                credited_minutes=credited, balance_minutes=credited, created_by=actor_id,
-            )
-        db.add(assignment)
+            assignment.person_id = uuid.UUID(person)
+            if not slot.is_locked and slot.source_type != SlotSourceType.manual:
+                assignment.assignment_source = AssignmentSource.auto
+            assignment.plan_status = PlanAssignmentStatus.pending
+            assignment.execution_status = ExecutionStatus.pending
+            assignment.raw_minutes = raw
+            assignment.weighted_minutes_before_round = weighted
+            assignment.credited_minutes = credited
+            assignment.balance_minutes = credited
+            assignment.created_by = assignment.created_by or actor_id
 
     # 更新 slot 状态。注意：assignment 通过 duty_slot_id 创建，不会回填 slot.assignments 关系，
     # 因此这里用求解结果直接计数，不读关系集合。
@@ -143,10 +173,11 @@ def publish(db: Session, week_start: date, actor_id: uuid.UUID | None) -> Weekly
             if a.plan_status == PlanAssignmentStatus.pending and a.person_id is not None:
                 a.plan_status = PlanAssignmentStatus.assigned
     was_published = plan.status == PlanStatus.published
+    was_published_before = plan.published_at is not None
     plan.status = PlanStatus.published
     plan.published_at = datetime.now(timezone.utc)
     plan.published_by = actor_id
-    if was_published:
+    if was_published or (not was_published and was_published_before):
         plan.revision += 1
     db.flush()
     record_audit(
@@ -198,7 +229,7 @@ def add_task_to_plan(db: Session, task_id: uuid.UUID, actor_id: uuid.UUID | None
     if task is None:
         raise HTTPException(status_code=404, detail="任务不存在")
     if task.status not in (
-        TaskStatus.confirmed, TaskStatus.scheduled, TaskStatus.executing, TaskStatus.completed
+        TaskStatus.confirmed,
     ):
         raise HTTPException(status_code=422, detail=f"任务状态「{task.status.value}」不可加入排班")
 
@@ -244,8 +275,9 @@ def add_task_to_plan(db: Session, task_id: uuid.UUID, actor_id: uuid.UUID | None
         ))
 
     was_published = plan.status == PlanStatus.published
-    if was_published:
-        plan.revision += 1
+    task.status = TaskStatus.scheduled
+    task.version += 1
+    mark_plan_changed(db, plan)
 
     db.flush()
     record_audit(
@@ -311,7 +343,13 @@ def serialize_week(db: Session, plan: WeeklyPlan) -> dict:
             select(DutySlot).where(DutySlot.weekly_plan_id == plan.id).order_by(DutySlot.slot_start_at)
         )
     )
-    person_ids = {a.person_id for s in slot_rows for a in s.assignments if a.person_id}
+    visible_statuses = (PlanAssignmentStatus.assigned, PlanAssignmentStatus.pending)
+    person_ids = {
+        a.person_id
+        for s in slot_rows
+        for a in s.assignments
+        if a.person_id and a.plan_status in visible_statuses
+    }
     names = {
         p.id: p.full_name
         for p in db.scalars(select(PersonProfile).where(PersonProfile.id.in_(person_ids)))
@@ -339,8 +377,8 @@ def serialize_week(db: Session, plan: WeeklyPlan) -> dict:
                 "assignments": [
                     {
                         "id": a.id,
-                        "person_id": a.person_id,
-                        "person_name": names.get(a.person_id),
+                        "person_id": a.person_id if a.plan_status in visible_statuses else None,
+                        "person_name": names.get(a.person_id) if a.plan_status in visible_statuses else None,
                         "position_index": a.position_index,
                         "plan_status": a.plan_status.value,
                         "execution_status": a.execution_status.value,
@@ -359,6 +397,8 @@ def set_lock(db: Session, assignment_id: uuid.UUID, locked: bool) -> DutySlot:
     if a is None:
         raise HTTPException(status_code=404, detail="分配不存在")
     slot = db.get(DutySlot, a.duty_slot_id)
+    if locked and a.person_id is None:
+        raise HTTPException(status_code=422, detail="空缺岗位不能锁定")
     slot.is_locked = locked
     db.flush()
     return slot

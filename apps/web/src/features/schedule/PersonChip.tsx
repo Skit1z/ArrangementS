@@ -6,12 +6,14 @@ interface Props {
   label: string;
   color?: string;
   compact?: boolean;
+  disabled?: boolean;
 }
 
-export default function PersonChip({ id, personId, label, color, compact }: Props) {
+export default function PersonChip({ id, personId, label, color, compact, disabled }: Props) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
     data: { personId },
+    disabled,
   });
 
   let bg = "#f0f5ff";
@@ -43,7 +45,7 @@ export default function PersonChip({ id, personId, label, color, compact }: Prop
       {...attributes}
       style={{
         opacity: isDragging ? 0.4 : 1,
-        cursor: "grab",
+        cursor: disabled ? "not-allowed" : "grab",
         touchAction: "none",
         display: compact ? "block" : "inline-block",
         width: compact ? "100%" : "auto",

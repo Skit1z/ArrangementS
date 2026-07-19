@@ -90,11 +90,23 @@ def solve(data: SolverInput) -> SolverResult:
     persons = data.persons
     pos_index = {p.id: idx for idx, p in enumerate(positions)}
 
+    unknown_positions = set(data.locked) - set(pos_index)
+    unknown_people = set(data.locked.values()) - set(persons)
+    if unknown_positions or unknown_people:
+        details = []
+        if unknown_positions:
+            details.append(f"岗位不存在: {', '.join(sorted(unknown_positions))}")
+        if unknown_people:
+            details.append(f"人员不在可排班人员池: {', '.join(sorted(unknown_people))}")
+        raise ValueError("锁定分配无效（" + "；".join(details) + "）")
+
     # 决策变量 x[p, pos]
     x: dict[tuple[str, int], cp_model.IntVar] = {}
     for person in persons:
         for idx, pos in enumerate(positions):
-            if data.available.get((person, pos.id), False):
+            # 锁定是管理员显式决定，优先于后来出现的课表/白名单等可用性变化。
+            # 若人员已不在人员池则在上方明确报错，绝不静默丢锁。
+            if data.available.get((person, pos.id), False) or data.locked.get(pos.id) == person:
                 x[(person, idx)] = model.NewBoolVar(f"x_{person}_{idx}")
 
     # 空缺变量
@@ -112,8 +124,7 @@ def solve(data: SolverInput) -> SolverResult:
     # 人工锁定
     for pos_id, person in data.locked.items():
         idx = pos_index[pos_id]
-        if (person, idx) in x:
-            model.Add(x[(person, idx)] == 1)
+        model.Add(x[(person, idx)] == 1)
 
     # 时间重叠：同一人在重叠岗位最多一个
     overlaps = _overlapping_position_pairs(positions)

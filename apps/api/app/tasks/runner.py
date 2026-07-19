@@ -23,7 +23,7 @@ from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.models.semester import Semester
-from app.services import execution_service, timetable_service
+from app.services import execution_service, leave_service, swap_service, timetable_service
 
 log = logging.getLogger("app.tasks")
 
@@ -49,6 +49,25 @@ def job_auto_complete(db=None) -> int:
     if n:
         log.info("auto_complete_ended: 已自动完成 %d 条班次", n)
     return n
+
+
+def job_expire_workflows(db=None) -> dict[str, int]:
+    """关闭班次已开始但仍未完成的请假、换班流程。"""
+    def _do(session) -> dict[str, int]:
+        now = datetime.now(timezone.utc)
+        return {
+            "leaves": leave_service.expire_started(session, now),
+            "swaps": swap_service.expire_started(session, now),
+        }
+
+    if db is not None:
+        return _do(db)
+    with SessionLocal() as session:
+        result = _do(session)
+        session.commit()
+    if result["leaves"] or result["swaps"]:
+        log.info("expire_workflows: 请假 %d 条，换班 %d 条", result["leaves"], result["swaps"])
+    return result
 
 
 def job_expire_semesters(db=None, today: date | None = None) -> list[str]:
@@ -122,6 +141,14 @@ def build_scheduler() -> BlockingScheduler:
         coalesce=True,
         misfire_grace_time=3600,
     )
+    scheduler.add_job(
+        job_expire_workflows,
+        IntervalTrigger(minutes=AUTO_COMPLETE_INTERVAL_MINUTES),
+        id="expire-workflows",
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=60,
+    )
     return scheduler
 
 
@@ -139,6 +166,7 @@ def main() -> None:
     # 启动时各跑一次，避免重启后首批延迟
     try:
         job_auto_complete()
+        job_expire_workflows()
         job_expire_semesters()
     except Exception:  # noqa: BLE001 — 启动自检失败不应阻塞 scheduler
         log.exception("启动自检任务失败，继续运行 scheduler")

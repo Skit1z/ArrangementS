@@ -35,6 +35,7 @@ import {
   type SpecialDate,
   type SpecialDateIn,
   type Vacation,
+  type VacationAvailability,
   type VacationCreate,
 } from "@/features/admin/api";
 
@@ -90,6 +91,8 @@ function MultipliersTab() {
     weekdays?: number[] | null;
     priority?: number;
     is_active?: boolean;
+    effective_start_date?: dayjs.Dayjs | null;
+    effective_end_date?: dayjs.Dayjs | null;
   }>();
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "multipliers"] });
 
@@ -146,6 +149,8 @@ function MultipliersTab() {
       weekdays: r.weekdays ?? undefined,
       priority: r.priority,
       is_active: r.is_active,
+      effective_start_date: r.effective_start_date ? dayjs(r.effective_start_date) : null,
+      effective_end_date: r.effective_end_date ? dayjs(r.effective_end_date) : null,
     });
     setEditing(r);
   };
@@ -161,6 +166,8 @@ function MultipliersTab() {
       weekdays: v.weekdays ?? null,
       priority: v.priority ?? 0,
       is_active: v.is_active ?? true,
+      effective_start_date: v.effective_start_date?.format("YYYY-MM-DD") ?? null,
+      effective_end_date: v.effective_end_date?.format("YYYY-MM-DD") ?? null,
     };
     if (editing) updateM.mutate({ id: editing.id, patch: payload });
     else createM.mutate(payload);
@@ -198,6 +205,14 @@ function MultipliersTab() {
               w && w.length ? w.map((d) => "日一二三四五六"[d]).join("") : "全部",
           },
           { title: "优先级", dataIndex: "priority", width: 80 },
+          {
+            title: "生效日期",
+            width: 190,
+            render: (_, r) =>
+              r.effective_start_date || r.effective_end_date
+                ? `${r.effective_start_date ?? "不限"} – ${r.effective_end_date ?? "不限"}`
+                : "长期有效",
+          },
           {
             title: "状态",
             dataIndex: "is_active",
@@ -274,6 +289,28 @@ function MultipliersTab() {
               ]}
             />
           </Form.Item>
+          <Space>
+            <Form.Item name="effective_start_date" label="生效开始日期">
+              <DatePicker format="YYYY-MM-DD" />
+            </Form.Item>
+            <Form.Item
+              name="effective_end_date"
+              label="生效结束日期"
+              dependencies={["effective_start_date"]}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const start = getFieldValue("effective_start_date");
+                    return !value || !start || !value.isBefore(start, "day")
+                      ? Promise.resolve()
+                      : Promise.reject(new Error("结束日期不得早于开始日期"));
+                  },
+                }),
+              ]}
+            >
+              <DatePicker format="YYYY-MM-DD" />
+            </Form.Item>
+          </Space>
           <Form.Item name="is_active" label="启用" valuePropName="checked">
             <Checkbox>启用</Checkbox>
           </Form.Item>
@@ -530,7 +567,6 @@ function SemesterTab() {
   const [form] = Form.useForm<{
     name: string;
     first_monday: dayjs.Dayjs;
-    week_count: number;
     course_buffer_enabled: boolean;
     course_buffer_minutes: number;
   }>();
@@ -570,7 +606,7 @@ function SemesterTab() {
 
   const openCreate = () => {
     form.resetFields();
-    form.setFieldsValue({ week_count: 20, course_buffer_enabled: false, course_buffer_minutes: 10 });
+    form.setFieldsValue({ course_buffer_enabled: false, course_buffer_minutes: 10 });
     setCreating(true);
   };
 
@@ -578,7 +614,6 @@ function SemesterTab() {
     form.setFieldsValue({
       name: s.name,
       first_monday: dayjs(s.first_monday),
-      week_count: s.week_count,
       course_buffer_enabled: s.course_buffer_enabled,
       course_buffer_minutes: s.course_buffer_minutes,
     });
@@ -590,7 +625,7 @@ function SemesterTab() {
     const payload = {
       name: v.name,
       first_monday: (v.first_monday as dayjs.Dayjs).format("YYYY-MM-DD"),
-      week_count: v.week_count,
+      week_count: 20,
       course_buffer_enabled: v.course_buffer_enabled,
       course_buffer_minutes: v.course_buffer_minutes,
     };
@@ -665,12 +700,8 @@ function SemesterTab() {
           <Form.Item name="first_monday" label="首周周一" rules={[{ required: true }]}>
             <DatePicker picker="date" format="YYYY-MM-DD" />
           </Form.Item>
-          <Form.Item
-            name="week_count"
-            label="周数（1-30，默认 20）"
-            rules={[{ required: true, type: "number", min: 1, max: 30 }]}
-          >
-            <InputNumber min={1} max={30} />
+          <Form.Item label="教学周数">
+            <Input value="20（固定）" disabled />
           </Form.Item>
           <Form.Item name="course_buffer_enabled" label="启用课程缓冲" valuePropName="checked">
             <Checkbox>启用（课表时间前后加缓冲分钟）</Checkbox>
@@ -698,7 +729,18 @@ function VacationsTab() {
   });
 
   const [creating, setCreating] = useState(false);
+  const [managing, setManaging] = useState<Vacation | null>(null);
   const [form] = Form.useForm();
+  const [availabilityForm] = Form.useForm();
+  const peopleQ = useQuery({
+    queryKey: ["admin", "people"],
+    queryFn: adminApi.people.list,
+  });
+  const availabilitiesQ = useQuery<VacationAvailability[]>({
+    queryKey: ["admin", "vacation-availabilities", managing?.id],
+    queryFn: () => adminApi.vacations.availabilities(managing!.id),
+    enabled: !!managing,
+  });
   
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "vacations"] });
 
@@ -718,6 +760,23 @@ function VacationsTab() {
     onSuccess: () => {
       message.success("寒暑假已停用");
       invalidate();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const setAvailabilitiesM = useMutation({
+    mutationFn: async (values: { person_id: string; ranges: [dayjs.Dayjs, dayjs.Dayjs][] }) =>
+      adminApi.vacations.setAvailabilities(managing!.id, {
+        person_id: values.person_id,
+        intervals: values.ranges.map(([start, end]) => ({
+          start_at: start.toISOString(),
+          end_at: end.toISOString(),
+        })),
+      }),
+    onSuccess: () => {
+      message.success("可值班时段已保存");
+      availabilityForm.resetFields();
+      qc.invalidateQueries({ queryKey: ["admin", "vacation-availabilities", managing?.id] });
     },
     onError: (e) => message.error(errorMessage(e)),
   });
@@ -770,6 +829,9 @@ function VacationsTab() {
             width: 120,
             render: (_, r) => (
               <Space>
+                <Button size="small" onClick={() => setManaging(r)}>
+                  可值班名单
+                </Button>
                 {r.is_active && (
                   <Popconfirm title="确认停用？" onConfirm={() => disableM.mutate(r.id)}>
                     <Button size="small" danger>
@@ -808,8 +870,71 @@ function VacationsTab() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title={`${managing?.name ?? "假期"} · 可值班名单与时段`}
+        open={!!managing}
+        width={680}
+        onClose={() => setManaging(null)}
+        destroyOnClose
+      >
+        <Form
+          form={availabilityForm}
+          layout="vertical"
+          initialValues={{ ranges: [[dayjs(managing?.start_date).startOf("day"), dayjs(managing?.end_date).endOf("day")]] }}
+          onFinish={(v) => setAvailabilitiesM.mutate(v)}
+        >
+          <Form.Item name="person_id" label="人员" rules={[{ required: true, message: "请选择人员" }]}>
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={(peopleQ.data ?? []).map((p) => ({
+                value: p.id,
+                label: `${p.full_name}（${p.student_no}）`,
+              }))}
+            />
+          </Form.Item>
+          <Form.List name="ranges">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map((field, index) => (
+                  <Space key={field.key} align="baseline" style={{ display: "flex" }}>
+                    <Form.Item
+                      {...field}
+                      label={index === 0 ? "具体可值班时段" : undefined}
+                      rules={[{ required: true, message: "请选择时段" }]}
+                    >
+                      <DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm" />
+                    </Form.Item>
+                    {fields.length > 1 && <Button danger onClick={() => remove(field.name)}>删除</Button>}
+                  </Space>
+                ))}
+                <Button onClick={() => add()} style={{ marginBottom: 16 }}>添加时段</Button>
+              </>
+            )}
+          </Form.List>
+          <Button type="primary" htmlType="submit" loading={setAvailabilitiesM.isPending}>
+            覆盖保存该人员时段
+          </Button>
+        </Form>
+
+        <Table<VacationAvailability>
+          rowKey="id"
+          size="small"
+          loading={availabilitiesQ.isLoading}
+          dataSource={availabilitiesQ.data}
+          pagination={false}
+          style={{ marginTop: 24 }}
+          columns={[
+            {
+              title: "人员",
+              render: (_, r) => peopleQ.data?.find((p) => p.id === r.person_id)?.full_name ?? r.person_id,
+            },
+            { title: "开始", render: (_, r) => dayjs(r.start_at).format("YYYY-MM-DD HH:mm") },
+            { title: "结束", render: (_, r) => dayjs(r.end_at).format("YYYY-MM-DD HH:mm") },
+          ]}
+        />
+      </Drawer>
     </>
   );
 }
-
-

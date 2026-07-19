@@ -86,3 +86,8 @@ class SwapCandidate(Base):
     )
 
     swap_request: Mapped["SwapRequest"] = relationship(back_populates="candidates")
+    person = relationship("PersonProfile", foreign_keys=[candidate_person_id])
+
+    @property
+    def candidate_name(self) -> str | None:
+        return self.person.full_name if self.person else None

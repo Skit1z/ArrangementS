@@ -25,28 +25,23 @@ def test_create_semester_seeds_defaults(db_session):
     assert (second.start_time.hour, second.start_time.minute) == (10, 20)
 
 
-def test_week_count_range_1_to_30(db_session):
-    # 下限/上限边界：1 和 30 合法
-    s1 = semester_service.create_semester(db_session, name="短", first_monday=date(2026, 9, 1), week_count=1)
-    s30 = semester_service.create_semester(db_session, name="长", first_monday=date(2027, 2, 22), week_count=30)
-    db_session.commit()
-    assert s1.week_count == 1
-    assert s30.week_count == 30
-    # 超范围拒绝
+def test_week_count_is_fixed_at_20(db_session):
+    sem = semester_service.create_semester(db_session, name="标准", first_monday=date(2026, 9, 1))
+    assert sem.week_count == 20
     with pytest.raises(HTTPException):
-        semester_service.create_semester(db_session, name="x", first_monday=date(2027, 9, 1), week_count=0)
+        semester_service.create_semester(db_session, name="短", first_monday=date(2027, 9, 1), week_count=1)
     with pytest.raises(HTTPException):
-        semester_service.create_semester(db_session, name="y", first_monday=date(2028, 9, 1), week_count=31)
+        semester_service.create_semester(db_session, name="长", first_monday=date(2028, 9, 1), week_count=30)
 
 
-def test_update_semester_changes_week_count(db_session):
+def test_update_semester_rejects_non_20_week_count(db_session):
     sem = semester_service.create_semester(db_session, name="原", first_monday=date(2026, 9, 1))
     db_session.commit()
-    updated = semester_service.update_semester(db_session, sem.id, {"name": "改", "week_count": 18})
-    db_session.commit()
-    db_session.refresh(sem)
+    with pytest.raises(HTTPException):
+        semester_service.update_semester(db_session, sem.id, {"week_count": 18})
+    semester_service.update_semester(db_session, sem.id, {"name": "改", "week_count": 20})
     assert sem.name == "改"
-    assert sem.week_count == 18
+    assert sem.week_count == 20
 
 
 def test_activate_semester_is_exclusive(db_session):

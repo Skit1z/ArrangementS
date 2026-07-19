@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -23,6 +23,7 @@ def create_request(
     end_cmp = end_at.replace(tzinfo=timezone.utc) if end_at.tzinfo is None else end_at
     if end_cmp < now:
         raise HTTPException(status_code=422, detail="不能对已过期时间提交申请")
+    _expand_intervals(start_at, end_at, recurrence_rule)  # 提交时即校验规则，避免审核时才失败
     req = AvailabilityRequest(
         person_id=person_id, start_at=start_at, end_at=end_at, reason=reason,
         recurrence_rule=recurrence_rule, status=RequestStatus.pending,
@@ -67,19 +68,54 @@ def approve(db: Session, actor_id: uuid.UUID | None, request_id: uuid.UUID) -> A
     req.status = RequestStatus.approved
     req.reviewer_id = actor_id
     req.reviewed_at = now
-    db.add(
-        AvailabilityBlock(
+    intervals = _expand_intervals(req.start_at, req.end_at, req.recurrence_rule)
+    for start_at, end_at in intervals:
+        db.add(AvailabilityBlock(
             person_id=req.person_id, source=AvailabilitySource.user_request,
-            start_at=req.start_at, end_at=req.end_at, status=AvailabilityStatus.active,
+            start_at=start_at, end_at=end_at, status=AvailabilityStatus.active,
             reason=req.reason, source_ref_id=req.id, approved_by=actor_id, approved_at=now,
-        )
-    )
+        ))
     db.flush()
     record_audit(
         db, actor_user_id=actor_id, action="availability_request.approve",
         entity_type="availability_request", entity_id=req.id,
     )
     return req
+
+
+def _expand_intervals(
+    start_at: datetime, end_at: datetime, recurrence_rule: str | None
+) -> list[tuple[datetime, datetime]]:
+    """展开前端支持的每周规则：``FREQ=WEEKLY;UNTIL=<ISO datetime>``。"""
+    if not recurrence_rule:
+        return [(start_at, end_at)]
+    parts = {}
+    for item in recurrence_rule.split(";"):
+        if "=" not in item:
+            raise HTTPException(status_code=422, detail="重复规则格式无效")
+        key, value = item.split("=", 1)
+        parts[key.upper()] = value
+    if parts.get("FREQ") != "WEEKLY" or not parts.get("UNTIL"):
+        raise HTTPException(status_code=422, detail="当前仅支持设置每周重复及截止时间")
+    try:
+        until = datetime.fromisoformat(parts["UNTIL"].replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="重复截止时间格式无效") from exc
+    if start_at.tzinfo is not None and until.tzinfo is None:
+        until = until.replace(tzinfo=start_at.tzinfo)
+    if start_at.tzinfo is None and until.tzinfo is not None:
+        until = until.replace(tzinfo=None)
+    if until < start_at:
+        raise HTTPException(status_code=422, detail="重复截止时间不得早于首次开始时间")
+    result = []
+    current_start, current_end = start_at, end_at
+    while current_start <= until:
+        result.append((current_start, current_end))
+        current_start += timedelta(weeks=1)
+        current_end += timedelta(weeks=1)
+        if len(result) > 104:
+            raise HTTPException(status_code=422, detail="重复申请最多支持 104 周")
+    return result
 
 
 def reject(db: Session, actor_id: uuid.UUID | None, request_id: uuid.UUID, comment: str | None = None) -> AvailabilityRequest:

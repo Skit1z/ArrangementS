@@ -8,15 +8,15 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import SlotSourceType, TaskStatus, VenueType
 from app.models.schedule import DutySlot, WeeklyPlan
-
-# 业务时间为北京时间；存入 timestamptz 列时必须带时区，否则 naive datetime 被
-# Postgres 当 UTC，导致 API 返回 Z 后缀、前端按本地时区渲染时错 8 小时。
-BEIJING_TZ = timezone(timedelta(hours=8))
 from app.models.special_date import SpecialDate
 from app.models.vacation import VacationPeriod
 from app.models.venue import ShiftTemplate, Venue
 from app.models.venue_task import VenueTask
 from app.services.day_rule_service import resolve_required_people
+
+# 业务时间为北京时间；存入 timestamptz 列时必须带时区，否则 naive datetime 被
+# Postgres 当 UTC，导致 API 返回 Z 后缀、前端按本地时区渲染时错 8 小时。
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 def month_key(d: date) -> str:
@@ -34,10 +34,32 @@ def _active_vacation(db: Session, day: date) -> VacationPeriod | None:
 
 
 def generate_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
-    """为周计划生成岗位。清空已有未锁定岗位后重建（锁定岗位保留）。"""
-    slots: list[DutySlot] = []
-    slots.extend(_generate_fixed_slots(db, plan))
-    slots.extend(_generate_task_slots(db, plan))
+    """为周计划生成岗位；与已保留的锁定岗位同源同时间的岗位不重复创建。"""
+    generated: list[DutySlot] = []
+    generated.extend(_generate_fixed_slots(db, plan))
+    generated.extend(_generate_task_slots(db, plan))
+    def identity(s: DutySlot) -> tuple:
+        # SQLite 测试库会丢失 tzinfo；以墙上时间比较，避免同一锁定岗位被重复生成。
+        return (
+            s.venue_id,
+            s.source_type,
+            s.source_id,
+            s.slot_start_at.replace(tzinfo=None),
+            s.slot_end_at.replace(tzinfo=None),
+        )
+
+    existing_keys = {
+        identity(s)
+        for s in db.scalars(
+            select(DutySlot).where(
+                DutySlot.weekly_plan_id == plan.id,
+                DutySlot.is_locked.is_(True),
+            )
+        )
+    }
+    slots = [
+        s for s in generated if identity(s) not in existing_keys
+    ]
     for s in slots:
         db.add(s)
     db.flush()

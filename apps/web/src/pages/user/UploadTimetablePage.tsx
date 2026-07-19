@@ -1,13 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Card, Table, Tag, Typography, Upload } from "antd";
+import { App, Button, Card, Tag, Typography, Upload } from "antd";
 import dayjs from "dayjs";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { errorMessage } from "@/api/client";
+import { TimetableEntryEditor } from "@/components/TimetableEntryEditor";
 import { meApi, type ParsedEntry } from "@/features/me/api";
-
-const WEEKDAY_LABEL = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
 export default function UploadTimetablePage() {
   const { message, modal } = App.useApp();
@@ -52,6 +51,12 @@ export default function UploadTimetablePage() {
   });
 
   const handleConfirm = () => {
+    if (!parsed?.length || parsed.some((entry) =>
+      entry.period_start > entry.period_end || !entry.week_expr.trim()
+    )) {
+      message.error("请检查节次范围和周次，至少保留一条有效课程时段");
+      return;
+    }
     if (activeQuery.data) {
       modal.confirm({
         title: "确认覆盖现有课表",
@@ -114,27 +119,7 @@ export default function UploadTimetablePage() {
             </Button>
           }
         >
-          <Table
-            size="small"
-            pagination={false}
-            scroll={{ y: 320 }}
-            dataSource={parsed.map((e, i) => ({ ...e, key: i }))}
-            columns={[
-              {
-                title: "星期",
-                dataIndex: "weekday",
-                render: (v: number) => WEEKDAY_LABEL[v],
-                width: 70,
-              },
-              {
-                title: "节次",
-                render: (_, r) => `第 ${r.period_start}-${r.period_end} 节`,
-                width: 100,
-              },
-              { title: "周次", dataIndex: "week_expr", width: 130 },
-              { title: "场地", dataIndex: "location_code", width: 100 },
-            ]}
-          />
+          <TimetableEntryEditor value={parsed} onChange={setParsed} />
           <div style={{ marginTop: 8, color: "#888", fontSize: 12 }}>
             * 仅记录时段占用用于排班，不存储课程名等业务信息。
           </div>

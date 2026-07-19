@@ -3,12 +3,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, uuid_pk
 from app.models.enums import RequestStatus
+
+if TYPE_CHECKING:
+    from app.models.person import PersonProfile
+    from app.models.schedule import DutySlot
+    from app.models.user import User
+    from app.models.venue import Venue
 
 
 class OvertimeRequest(Base, TimestampMixin):

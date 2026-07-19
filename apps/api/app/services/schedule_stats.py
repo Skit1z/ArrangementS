@@ -71,6 +71,18 @@ def recalculate(db: Session, month_key: str) -> int:
     _apply_swap_counts(db, month_key, agg)
     _apply_adjustments(db, month, agg)
 
+    # Previously calculated people must also be revisited.  Otherwise deleting
+    # their last assignment leaves stale non-zero monthly totals forever.
+    existing_summaries = list(
+        db.scalars(select(MonthlyHourSummary).where(MonthlyHourSummary.month == month))
+    )
+    for summary in existing_summaries:
+        if summary.status != MonthlySummaryStatus.locked:
+            agg.setdefault(
+                summary.person_id,
+                dict(balance=0, completed=0, extra=0, leave=0, absence=0),
+            )
+
     now = datetime.now(timezone.utc)
     processed = 0
     for pid, rec in agg.items():
@@ -125,7 +137,23 @@ def _apply_adjustments(db: Session, month: date, agg: dict) -> None:
 
 
 def _write_venue_summaries(db: Session, month: date, venue_agg: dict, now: datetime) -> None:
+    locked_people = set(
+        db.scalars(select(MonthlyHourSummary.person_id).where(
+            MonthlyHourSummary.month == month,
+            MonthlyHourSummary.status == MonthlySummaryStatus.locked,
+        ))
+    )
+    current_keys = set(venue_agg)
+    existing_rows = list(
+        db.scalars(select(MonthlyVenueHourSummary).where(MonthlyVenueHourSummary.month == month))
+    )
+    for row in existing_rows:
+        if row.person_id not in locked_people and (row.person_id, row.venue_id) not in current_keys:
+            db.delete(row)
+
     for (pid, vid), vrec in venue_agg.items():
+        if pid in locked_people:
+            continue
         row = db.scalar(
             select(MonthlyVenueHourSummary).where(
                 MonthlyVenueHourSummary.person_id == pid,

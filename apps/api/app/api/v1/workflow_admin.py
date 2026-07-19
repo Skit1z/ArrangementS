@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -83,10 +83,17 @@ def reject_leave(leave_id: uuid.UUID, payload: ReviewIn, actor: User = Depends(r
     return leave
 
 
+@router.post("/leave-requests/{leave_id}/revoke-approval", response_model=LeaveOut)
+def revoke_leave_approval(leave_id: uuid.UUID, payload: ReviewIn, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
+    leave = leave_service.revoke_approval(db, actor.id, leave_id, payload.comment)
+    db.commit()
+    return leave
+
+
 # --- 换班 ---
 @router.get("/swap-requests", response_model=list[SwapOut])
 def open_swaps(_: User = Depends(require_admin), db: Session = Depends(get_db)):
-    return swap_service.list_open(db)
+    return swap_service.list_reviewable(db)
 
 
 @router.post("/swap-requests/{swap_id}/approve", response_model=SwapOut)

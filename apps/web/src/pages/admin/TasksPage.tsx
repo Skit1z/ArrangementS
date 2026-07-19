@@ -31,7 +31,6 @@ import { hoursOf } from "@/features/me/api";
 // 任务状态机的下一状态（用于「推进」按钮）
 const NEXT_STATUS: Record<string, string> = {
   draft: "confirmed",
-  confirmed: "scheduled",
   scheduled: "executing",
   executing: "completed",
 };
@@ -246,7 +245,7 @@ export default function TasksPage() {
                 <Button size="small" onClick={() => setPreviewId(r.id)}>
                   工时预览
                 </Button>
-                {r.status !== "cancelled" && r.status !== "completed" && (
+                {(r.status === "draft" || r.status === "confirmed") && (
                   <Button size="small" onClick={() => openEdit(r)}>
                     编辑
                   </Button>
@@ -263,7 +262,7 @@ export default function TasksPage() {
                     </Button>
                   </Popconfirm>
                 )}
-                {(r.status === "confirmed" || r.status === "scheduled") && (
+                {r.status === "confirmed" && (
                   <Popconfirm
                     title="把这个任务加入本周排班（创建空缺岗位）？"
                     onConfirm={() => addToPlanM.mutate(r.id)}

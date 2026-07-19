@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -107,20 +107,6 @@ def list_all_overtime(
         )
         res.append(out)
     return res
-
-def get_or_create_plan_for_date(db: Session, target_date):
-    # Find the Monday of the week
-    week_start = target_date.date() - timedelta(days=target_date.weekday())
-    week_end = week_start + timedelta(days=6)
-    plan = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == week_start).first()
-    if not plan:
-        plan = WeeklyPlan(
-            week_start=week_start,
-            week_end=week_end,
-        )
-        db.add(plan)
-        db.flush()
-    return plan
 
 @router.post("/admin/overtime/{req_id}/approve", response_model=MessageOut)
 def approve_overtime(

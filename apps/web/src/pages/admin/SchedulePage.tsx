@@ -124,6 +124,16 @@ export default function SchedulePage() {
     onError: (e) => message.error(errorMessage(e)),
   });
 
+  const toggleLock = useMutation({
+    mutationFn: async ({ assignmentId, locked }: { assignmentId: string; locked: boolean }) =>
+      (await api.post(`/assignments/${assignmentId}/${locked ? "lock" : "unlock"}`)).data,
+    onSuccess: (_data, variables) => {
+      message.success(variables.locked ? "已锁定，重新生成时会保留" : "已解锁");
+      qc.invalidateQueries({ queryKey: ["week", week] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
   const checkConflicts = useMutation({
     mutationFn: async () => (await api.post(`/schedule/weeks/${week}/validate`)).data as Conflict[],
     onSuccess: (d) => {
@@ -186,6 +196,15 @@ export default function SchedulePage() {
           checkingConflicts={checkConflicts.isPending}
           activeVenueId={activeVenueId}
           setActiveVenueId={setActiveVenueId}
+          onToggleLock={(slot) => {
+            const assignment = slot.assignments.find((a) => a.person_id) ?? slot.assignments[0];
+            if (!assignment) {
+              message.error("该岗位没有可操作的分配");
+              return;
+            }
+            toggleLock.mutate({ assignmentId: assignment.id, locked: !slot.is_locked });
+          }}
+          lockPending={toggleLock.isPending}
         />
       )}
 

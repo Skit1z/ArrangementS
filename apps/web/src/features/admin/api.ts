@@ -153,6 +153,8 @@ export interface MultiplierRule {
   multiplier: string; // Decimal 字符串
   venue_id: string | null;
   weekdays: number[] | null;
+  effective_start_date: string | null;
+  effective_end_date: string | null;
   priority: number;
   is_active: boolean;
 }
@@ -164,6 +166,8 @@ export interface MultiplierRuleIn {
   multiplier: string;
   venue_id?: string | null;
   weekdays?: number[] | null;
+  effective_start_date?: string | null;
+  effective_end_date?: string | null;
   priority?: number;
   is_active?: boolean;
 }
@@ -244,6 +248,23 @@ export interface Vacation {
   end_date: string;
   semester_id: string;
   is_active: boolean;
+  required_people: number;
+}
+
+export interface VacationAvailability {
+  id: string;
+  person_id: string;
+  start_at: string;
+  end_at: string;
+  notes: string | null;
+}
+
+export interface AdminPerson {
+  id: string;
+  full_name: string;
+  student_no: string;
+  class_name: string;
+  status: string;
 }
 
 export interface VacationCreate {
@@ -351,6 +372,17 @@ export const adminApi = {
       (await api.post<Vacation>("/admin/vacations", payload)).data,
     disable: async (id: string) =>
       (await api.post(`/admin/vacations/${id}/disable`)).data,
+    availabilities: async (id: string) =>
+      (await api.get<VacationAvailability[]>(`/admin/vacations/${id}/availabilities`)).data,
+    setAvailabilities: async (
+      id: string,
+      payload: { person_id: string; intervals: { start_at: string; end_at: string }[] },
+    ) =>
+      (await api.put<VacationAvailability[]>(`/admin/vacations/${id}/availabilities`, payload)).data,
+  },
+
+  people: {
+    list: async () => (await api.get<AdminPerson[]>("/people")).data,
   },
 
   // 课表
@@ -421,6 +453,8 @@ export const adminApi = {
       (await api.post<LeaveItem>(`/admin/leave-requests/${id}/approve`, { comment })).data,
     rejectLeave: async (id: string, comment?: string) =>
       (await api.post<LeaveItem>(`/admin/leave-requests/${id}/reject`, { comment })).data,
+    revokeLeaveApproval: async (id: string, comment?: string) =>
+      (await api.post<LeaveItem>(`/admin/leave-requests/${id}/revoke-approval`, { comment })).data,
 
     // 换班（公开征集/指定 待 admin 终审）
     swapRequests: async () => (await api.get<SwapItem[]>("/admin/swap-requests")).data,
@@ -485,6 +519,12 @@ export interface SwapItem {
   venue_name: string | null;
   slot_start_at: string | null;
   slot_end_at: string | null;
+  candidates: {
+    id: string;
+    candidate_person_id: string;
+    candidate_name: string | null;
+    status: string;
+  }[];
 }
 
 // --- 展示常量 ---

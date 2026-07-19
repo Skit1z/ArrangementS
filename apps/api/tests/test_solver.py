@@ -109,6 +109,29 @@ def test_locked_assignment_respected():
     assert result.assignments["s1-0"] == "a"
 
 
+def test_locked_assignment_overrides_new_unavailability():
+    positions = [pos("s1-0", "s1", 8)]
+    result = solve(SolverInput(
+        positions=positions,
+        persons=["a"],
+        available={("a", "s1-0"): False},
+        locked={"s1-0": "a"},
+    ))
+    assert result.assignments["s1-0"] == "a"
+
+
+def test_locked_person_outside_pool_is_explicit_error():
+    import pytest
+
+    with pytest.raises(ValueError, match="人员不在可排班人员池"):
+        solve(SolverInput(
+            positions=[pos("s1-0", "s1", 8)],
+            persons=["b"],
+            available={("b", "s1-0"): True},
+            locked={"s1-0": "a"},
+        ))
+
+
 # --- P1.3：多维公平目标测试 ---
 def test_daily_max_per_person_enforced():
     """单人单日最多 N 班：超过会被分散到不同人。"""
