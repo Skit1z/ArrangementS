@@ -107,3 +107,74 @@ def test_locked_assignment_respected():
         locked={"s1-0": "a"},
     ))
     assert result.assignments["s1-0"] == "a"
+
+
+# --- P1.3：多维公平目标测试 ---
+def test_daily_max_per_person_enforced():
+    """单人单日最多 N 班：超过会被分散到不同人。"""
+    from datetime import timedelta
+    from app.scheduling.solver import Position, SolverInput, solve
+
+    start = datetime(2026, 3, 2, 8, 0)
+    positions = [
+        Position(id=f"p{i}", slot_id=f"s{i}", month_key="2026-03", credited_minutes=120,
+                 venue_id="HL", start_at=start + timedelta(hours=i * 3),
+                 end_at=start + timedelta(hours=i * 3 + 2))
+        for i in range(3)
+    ]
+    persons = ["a", "b", "c"]
+    result = solve(SolverInput(
+        positions=positions, persons=persons,
+        available={(p, pos.id): True for p in persons for pos in positions},
+        daily_max_per_person=1,
+    ))
+    counts: dict[str, int] = {}
+    for pos in positions:
+        chosen = result.assignments[pos.id]
+        if chosen:
+            counts[chosen] = counts.get(chosen, 0) + 1
+    assert all(c <= 1 for c in counts.values()), counts
+    assert len(counts) == 3
+
+
+def test_weekend_balance_distributes_evenly():
+    """周末岗位在多人间均衡分布。"""
+    from datetime import timedelta
+    from app.scheduling.solver import Position, SolverInput, solve
+
+    start = datetime(2026, 3, 7, 8, 0)
+    positions = [
+        Position(id=f"p{i}", slot_id=f"s{i}", month_key="2026-03", credited_minutes=120,
+                 venue_id="HL", start_at=start + timedelta(days=i, hours=i * 3),
+                 end_at=start + timedelta(days=i, hours=i * 3 + 2),
+                 is_weekend=True)
+        for i in range(4)
+    ]
+    persons = ["a", "b"]
+    result = solve(SolverInput(
+        positions=positions, persons=persons,
+        available={(p, pos.id): True for p in persons for pos in positions},
+    ))
+    counts = {"a": 0, "b": 0}
+    for pos in positions:
+        c = result.assignments[pos.id]
+        if c:
+            counts[c] += 1
+    assert abs(counts["a"] - counts["b"]) <= 1, counts
+
+
+def test_preference_soft_objective_preferred_person_picked():
+    """个人偏好作为软目标：偏好的人会被优先选中。"""
+    from datetime import timedelta
+    from app.scheduling.solver import Position, SolverInput, solve
+
+    start = datetime(2026, 3, 2, 9, 0)
+    pos = Position(id="p0", slot_id="s0", month_key="2026-03", credited_minutes=120,
+                   venue_id="V1", start_at=start, end_at=start + timedelta(hours=2))
+    persons = ["a", "b"]
+    result = solve(SolverInput(
+        positions=[pos], persons=persons,
+        available={(p, pos.id): True for p in persons},
+        preferences={"a": {"V1": 10}},
+    ))
+    assert result.assignments["p0"] == "a"

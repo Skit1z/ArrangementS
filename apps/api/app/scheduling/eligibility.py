@@ -123,6 +123,10 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
     blocks = _blocks(db, person_ids)
     constraints = _hard_constraints(db, person_ids)
 
+    # 预取场地（用于 is_event_venue 判定）
+    from app.models.venue import Venue
+    venue_by_id = {str(v.id): v for v in db.scalars(select(Venue))}
+
     # 展开岗位并计算可用性
     positions: list[Position] = []
     available: dict[tuple[str, str], bool] = {}
@@ -142,6 +146,17 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
 
     for slot in slots:
         vacation = _active_vacation(db, slot.slot_start_at.date())
+        # 预取场地类型（用于 is_event_venue 判定）
+        slot_venue = venue_by_id.get(str(slot.venue_id))
+        is_event = slot_venue is not None and slot_venue.venue_type.value == "event_based"
+        # 是否周末（北京时间）：周六/周日
+        if slot.slot_start_at.tzinfo is None:
+            _local = slot.slot_start_at
+        else:
+            _local = slot.slot_start_at.astimezone(BEIJING_TZ)
+        is_weekend = _local.weekday() >= 5  # 5=周六, 6=周日
+        # 早班：12 点前开始；晚班：18 点后开始（二者皆 False 为中午）
+        is_morning = _local.hour < 12
         for pidx in range(slot.required_people):
             pos_id = f"{slot.id}:{pidx}"
             positions.append(
@@ -153,6 +168,9 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
                     venue_id=str(slot.venue_id),
                     start_at=slot.slot_start_at,
                     end_at=slot.slot_end_at,
+                    is_weekend=is_weekend,
+                    is_morning=is_morning,
+                    is_event_venue=is_event,
                 )
             )
             lk = locked_by_slot_pos.get((str(slot.id), pidx))
