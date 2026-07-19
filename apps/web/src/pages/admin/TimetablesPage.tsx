@@ -70,10 +70,10 @@ export default function TimetablesPage() {
             value={viewMode}
             onChange={(v) => setViewMode(v as "busy" | "free")}
             options={[
-              { label: "忙碌时间 (有课)", value: "busy" },
-              { label: "空闲时间 (无课)", value: "free" },
+              { label: "有课表", value: "busy" },
+              { label: "无课表", value: "free" },
             ]}
-            style={{ width: 140 }}
+            style={{ width: 110 }}
           />
           <span style={{ marginLeft: 16 }}>人员筛选：</span>
           <Select

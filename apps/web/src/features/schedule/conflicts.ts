@@ -32,6 +32,13 @@ export function evaluateDrop(
 ): VerdictResult {
   const reasons: string[] = [];
 
+  if (fromKey) {
+    const { slotId: fromSlotId } = parsePosKey(fromKey);
+    if (fromSlotId === targetSlot.id) {
+      return { verdict: "overlap", reasons: ["已在该班次中"] };
+    }
+  }
+
   for (const [key, occupant] of Object.entries(board)) {
     if (!occupant || occupant.person_id !== personId) continue;
     if (key === targetKey || key === fromKey) continue;

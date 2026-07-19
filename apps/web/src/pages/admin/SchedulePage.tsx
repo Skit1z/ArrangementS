@@ -131,7 +131,13 @@ export default function SchedulePage() {
       title="周排班"
       extra={
         <Space wrap>
-          <DatePicker picker="week" value={dayjs(week)} onChange={(d) => d && setWeek(mondayOf(d))} />
+          <DatePicker
+            picker="week"
+            value={dayjs(week)}
+            onChange={(d) => d && setWeek(mondayOf(d))}
+            format={() => data?.week_label ?? dayjs(week).format("YYYY-wo")}
+            style={{ width: 260 }}
+          />
           <Button onClick={() => setWeek(mondayOf(dayjs()))}>本周</Button>
           <Button onClick={() => setCreatingManual(true)} disabled={!data}>
             新增临时班次

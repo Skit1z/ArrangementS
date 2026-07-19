@@ -87,4 +87,5 @@ class WeekView(BaseModel):
     status: str
     revision: int
     version: int
+    week_label: str | None = None
     slots: list[SlotView]

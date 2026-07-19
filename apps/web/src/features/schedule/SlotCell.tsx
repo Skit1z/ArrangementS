@@ -27,13 +27,49 @@ function Position({
   const verdict = activeVerdict?.key === key ? activeVerdict.verdict : null;
   const hasConflict = conflictKeys.has(key);
 
-  let background = occupant ? "#e6f4ff" : "#fafafa"; // 淡蓝色背景
-  let border = occupant ? "1px solid #91caff" : "1px dashed #d9d9d9";
+  if (occupant) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={{
+          minHeight: 30,
+          borderRadius: 4,
+          marginBottom: 3,
+          boxSizing: "border-box",
+          outline: isOver && !verdict ? "1px solid #1677ff" : "none",
+        }}
+      >
+        <PersonChip
+          id={`pos:${key}`}
+          personId={occupant.person_id}
+          label={occupant.person_name}
+          color={hasConflict ? "red" : "blue"}
+          compact
+        />
+      </div>
+    );
+  }
+
+  let bg = "#fafafa";
+  let border = "1px dashed #d9d9d9";
+  let borderLeft = "4px dashed #d9d9d9";
+  let textColor = "#8c8c8c";
+  let text = "+ 拖拽至此添加";
+  let fontWeight = "normal";
+
+  if (index < slot.required_people) {
+    bg = "#fff1f0";
+    border = "1px dashed #ffa39e";
+    borderLeft = "4px solid #f5222d";
+    textColor = "#f5222d";
+    text = "空缺";
+    fontWeight = "bold";
+  }
+
   if (verdict) {
-    background = `${VERDICT_COLOR[verdict]}22`;
+    bg = `${VERDICT_COLOR[verdict]}22`;
     border = `2px solid ${VERDICT_COLOR[verdict]}`;
-  } else if (hasConflict) {
-    border = "2px solid #ff4d4f";
+    borderLeft = `4px solid ${VERDICT_COLOR[verdict]}`;
   }
 
   return (
@@ -42,28 +78,21 @@ function Position({
       style={{
         minHeight: 30,
         borderRadius: 4,
-        padding: 2,
         marginBottom: 3,
-        background,
+        background: bg,
         border,
+        borderLeft,
+        color: textColor,
+        display: "flex",
+        alignItems: "center",
+        paddingLeft: 8,
+        fontSize: 12,
+        fontWeight,
+        boxSizing: "border-box",
         outline: isOver && !verdict ? "1px solid #1677ff" : "none",
       }}
     >
-      {occupant ? (
-        <PersonChip
-          id={`pos:${key}`}
-          personId={occupant.person_id}
-          label={occupant.person_name}
-          color={hasConflict ? "red" : "blue"}
-          compact
-        />
-      ) : (
-        index < slot.required_people ? (
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#ff4d4f", paddingLeft: 4 }}>空缺</span>
-        ) : (
-          <span style={{ fontSize: 12, color: "#bfbfbf", paddingLeft: 4 }}>+ 拖拽至此添加</span>
-        )
-      )}
+      {text}
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import { useDraggable } from "@dnd-kit/core";
-import { Tag } from "antd";
 
 interface Props {
   id: string; // 拖拽标识：drawer:<personId> 或 pos:<positionKey>
@@ -15,6 +14,28 @@ export default function PersonChip({ id, personId, label, color, compact }: Prop
     data: { personId },
   });
 
+  let bg = "#f0f5ff";
+  let border = "1px solid #adc6ff";
+  let borderLeft = "4px solid #2f54eb";
+  let textColor = "#1d39c4";
+
+  if (color === "red") {
+    bg = "#fff1f0";
+    border = "1px solid #ffa39e";
+    borderLeft = "4px solid #f5222d";
+    textColor = "#cf1322";
+  } else if (color === "orange") {
+    bg = "#fff7e6";
+    border = "1px solid #ffd591";
+    borderLeft = "4px solid #fa8c16";
+    textColor = "#d46b08";
+  } else if (color === "green") {
+    bg = "#f6ffed";
+    border = "1px solid #b7eb8f";
+    borderLeft = "4px solid #52c41a";
+    textColor = "#389e0d";
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -24,21 +45,21 @@ export default function PersonChip({ id, personId, label, color, compact }: Prop
         opacity: isDragging ? 0.4 : 1,
         cursor: "grab",
         touchAction: "none",
-        display: "inline-block",
+        display: compact ? "block" : "inline-block",
+        width: compact ? "100%" : "auto",
+        background: bg,
+        border,
+        borderLeft,
+        color: textColor,
+        padding: compact ? "4px 8px" : "5px 12px",
+        borderRadius: "4px",
+        fontSize: compact ? "12px" : "13px",
+        fontWeight: "bold",
+        userSelect: "none",
+        boxSizing: "border-box",
       }}
     >
-      <Tag 
-        color={color} 
-        style={{ 
-          margin: 2, 
-          fontSize: compact ? 13 : 14, 
-          fontWeight: 600,
-          padding: compact ? "2px 8px" : "4px 12px",
-          borderRadius: 6,
-        }}
-      >
-        {label}
-      </Tag>
+      {label}
     </div>
   );
 }

@@ -181,6 +181,46 @@ def get_plan(db: Session, week_start: date) -> WeeklyPlan:
     return plan
 
 
+def get_week_label(db: Session, week_start: date) -> str:
+    from app.models.semester import Semester
+    from datetime import timedelta
+
+    semesters = list(db.scalars(select(Semester).order_by(Semester.first_monday.asc())))
+    if not semesters:
+        return f"{week_start.year}年 第{week_start.isocalendar()[1]}周"
+
+    # 1. Check if falls within any semester
+    for sem in semesters:
+        sem_end = sem.first_monday + timedelta(weeks=sem.week_count)
+        if sem.first_monday <= week_start < sem_end:
+            diff_days = (week_start - sem.first_monday).days
+            week_num = (diff_days // 7) + 1
+            return f"{sem.name} 第{week_num}周"
+
+    # 2. Check if falls in a vacation after a semester
+    prev_sems = [s for s in semesters if s.first_monday <= week_start]
+    if prev_sems:
+        latest_sem = prev_sems[-1]
+        sem_end = latest_sem.first_monday + timedelta(weeks=latest_sem.week_count)
+        if week_start >= sem_end:
+            diff_days = (week_start - sem_end).days
+            vacation_week = (diff_days // 7) + 1
+            is_winter = sem_end.month in [1, 2, 3, 11, 12]
+            vacation_name = "寒假" if is_winter else "暑假"
+            return f"{latest_sem.name}后 {vacation_name}第{vacation_week}周"
+
+    # 3. If before the first semester in DB
+    first_sem = semesters[0]
+    if week_start < first_sem.first_monday:
+        diff_days = (first_sem.first_monday - week_start).days
+        weeks_before = (diff_days + 6) // 7
+        is_winter = first_sem.first_monday.month in [2, 3]
+        vacation_name = "寒假" if is_winter else "暑假"
+        return f"{first_sem.name}前 {vacation_name}第{weeks_before}周"
+
+    return f"{week_start.year}年 第{week_start.isocalendar()[1]}周"
+
+
 def serialize_week(db: Session, plan: WeeklyPlan) -> dict:
     from app.models.person import PersonProfile
 
@@ -202,6 +242,7 @@ def serialize_week(db: Session, plan: WeeklyPlan) -> dict:
         "status": plan.status.value,
         "revision": plan.revision,
         "version": plan.version,
+        "week_label": get_week_label(db, plan.week_start),
         "slots": [
             {
                 "id": s.id,
