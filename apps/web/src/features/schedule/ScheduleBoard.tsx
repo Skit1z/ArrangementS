@@ -78,6 +78,7 @@ export default function ScheduleBoard({
   setActiveVenueId,
 }: Props) {
   const { message } = App.useApp();
+  const qc = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const [activePerson, setActivePerson] = useState<{ id: string; name: string; from: string } | null>(null);
@@ -488,7 +489,6 @@ export default function ScheduleBoard({
                         weekStart={week.week_start}
                         weekEnd={week.week_end}
                         onTaskChanged={() => {
-                          const qc = useQueryClient();
                           qc.invalidateQueries({ queryKey: ["week", week.week_start] });
                         }}
                       />

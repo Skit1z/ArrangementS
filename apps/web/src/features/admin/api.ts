@@ -400,7 +400,88 @@ export const adminApi = {
     approve: async (id: string) => (await api.post(`/admin/overtime/${id}/approve`)).data,
     reject: async (id: string) => (await api.post(`/admin/overtime/${id}/reject`)).data,
   },
+
+  // 审核中心：不可值班申请 / 请假 / 换班 / 班次执行
+  review: {
+    // 不可值班申请
+    availabilityRequests: async () =>
+      (await api.get<AvailabilityRequestItem[]>("/admin/availability-requests")).data,
+    approveAvailability: async (id: string) =>
+      (await api.post<AvailabilityRequestItem>(`/admin/availability-requests/${id}/approve`)).data,
+    rejectAvailability: async (id: string, comment?: string) =>
+      (await api.post<AvailabilityRequestItem>(`/admin/availability-requests/${id}/reject`, { comment })).data,
+
+    // 请假
+    leaveRequests: async () => (await api.get<LeaveItem[]>("/admin/leave-requests")).data,
+    approveLeave: async (id: string, comment?: string) =>
+      (await api.post<LeaveItem>(`/admin/leave-requests/${id}/approve`, { comment })).data,
+    rejectLeave: async (id: string, comment?: string) =>
+      (await api.post<LeaveItem>(`/admin/leave-requests/${id}/reject`, { comment })).data,
+
+    // 换班（公开征集/指定 待 admin 终审）
+    swapRequests: async () => (await api.get<SwapItem[]>("/admin/swap-requests")).data,
+    approveSwap: async (id: string, selectedPersonId?: string) =>
+      (await api.post<SwapItem>(`/admin/swap-requests/${id}/approve`, {
+        selected_person_id: selectedPersonId,
+      })).data,
+    rejectSwap: async (id: string, comment?: string) =>
+      (await api.post<SwapItem>(`/admin/swap-requests/${id}/reject`, { comment })).data,
+
+    // 班次执行状态
+    markAbsent: async (assignmentId: string, reason?: string) =>
+      (await api.post(`/assignments/${assignmentId}/mark-absent`, { comment: reason })).data,
+    markCompleted: async (assignmentId: string) =>
+      (await api.post(`/assignments/${assignmentId}/mark-completed`)).data,
+    dailyAssignments: async (date: string) =>
+      (await api.get<DailyAssignment[]>(`/admin/assignments/daily`, { params: { date } })).data,
+  },
 };
+
+export interface DailyAssignment {
+  assignment_id: string;
+  person_id: string | null;
+  person_name: string | null;
+  venue_id: string;
+  venue_name: string;
+  slot_start_at: string;
+  slot_end_at: string;
+  execution_status: string;
+  plan_status: string;
+}
+
+// --- 审核中心类型 ---
+export interface AvailabilityRequestItem {
+  id: string;
+  person_id: string;
+  start_at: string;
+  end_at: string;
+  reason: string;
+  status: string;
+}
+
+export interface LeaveItem {
+  id: string;
+  assignment_id: string;
+  applicant_person_id: string;
+  reason: string;
+  is_emergency: boolean;
+  status: string;
+}
+
+export interface SwapItem {
+  id: string;
+  assignment_id: string;
+  requester_person_id: string;
+  mode: "targeted" | "open";
+  target_person_id: string | null;
+  selected_person_id: string | null;
+  status: string;
+  requester_name: string | null;
+  requester_phone: string | null;
+  venue_name: string | null;
+  slot_start_at: string | null;
+  slot_end_at: string | null;
+}
 
 // --- 展示常量 ---
 export const VENUE_TYPE_LABEL: Record<VenueType, string> = {

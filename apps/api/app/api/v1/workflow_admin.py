@@ -2,13 +2,18 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_admin
 from app.db.session import get_db
+from app.models.person import PersonProfile
+from app.models.schedule import Assignment, DutySlot
 from app.models.user import User
+from app.models.venue import Venue
 from app.schemas.auth import MessageOut
 from app.schemas.workflow import (
     AdminBlockIn,
@@ -117,3 +122,46 @@ def mark_completed(assignment_id: uuid.UUID, actor: User = Depends(require_admin
     execution_service.mark_completed(db, actor_id=actor.id, assignment_id=assignment_id)
     db.commit()
     return MessageOut(message="已标记完成")
+
+
+@router.get("/assignments/daily")
+def list_daily_assignments(
+    d: date = Query(..., alias="date"),
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """列出某一天的所有排班分配（供审核中心「执行状态」Tab 标记未到岗/完成）。
+
+    按时段排序，返回 assignment_id / 人员名 / 场地名 / 时段 / 执行状态。
+    """
+    day_start = datetime.combine(d, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+    rows = db.execute(
+        select(Assignment, DutySlot, Venue, PersonProfile)
+        .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
+        .join(Venue, DutySlot.venue_id == Venue.id)
+        .outerjoin(PersonProfile, Assignment.person_id == PersonProfile.id)
+        .where(
+            DutySlot.slot_start_at >= day_start,
+            DutySlot.slot_start_at < day_end,
+            Assignment.person_id.is_not(None),
+        )
+        .order_by(DutySlot.slot_start_at.asc())
+    ).all()
+
+    out: list[dict] = []
+    for a, slot, venue, person in rows:
+        out.append(
+            {
+                "assignment_id": str(a.id),
+                "person_id": str(a.person_id) if a.person_id else None,
+                "person_name": person.full_name if person else None,
+                "venue_id": str(slot.venue_id),
+                "venue_name": venue.name,
+                "slot_start_at": slot.slot_start_at.isoformat(),
+                "slot_end_at": slot.slot_end_at.isoformat(),
+                "execution_status": a.execution_status.value,
+                "plan_status": a.plan_status.value,
+            }
+        )
+    return out

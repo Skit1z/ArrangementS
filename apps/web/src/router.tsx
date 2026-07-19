@@ -5,6 +5,7 @@ import AdminLayout from "@/layouts/AdminLayout";
 import UserLayout from "@/layouts/UserLayout";
 import LoginPage from "@/pages/LoginPage";
 import PeoplePage from "@/pages/admin/PeoplePage";
+import ReviewCenterPage from "@/pages/admin/ReviewCenterPage";
 import SchedulePage from "@/pages/admin/SchedulePage";
 import SettingsPage from "@/pages/admin/SettingsPage";
 import StatisticsPage from "@/pages/admin/StatisticsPage";
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/admin/schedule" replace /> },
           { path: "schedule", element: <SchedulePage /> },
           { path: "people", element: <PeoplePage /> },
+          { path: "review", element: <ReviewCenterPage /> },
           { path: "timetables", element: <TimetablesPage /> },
           { path: "venues", element: <VenuesPage /> },
           { path: "tasks", element: <TasksPage /> },

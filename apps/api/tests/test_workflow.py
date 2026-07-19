@@ -207,3 +207,66 @@ def test_mark_absent_zeroes_credited_preserves_balance(db_session):
     assert a.execution_status == ExecutionStatus.absent
     assert a.credited_minutes == 0  # 实际完成 0
     assert a.balance_minutes == 120  # 平衡工时保留（不降低后续排班权重）
+
+
+# --- 审核中心：GET /admin/assignments/daily + mark-absent/complete API 端到端 ---
+def test_admin_daily_assignments_endpoint(client, seed_admin, db_session):
+    """admin GET /admin/assignments/daily?date=... 返回当天所有分配。"""
+    from tests.conftest import csrf_headers, login
+
+    p = _person(db_session, 0)
+    a, slot = _future_assignment(db_session, p, hours_ahead=12)
+    db_session.commit()
+
+    # 计算当天日期（slot 所在 UTC 日）
+    slot_day = slot.slot_start_at.date()
+    token = login(client, "admin", "admin1234")
+    resp = client.get(
+        f"/api/v1/admin/assignments/daily?date={slot_day.isoformat()}",
+        headers=csrf_headers(token),
+    )
+    assert resp.status_code == 200, resp.text
+    rows = resp.json()
+    assert any(r["assignment_id"] == str(a.id) for r in rows)
+    mine = next(r for r in rows if r["assignment_id"] == str(a.id))
+    assert mine["person_name"] == "人0"
+    assert mine["venue_name"] == "黄楼"
+    assert mine["execution_status"] == "pending"
+
+
+def test_admin_daily_assignments_requires_admin(client, seed_admin, db_session):
+    """普通用户不能访问。"""
+    from tests.conftest import login, csrf_headers
+
+    _person(db_session, 0)
+    db_session.commit()
+    # 用 admin 创建一个普通用户来登录
+    from app.models.user import User
+    from app.models.enums import UserRole
+    u = User(username="u1", password_hash=hash_password("y"), role=UserRole.user, is_active=True)
+    db_session.add(u); db_session.commit()
+    token = login(client, "u1", "y")
+    resp = client.get(
+        "/api/v1/admin/assignments/daily?date=2026-03-04",
+        headers=csrf_headers(token),
+    )
+    assert resp.status_code == 403
+
+
+def test_admin_mark_absent_via_api(client, seed_admin, db_session):
+    """admin 通过 API 标记未到岗。"""
+    from tests.conftest import login, csrf_headers
+
+    p = _person(db_session, 0)
+    a, _ = _future_assignment(db_session, p, hours_ahead=12)
+    db_session.commit()
+
+    token = login(client, "admin", "admin1234")
+    resp = client.post(
+        f"/api/v1/assignments/{a.id}/mark-absent",
+        headers=csrf_headers(token),
+        json={"comment": "缺勤"},
+    )
+    assert resp.status_code == 200, resp.text
+    db_session.refresh(a)
+    assert a.execution_status == ExecutionStatus.absent
