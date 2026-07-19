@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Card, Tag, Typography, Upload } from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -73,9 +74,17 @@ export default function UploadTimetablePage() {
 
   return (
     <div>
-      <Typography.Title level={4} style={{ marginTop: 0 }}>
-        上传我的课表
-      </Typography.Title>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(-1)}
+          style={{ fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}
+        />
+        <Typography.Title level={4} style={{ margin: 0 }}>
+          上传我的课表
+        </Typography.Title>
+      </div>
 
       {activeQuery.data && (
         <Card size="small" style={{ marginBottom: 12, background: "#fffbe6", border: "1px solid #ffe58f" }}>

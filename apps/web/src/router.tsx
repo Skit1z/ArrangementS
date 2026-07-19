@@ -13,13 +13,11 @@ import TasksPage from "@/pages/admin/TasksPage";
 import TimetablesPage from "@/pages/admin/TimetablesPage";
 import VenuesPage from "@/pages/admin/VenuesPage";
 import AdminOvertimePage from "@/pages/admin/AdminOvertimePage";
-import AvailabilityPage from "@/pages/user/AvailabilityPage";
 import HomePage from "@/pages/user/HomePage";
 import HoursPage from "@/pages/user/HoursPage";
 import MySchedulePage from "@/pages/user/MySchedulePage";
-import SwapsPage from "@/pages/user/SwapsPage";
-import OvertimePage from "@/pages/user/OvertimePage";
 import UploadTimetablePage from "@/pages/user/UploadTimetablePage";
+import RequestsPage from "@/pages/user/RequestsPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -55,9 +53,10 @@ export const router = createBrowserRouter([
           { path: "home", element: <HomePage /> },
           { path: "schedule", element: <MySchedulePage /> },
           { path: "timetable", element: <UploadTimetablePage /> },
-          { path: "availability", element: <AvailabilityPage /> },
-          { path: "swaps", element: <SwapsPage /> },
-          { path: "overtime", element: <OvertimePage /> },
+          { path: "requests", element: <RequestsPage /> },
+          { path: "availability", element: <Navigate to="/app/requests?tab=availability" replace /> },
+          { path: "swaps", element: <Navigate to="/app/requests?tab=swaps" replace /> },
+          { path: "overtime", element: <Navigate to="/app/requests?tab=overtime" replace /> },
           { path: "hours", element: <HoursPage /> },
         ],
       },

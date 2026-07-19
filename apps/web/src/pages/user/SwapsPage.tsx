@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import { errorMessage } from "@/api/client";
 import { meApi, STATUS_COLOR, STATUS_LABEL, type SwapRequest } from "@/features/me/api";
 
-export default function SwapsPage() {
+export default function SwapsPage({ hideTitle }: { hideTitle?: boolean }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
 
@@ -32,9 +32,11 @@ export default function SwapsPage() {
 
   return (
     <div>
-      <Typography.Title level={4} style={{ marginTop: 0 }}>
-        换班
-      </Typography.Title>
+      {!hideTitle && (
+        <Typography.Title level={4} style={{ marginTop: 0 }}>
+          换班
+        </Typography.Title>
+      )}
       <Tabs
         items={[
           {

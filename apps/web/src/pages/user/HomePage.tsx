@@ -67,7 +67,14 @@ export default function HomePage() {
         )}
       </Card>
 
-      <Card size="small" title={`本月工时（${month}）`} style={{ marginBottom: 12 }}>
+      <Card
+        size="small"
+        title={`本月工时（${month}）`}
+        hoverable
+        onClick={() => navigate("/app/hours")}
+        style={{ marginBottom: 12 }}
+        extra={<span style={{ color: "#1677ff", fontSize: 13 }}>详情 →</span>}
+      >
         {hours.isLoading ? (
           <Skeleton active paragraph={{ rows: 1 }} />
         ) : (

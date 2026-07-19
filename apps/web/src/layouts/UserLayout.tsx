@@ -1,10 +1,7 @@
 import {
   CalendarOutlined,
-  ClockCircleOutlined,
-  FileTextOutlined,
+  FormOutlined,
   HomeOutlined,
-  StopOutlined,
-  SwapOutlined,
 } from "@ant-design/icons";
 import { Layout } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -12,12 +9,8 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 // 移动端底部导航
 const tabs = [
   { key: "/app/home", icon: <HomeOutlined />, label: "首页" },
-  { key: "/app/schedule", icon: <CalendarOutlined />, label: "排班" },
-  { key: "/app/timetable", icon: <FileTextOutlined />, label: "课表" },
-  { key: "/app/availability", icon: <StopOutlined />, label: "不可值班" },
-  { key: "/app/swaps", icon: <SwapOutlined />, label: "换班" },
-  { key: "/app/overtime", icon: <ClockCircleOutlined />, label: "加班" },
-  { key: "/app/hours", icon: <ClockCircleOutlined />, label: "工时" },
+  { key: "/app/schedule", icon: <CalendarOutlined />, label: "我的排班" },
+  { key: "/app/requests", icon: <FormOutlined />, label: "申请中心" },
 ];
 
 export default function UserLayout() {

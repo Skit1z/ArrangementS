@@ -13,7 +13,7 @@ interface FormValues {
   recurrenceUntil?: Dayjs;
 }
 
-export default function AvailabilityPage() {
+export default function AvailabilityPage({ hideTitle }: { hideTitle?: boolean }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm<FormValues>();
@@ -49,9 +49,11 @@ export default function AvailabilityPage() {
 
   return (
     <div>
-      <Typography.Title level={4} style={{ marginTop: 0 }}>
-        不可值班申请
-      </Typography.Title>
+      {!hideTitle && (
+        <Typography.Title level={4} style={{ marginTop: 0 }}>
+          不可值班申请
+        </Typography.Title>
+      )}
 
       <Card size="small" title="新建申请" style={{ marginBottom: 12 }}>
         <Form form={form} layout="vertical" onFinish={(v) => create.mutate(v)}>

@@ -7,7 +7,7 @@ import { errorMessage } from "@/api/client";
 import { adminApi, Venue } from "@/features/admin/api";
 import { meApi, STATUS_COLOR, STATUS_LABEL } from "@/features/me/api";
 
-export default function OvertimePage() {
+export default function OvertimePage({ hideTitle }: { hideTitle?: boolean }) {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
 
@@ -51,7 +51,7 @@ export default function OvertimePage() {
 
   return (
     <Card
-      title="加班记录"
+      title={hideTitle ? null : "加班记录"}
       extra={
         isMobile ? null : (
           <Button type="primary" onClick={() => setCreating(true)}>
