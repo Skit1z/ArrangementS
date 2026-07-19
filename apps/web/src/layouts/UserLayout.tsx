@@ -1,6 +1,7 @@
 import {
   CalendarOutlined,
   ClockCircleOutlined,
+  FileTextOutlined,
   HomeOutlined,
   StopOutlined,
   SwapOutlined,
@@ -12,6 +13,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 const tabs = [
   { key: "/app/home", icon: <HomeOutlined />, label: "首页" },
   { key: "/app/schedule", icon: <CalendarOutlined />, label: "排班" },
+  { key: "/app/timetable", icon: <FileTextOutlined />, label: "课表" },
   { key: "/app/availability", icon: <StopOutlined />, label: "不可值班" },
   { key: "/app/swaps", icon: <SwapOutlined />, label: "换班" },
   { key: "/app/overtime", icon: <ClockCircleOutlined />, label: "加班" },

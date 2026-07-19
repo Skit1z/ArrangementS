@@ -75,6 +75,30 @@ export interface AvailabilityRequest {
   status: string;
 }
 
+// --- 课表 ---
+export interface ParsedEntry {
+  weekday: number;
+  period_start: number;
+  period_end: number;
+  week_expr: string;
+  location_code: string | null;
+  course_name: string | null;
+}
+
+export interface ParsedPdf {
+  student_no: string | null;
+  full_name: string | null;
+  entries: ParsedEntry[];
+  warnings: string[];
+}
+
+export interface MyTimetable {
+  upload_id: string;
+  uploaded_at: string;
+  review_status: string;
+  entries: ParsedEntry[];
+}
+
 export const meApi = {
   schedule: async () => (await api.get<MyAssignment[]>("/me/schedule")).data,
   nextDuty: async () => (await api.get<{ next: NextDuty | null }>("/me/next-duty")).data.next,
@@ -108,6 +132,36 @@ export const meApi = {
   createOvertime: async (venue_id: string, start_at: string, end_at: string, reason: string) =>
     (await api.post<any>("/me/overtime", { venue_id, start_at, end_at, reason })).data,
   peers: async () => (await api.get<Peer[]>("/me/peers")).data,
+
+  // 课表
+  timetable: {
+    parsePdf: async (file: File, semesterId?: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (semesterId) form.append("semester_id", semesterId);
+      const res = await api.post<ParsedPdf>("/timetables/parse-pdf", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data;
+    },
+    upload: async (
+      fileName: string,
+      entries: ParsedEntry[],
+      semesterId?: string,
+      personId?: string
+    ) =>
+      (
+        await api.post<{ id: string }>("/timetables/upload", {
+          semester_id: semesterId,
+          person_id: personId,
+          file_name: fileName,
+          entries,
+        })
+      ).data,
+    approve: async (uploadId: string) =>
+      (await api.post<{ message: string }>(`/timetables/${uploadId}/approve`)).data,
+    myActive: async () => (await api.get<MyTimetable | null>("/me/timetable")).data,
+  },
 };
 
 export interface Peer {

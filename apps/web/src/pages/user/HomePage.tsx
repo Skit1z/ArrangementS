@@ -24,6 +24,18 @@ export default function HomePage() {
         你好，{user?.username}
       </Typography.Title>
 
+      <Card
+        size="small"
+        hoverable
+        onClick={() => navigate("/app/timetable")}
+        style={{ marginBottom: 12, background: "#e6f4ff", border: "1px solid #91caff" }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontWeight: 600 }}>📄 上传我的课表 PDF</span>
+          <span style={{ color: "#1677ff" }}>去上传 →</span>
+        </div>
+      </Card>
+
       <Card size="small" title="下一次值班" style={{ marginBottom: 12 }}>
         {nextDuty.isLoading ? (
           <Skeleton active paragraph={{ rows: 1 }} />

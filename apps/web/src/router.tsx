@@ -18,6 +18,7 @@ import HoursPage from "@/pages/user/HoursPage";
 import MySchedulePage from "@/pages/user/MySchedulePage";
 import SwapsPage from "@/pages/user/SwapsPage";
 import OvertimePage from "@/pages/user/OvertimePage";
+import UploadTimetablePage from "@/pages/user/UploadTimetablePage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/app/home" replace /> },
           { path: "home", element: <HomePage /> },
           { path: "schedule", element: <MySchedulePage /> },
+          { path: "timetable", element: <UploadTimetablePage /> },
           { path: "availability", element: <AvailabilityPage /> },
           { path: "swaps", element: <SwapsPage /> },
           { path: "overtime", element: <OvertimePage /> },
