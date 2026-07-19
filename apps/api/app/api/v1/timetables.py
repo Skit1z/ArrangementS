@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, require_admin
@@ -12,16 +12,86 @@ from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.auth import MessageOut
 from app.schemas.timetable import (
+    ActiveTimetableOut,
     CourseRuleOut,
     CourseRulePatch,
+    ParsedEntryOut,
+    ParsedPdfOut,
     TimetablePreviewOut,
     TimetableUploadIn,
-    ActiveTimetableOut,
 )
 from app.services import people_service, timetable_service
-from app.timetable.extractor import ManualEntryExtractor
+from app.timetable.extractor import ManualEntryExtractor, get_pdf_extractor
 
 router = APIRouter(prefix="/timetables", tags=["timetables"])
+
+MAX_PDF_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+@router.post("/parse-pdf", response_model=ParsedPdfOut)
+def parse_pdf(
+    semester_id: uuid.UUID | None = Form(None),
+    file: UploadFile = File(...),
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ParsedPdfOut:
+    """解析 PDF 课表但不入库，返回 entries 供前端预览。
+
+    前端拿到 entries 后调 ``POST /timetables/upload`` 创建 draft，再调
+    ``POST /timetables/{id}/approve`` 生效。``semester_id`` 未传则用当前学期。
+    """
+    file_bytes = file.file.read()
+    if len(file_bytes) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="文件过大（>10MB）")
+
+    # 按 magic bytes 校验是 PDF（不信任扩展名/mime）
+    if not file_bytes.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="仅支持 PDF 文件")
+
+    # 学期：未传则取当前学期
+    from app.models.semester import Semester
+    from app.services import semester_service
+
+    if semester_id is not None:
+        if db.get(Semester, semester_id) is None:
+            raise HTTPException(status_code=404, detail="学期不存在")
+    else:
+        sem = semester_service.get_current_semester(db)
+        if sem is None:
+            raise HTTPException(status_code=400, detail="当前无激活学期，请联系管理员")
+
+    try:
+        extractor = get_pdf_extractor()
+        result = extractor.extract(file_bytes, file.filename or "timetable.pdf")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"PDF 解析失败：{exc}") from exc
+    except Exception as exc:  # pymupdf 解析失败等
+        raise HTTPException(status_code=400, detail=f"PDF 文件无法读取：{exc}") from exc
+
+    if not result.entries:
+        detail = (
+            "未识别到课程：" + "；".join(result.warnings)
+            if result.warnings
+            else "未识别到课程，请确认是学校教务系统导出的 PDF"
+        )
+        raise HTTPException(status_code=400, detail=detail)
+
+    return ParsedPdfOut(
+        student_no=result.student_no,
+        full_name=result.full_name,
+        entries=[
+            ParsedEntryOut(
+                weekday=e.weekday,
+                period_start=e.period_start,
+                period_end=e.period_end,
+                week_expr=e.week_expr,
+                location_code=e.location_code,
+                course_name=e.course_name,
+            )
+            for e in result.entries
+        ],
+        warnings=result.warnings,
+    )
 
 
 @router.post("/upload", response_model=TimetablePreviewOut)

@@ -72,3 +72,21 @@ class ActiveTimetableOut(BaseModel):
     rules: list[CourseRuleOut]
 
     model_config = {"from_attributes": True}
+
+
+class ParsedEntryOut(BaseModel):
+    """PDF 解析出的单条课程（供前端预览，未入库）。"""
+
+    weekday: int
+    period_start: int
+    period_end: int
+    week_expr: str
+    location_code: str | None = None
+    course_name: str | None = None
+
+
+class ParsedPdfOut(BaseModel):
+    student_no: str | None = None
+    full_name: str | None = None
+    entries: list[ParsedEntryOut]
+    warnings: list[str]
