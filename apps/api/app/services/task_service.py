@@ -200,6 +200,35 @@ def cancel_task(db: Session, task_id: uuid.UUID) -> VenueTask:
     return task
 
 
+# 允许的状态转换（from -> {allowed targets}）
+_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
+    TaskStatus.draft: {TaskStatus.confirmed, TaskStatus.cancelled},
+    TaskStatus.confirmed: {TaskStatus.scheduled, TaskStatus.cancelled},
+    TaskStatus.scheduled: {TaskStatus.executing, TaskStatus.cancelled},
+    TaskStatus.executing: {TaskStatus.completed},
+    TaskStatus.completed: set(),
+    TaskStatus.cancelled: set(),
+}
+
+
+def transition_task(db: Session, task_id: uuid.UUID, target: TaskStatus) -> VenueTask:
+    """按状态机转换任务状态：draft → confirmed → scheduled → executing → completed。
+
+    任意非终态都可转 cancelled；其它转换必须按顺序。已完成/已取消是终态。
+    """
+    task = get_task(db, task_id)
+    allowed = _TRANSITIONS.get(task.status, set())
+    if target not in allowed:
+        raise HTTPException(
+            status_code=422,
+            detail=f"任务当前状态「{task.status.value}」不能直接转到「{target.value}」",
+        )
+    task.status = target
+    task.version += 1
+    db.flush()
+    return task
+
+
 def get_task(db: Session, task_id: uuid.UUID) -> VenueTask:
     task = db.get(VenueTask, task_id)
     if task is None:

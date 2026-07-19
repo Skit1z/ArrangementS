@@ -90,3 +90,44 @@ def test_completed_task_not_editable(db_session):
     with pytest.raises(HTTPException) as ei:
         task_service.update_task(db_session, task.id, {"title": "B"})
     assert ei.value.status_code == 422
+
+
+# --- 任务状态转换 ---
+def test_transition_task_valid_flow(db_session):
+    """draft → confirmed → scheduled → executing → completed 全链路。"""
+    from app.models.enums import TaskStatus
+    v = _event_venue(db_session)
+    task = task_service.create_task(db_session, venue_id=v.id, title="A",
+        booking_start_at=datetime(2026, 3, 2, 9, 0), booking_end_at=datetime(2026, 3, 2, 10, 0))
+    db_session.commit()
+
+    for target in (TaskStatus.confirmed, TaskStatus.scheduled, TaskStatus.executing, TaskStatus.completed):
+        task_service.transition_task(db_session, task.id, target)
+        db_session.flush()
+        db_session.refresh(task)
+        assert task.status == target
+
+
+def test_transition_task_rejects_invalid_jump(db_session):
+    """draft 不能直接跳到 executing（必须经 confirmed/scheduled）。"""
+    from app.models.enums import TaskStatus
+    v = _event_venue(db_session)
+    task = task_service.create_task(db_session, venue_id=v.id, title="A",
+        booking_start_at=datetime(2026, 3, 2, 9, 0), booking_end_at=datetime(2026, 3, 2, 10, 0))
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as ei:
+        task_service.transition_task(db_session, task.id, TaskStatus.executing)
+    assert ei.value.status_code == 422
+
+
+def test_transition_task_rejects_terminal(db_session):
+    """已完成/已取消任务不允许再转换。"""
+    from app.models.enums import TaskStatus
+    v = _event_venue(db_session)
+    task = task_service.create_task(db_session, venue_id=v.id, title="A",
+        booking_start_at=datetime(2026, 3, 2, 9, 0), booking_end_at=datetime(2026, 3, 2, 10, 0))
+    task.status = TaskStatus.completed
+    db_session.commit()
+    with pytest.raises(HTTPException):
+        task_service.transition_task(db_session, task.id, TaskStatus.scheduled)

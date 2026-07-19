@@ -104,11 +104,18 @@ def _templates_for_day(
 def _generate_task_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
     week_start_dt = datetime.combine(plan.week_start, time.min, tzinfo=BEIJING_TZ)
     week_end_dt = datetime.combine(plan.week_end + timedelta(days=1), time.min, tzinfo=BEIJING_TZ)
+    # 仅已确认及之后状态的任务进入排班；草稿任务待 admin 确认后才占用岗位
+    schedulable = (
+        TaskStatus.confirmed,
+        TaskStatus.scheduled,
+        TaskStatus.executing,
+        TaskStatus.completed,
+    )
     tasks = db.scalars(
         select(VenueTask).where(
             VenueTask.duty_start_at >= week_start_dt,
             VenueTask.duty_start_at < week_end_dt,
-            VenueTask.status.notin_([TaskStatus.cancelled]),
+            VenueTask.status.in_(schedulable),
         )
     )
     result: list[DutySlot] = []

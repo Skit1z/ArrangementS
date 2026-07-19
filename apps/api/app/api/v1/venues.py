@@ -18,6 +18,7 @@ from app.schemas.venue import (
     TaskCreate,
     TaskListItem,
     TaskOut,
+    TaskTransitionIn,
     TaskUpdate,
     VenueCreate,
     VenueOut,
@@ -136,6 +137,25 @@ def cancel_task(task_id: uuid.UUID, _: User = Depends(require_admin), db: Sessio
     task_service.cancel_task(db, task_id)
     db.commit()
     return MessageOut(message="任务已取消")
+
+
+@router.post("/venue-tasks/{task_id}/transition", response_model=TaskOut)
+def transition_task(
+    task_id: uuid.UUID,
+    payload: TaskTransitionIn,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> object:
+    """按状态机转换任务状态（draft→confirmed→scheduled→executing→completed）。"""
+    from app.models.enums import TaskStatus
+    try:
+        target = TaskStatus(payload.target_status)
+    except ValueError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail=f"未知任务状态：{payload.target_status}") from exc
+    task = task_service.transition_task(db, task_id, target)
+    db.commit()
+    return task
 
 
 @router.get("/venue-tasks/{task_id}/hours-preview")

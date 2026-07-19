@@ -93,6 +93,12 @@ class TaskUpdate(BaseModel):
     organization: str | None = None
     contact_name: str | None = None
     contact_phone: str | None = None
+
+
+class TaskTransitionIn(BaseModel):
+    """任务状态转换请求。target_status 必须是 TaskStatus 枚举值。"""
+
+    target_status: str
     requirements: str | None = None
     notes: str | None = None
     expected_version: int | None = None
