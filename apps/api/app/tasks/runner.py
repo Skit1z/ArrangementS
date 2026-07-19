@@ -52,37 +52,46 @@ def job_auto_complete(db=None) -> int:
 
 
 def job_expire_semesters(db=None, today: date | None = None) -> list[str]:
-    """学期结束：该学期课表与不可值班区间失效，并将学期置为非当前。返回已处理的学期名。
+    """学期结束：过期学期的课表与不可值班区间失效，并把该学期置为非当前。返回已处理的学期名。
 
-    判定：is_current=True 且 first_monday + week_count*7 天 <= today。
+    判定：``first_monday + week_count 周 <= today`` 的学期视为已结束。无论该学期是否有
+    已审核课表，都会被置为 ``is_current=False``（避免无课表的过期学期长期保留当前态）；
+    若有已审核课表则同时调用 ``expire_semester_courses`` 让课表/区间逻辑失效。
+
     传入 db/today 供测试用；默认自建会话并提交。
     """
     today = today or datetime.now(timezone.utc).date()
-    processed: list[str] = []
 
     def _do(session) -> list[str]:
         from app.models.timetable import TimetableUpload
         from app.models.enums import ReviewStatus
         from sqlalchemy import func
+
         rows = list(session.scalars(select(Semester)))
         result: list[str] = []
         for sem in rows:
             end = sem.first_monday + timedelta(weeks=sem.week_count)
-            if end <= today:
-                # Check if there are still approved uploads for this semester
-                has_active = session.scalar(
-                    select(func.count(TimetableUpload.id)).where(
-                        TimetableUpload.semester_id == sem.id,
-                        TimetableUpload.review_status == ReviewStatus.approved,
-                    )
+            if end > today:
+                continue  # 尚未结束
+            # 已结束：无论是否有课表，都先解除当前态
+            sem.is_current = False
+            # 若有已审核课表则一并失效
+            has_approved = session.scalar(
+                select(func.count(TimetableUpload.id)).where(
+                    TimetableUpload.semester_id == sem.id,
+                    TimetableUpload.review_status == ReviewStatus.approved,
                 )
-                if has_active > 0:
-                    n = timetable_service.expire_semester_courses(session, sem.id)
-                    result.append(sem.name)
-                    log.info(
-                        "expire_semester_courses: 学期「%s」已结束（%s），自动失效 %d 份课表",
-                        sem.name, end, n,
-                    )
+            )
+            if has_approved:
+                n = timetable_service.expire_semester_courses(session, sem.id)
+                log.info(
+                    "expire_semester_courses: 学期「%s」已结束（%s），自动失效 %d 份课表",
+                    sem.name, end, n,
+                )
+            else:
+                log.info("expire_semester_courses: 学期「%s」已结束（%s），无已审核课表，仅解除当前态",
+                         sem.name, end)
+            result.append(sem.name)
         return result
 
     if db is not None:

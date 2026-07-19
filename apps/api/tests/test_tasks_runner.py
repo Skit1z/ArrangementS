@@ -145,3 +145,17 @@ def test_job_expire_semesters_skips_active(db_session):
     assert names == []
     db_session.refresh(sem)
     assert sem.is_current is True
+
+
+def test_job_expire_semesters_deactivates_past_without_uploads(db_session):
+    """已结束但无任何已审核课表的当前学期：仍应被置为非当前。"""
+    first_monday = datetime.now(timezone.utc).date() - timedelta(weeks=21)
+    sem = semester_service.create_semester(db_session, name="空过期学期", first_monday=first_monday, is_current=True)
+    db_session.commit()
+    assert sem.is_current is True
+
+    names = runner.job_expire_semesters(db=db_session)
+    assert sem.name in names
+    db_session.flush()  # 把 runner 对 sem 的修改写库，便于 refresh 校验
+    db_session.refresh(sem)
+    assert sem.is_current is False
