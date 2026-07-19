@@ -6,16 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, require_admin
 from app.db.session import get_db
-from app.models.enums import RequestStatus, SlotSourceType, SlotStatus, PlanAssignmentStatus, ExecutionStatus, AssignmentSource
+from app.models.enums import RequestStatus, SlotSourceType
 from app.models.overtime import OvertimeRequest
 from app.models.person import PersonProfile
-from app.models.schedule import DutySlot, WeeklyPlan, Assignment
 from app.models.user import User
 from app.models.venue import Venue
 from app.schemas.auth import MessageOut
 from app.schemas.manual_slot import ManualSlotCreate
 from app.schemas.overtime import OvertimeRequestCreate, OvertimeRequestOut
-from app.services import schedule_service
 
 router = APIRouter(tags=["overtime"])
 
@@ -130,48 +128,35 @@ def approve_overtime(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    """批准加班申请：走核心排班规则（冲突/课程/不可值班/倍率/取整/审计）。
+
+    若该人在此时段存在课程/不可值班区间/场地硬约束/时间重叠，会被拒绝，申请保持 pending。
+    """
+    from app.services import manual_scheduling_service
+
     req = db.query(OvertimeRequest).filter(OvertimeRequest.id == req_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="申请不存在")
     if req.status != RequestStatus.pending:
         raise HTTPException(status_code=400, detail="该申请已被处理")
 
+    # 走核心规则（失败会抛 HTTPException 422）
+    slot, assignment = manual_scheduling_service.assign_person_to_new_slot(
+        db,
+        person_id=req.person_id,
+        venue_id=req.venue_id,
+        start_at=req.start_at,
+        end_at=req.end_at,
+        source_type=SlotSourceType.manual,
+        created_by=admin.id,
+        action="overtime.approve",
+    )
+
     req.status = RequestStatus.approved
     req.reviewed_by = admin.id
     req.reviewed_at = datetime.now()
-
-    # Create slot and assignment
-    plan = get_or_create_plan_for_date(db, req.start_at)
-    minutes = int((req.end_at - req.start_at).total_seconds() / 60)
-    
-    slot = DutySlot(
-        weekly_plan_id=plan.id,
-        venue_id=req.venue_id,
-        source_type=SlotSourceType.manual,
-        slot_start_at=req.start_at,
-        slot_end_at=req.end_at,
-        required_people=1,
-        credited_minutes=minutes,
-        month_key=req.start_at.strftime("%Y-%m"),
-        status=SlotStatus.filled
-    )
-    db.add(slot)
-    db.flush()
-    
-    assignment = Assignment(
-        duty_slot_id=slot.id,
-        person_id=req.person_id,
-        position_index=0,
-        assignment_source=AssignmentSource.manual,
-        plan_status=PlanAssignmentStatus.assigned,
-        execution_status=ExecutionStatus.pending,
-        raw_minutes=minutes,
-        credited_minutes=minutes,
-        balance_minutes=minutes
-    )
-    db.add(assignment)
     req.generated_slot_id = slot.id
-    
+
     db.commit()
     return MessageOut(message="已批准并自动生成排班")
 
@@ -199,39 +184,19 @@ def create_manual_slot(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    if payload.end_at <= payload.start_at:
-        raise HTTPException(status_code=400, detail="结束时间必须晚于开始时间")
-        
-    plan = get_or_create_plan_for_date(db, payload.start_at)
-    minutes = int((payload.end_at - payload.start_at).total_seconds() / 60)
-    
-    slot = DutySlot(
-        weekly_plan_id=plan.id,
+    """创建临时空缺班次（无人员）：balance 全部为 0，不污染统计。
+
+    走 ``manual_scheduling_service.create_vacant_slot``，与核心模型一致。
+    """
+    from app.services import manual_scheduling_service
+
+    manual_scheduling_service.create_vacant_slot(
+        db,
         venue_id=payload.venue_id,
-        source_type=SlotSourceType.manual,
-        slot_start_at=payload.start_at,
-        slot_end_at=payload.end_at,
+        start_at=payload.start_at,
+        end_at=payload.end_at,
         required_people=payload.required_people,
-        credited_minutes=minutes,
-        month_key=payload.start_at.strftime("%Y-%m"),
-        status=SlotStatus.open
+        created_by=admin.id,
     )
-    db.add(slot)
-    db.flush()
-    
-    for i in range(payload.required_people):
-        assignment = Assignment(
-            duty_slot_id=slot.id,
-            person_id=None,
-            position_index=i,
-            assignment_source=AssignmentSource.auto,
-            plan_status=PlanAssignmentStatus.vacant,
-            execution_status=ExecutionStatus.pending,
-            raw_minutes=minutes,
-            credited_minutes=minutes,
-            balance_minutes=minutes
-        )
-        db.add(assignment)
-        
     db.commit()
     return MessageOut(message="临时班次已创建")
