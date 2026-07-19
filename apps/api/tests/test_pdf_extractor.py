@@ -97,3 +97,34 @@ def test_student_no_extracted():
 
     result = PdfTimetableExtractor().extract(_bytes())
     assert result.student_no == "202301070410"
+
+
+def test_empty_bytes_raises():
+    import pytest
+    from app.timetable.pdf_extractor import PdfTimetableExtractor
+
+    with pytest.raises(Exception):
+        PdfTimetableExtractor().extract(b"", "empty.pdf")
+
+
+def test_non_pdf_bytes_raises():
+    import pytest
+    from app.timetable.pdf_extractor import PdfTimetableExtractor
+
+    # 不是 PDF 的字节流
+    with pytest.raises(Exception):
+        PdfTimetableExtractor().extract(b"not a pdf " * 100, "fake.pdf")
+
+
+def test_pdf_without_weekday_headers_returns_warning():
+    """构造一个不含星期列头的 PDF（空白页），应返回空 entries + warning。"""
+    import pymupdf
+    from app.timetable.pdf_extractor import PdfTimetableExtractor
+
+    doc = pymupdf.open()
+    doc.new_page()
+    empty_bytes = doc.tobytes()
+
+    result = PdfTimetableExtractor().extract(empty_bytes, "blank.pdf")
+    assert result.entries == []
+    assert any("星期" in w for w in result.warnings)
