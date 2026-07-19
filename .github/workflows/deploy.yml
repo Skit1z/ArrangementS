@@ -25,8 +25,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build frontend
-        working-directory: apps/web
-        run: pnpm exec vite build
+        run: pnpm --filter meeting-scheduler-web exec vite build
 
       - name: Setup SSH key
         run: |
