@@ -23,9 +23,18 @@ import {
   adminApi,
   TASK_STATUS_COLOR,
   TASK_STATUS_LABEL,
+  type TaskListItem,
   type Venue,
 } from "@/features/admin/api";
 import { hoursOf } from "@/features/me/api";
+
+// 任务状态机的下一状态（用于「推进」按钮）
+const NEXT_STATUS: Record<string, string> = {
+  draft: "confirmed",
+  confirmed: "scheduled",
+  scheduled: "executing",
+  executing: "completed",
+};
 
 export default function TasksPage() {
   const { message } = App.useApp();
@@ -73,6 +82,30 @@ export default function TasksPage() {
     onError: (e) => message.error(errorMessage(e)),
   });
 
+  const transitionM = useMutation({
+    mutationFn: ({ id, target }: { id: string; target: string }) => adminApi.tasks.transition(id, target),
+    onSuccess: () => {
+      message.success("状态已更新");
+      qc.invalidateQueries({ queryKey: ["admin", "tasks"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  // 编辑：复用 create form，按任务填充初值后切换到 update 模式
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const updateM = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof adminApi.tasks.update>[1] }) =>
+      adminApi.tasks.update(id, { ...patch, expected_version: (tasksQ.data ?? []).find((t) => t.id === id)?.version }),
+    onSuccess: () => {
+      message.success("任务已更新");
+      setEditingId(null);
+      form.resetFields();
+      qc.invalidateQueries({ queryKey: ["admin", "tasks"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
   const openCreate = () => {
     form.resetFields();
     const firstEvent = (venuesQ.data ?? []).find((v) => v.venue_type === "event_based");
@@ -84,13 +117,32 @@ export default function TasksPage() {
       required_people: 2,
       is_temporary: false,
     });
+    setEditingId(null);
+    setCreating(true);
+  };
+
+  const openEdit = (task: TaskListItem) => {
+    form.resetFields();
+    form.setFieldsValue({
+      venue_id: task.venue_id,
+      title: task.title,
+      booking_range: [dayjs(task.booking_start_at), dayjs(task.booking_end_at)],
+      prep_minutes: task.prep_minutes,
+      cleanup_minutes: task.cleanup_minutes,
+      required_people: task.required_people,
+      is_temporary: task.is_temporary,
+      organization: task.organization,
+      contact_name: task.contact_name,
+      contact_phone: task.contact_phone,
+    });
+    setEditingId(task.id);
     setCreating(true);
   };
 
   const submit = async () => {
     const values = await form.validateFields();
     const range: [dayjs.Dayjs, dayjs.Dayjs] = values.booking_range;
-    createM.mutate({
+    const payload = {
       venue_id: values.venue_id,
       title: values.title,
       booking_start_at: range[0].toISOString(),
@@ -104,7 +156,13 @@ export default function TasksPage() {
       contact_phone: values.contact_phone,
       requirements: values.requirements,
       notes: values.notes,
-    });
+    };
+    if (editingId) {
+      const { venue_id: _v, ...patch } = payload;
+      updateM.mutate({ id: editingId, patch });
+    } else {
+      createM.mutate(payload);
+    }
   };
 
   return (
@@ -173,12 +231,29 @@ export default function TasksPage() {
           },
           {
             title: "操作",
-            width: 160,
+            width: 280,
             render: (_, r) => (
-              <Space>
+              <Space wrap size="small">
                 <Button size="small" onClick={() => setPreviewId(r.id)}>
                   工时预览
                 </Button>
+                {r.status !== "cancelled" && r.status !== "completed" && (
+                  <Button size="small" onClick={() => openEdit(r)}>
+                    编辑
+                  </Button>
+                )}
+                {NEXT_STATUS[r.status as keyof typeof NEXT_STATUS] && (
+                  <Popconfirm
+                    title={`确认推进到「${TASK_STATUS_LABEL[NEXT_STATUS[r.status as keyof typeof NEXT_STATUS] as keyof typeof TASK_STATUS_LABEL]}」？`}
+                    onConfirm={() =>
+                      transitionM.mutate({ id: r.id, target: NEXT_STATUS[r.status as keyof typeof NEXT_STATUS]! })
+                    }
+                  >
+                    <Button size="small" type="primary" ghost loading={transitionM.isPending}>
+                      → {TASK_STATUS_LABEL[NEXT_STATUS[r.status as keyof typeof NEXT_STATUS] as keyof typeof TASK_STATUS_LABEL]}
+                    </Button>
+                  </Popconfirm>
+                )}
                 {r.status !== "cancelled" && r.status !== "completed" && (
                   <Popconfirm title="确认取消该任务？" onConfirm={() => cancelM.mutate(r.id)}>
                     <Button size="small" danger>
@@ -193,11 +268,14 @@ export default function TasksPage() {
       />
 
       <Modal
-        title="新建任务"
+        title={editingId ? "编辑任务" : "新建任务"}
         open={creating}
         onOk={submit}
-        onCancel={() => setCreating(false)}
-        confirmLoading={createM.isPending}
+        onCancel={() => {
+          setCreating(false);
+          setEditingId(null);
+        }}
+        confirmLoading={createM.isPending || updateM.isPending}
         destroyOnClose
         width={600}
       >

@@ -76,6 +76,47 @@ def test_job_auto_complete_completes_ended(db_session):
     assert a.execution_status == ExecutionStatus.completed
 
 
+def test_job_auto_complete_syncs_venue_task_status(db_session):
+    """班次自动完成时，关联的 VenueTask 应从 executing → completed。"""
+    from app.models.enums import TaskStatus, VenueType
+    from app.models.venue import Venue
+    from app.models.venue_task import VenueTask
+
+    v = Venue(name="蓝厅", code="LT", venue_type=VenueType.event_based, default_required_people=2)
+    db_session.add(v); db_session.flush()
+    p = _person(db_session)
+    plan = WeeklyPlan(week_start=date(2026, 3, 2), week_end=date(2026, 3, 8), revision=1, status=PlanStatus.published)
+    db_session.add(plan); db_session.flush()
+
+    end = datetime.now(timezone.utc) - timedelta(minutes=30)
+    start = end - timedelta(hours=2)
+    task = VenueTask(
+        venue_id=v.id, title="讲座", booking_start_at=start, booking_end_at=end,
+        prep_minutes=0, cleanup_minutes=0, duty_start_at=start, duty_end_at=end,
+        required_people=1, is_temporary=False, status=TaskStatus.executing, version=1,
+    )
+    db_session.add(task); db_session.flush()
+    slot = DutySlot(
+        weekly_plan_id=plan.id, venue_id=v.id, source_type=SlotSourceType.venue_task,
+        source_id=task.id, slot_start_at=start, slot_end_at=end, required_people=1,
+        credited_minutes=0, month_key="2026-03", status=SlotStatus.filled,
+    )
+    db_session.add(slot); db_session.flush()
+    a = Assignment(
+        duty_slot_id=slot.id, person_id=p.id, position_index=0,
+        plan_status=PlanAssignmentStatus.assigned, execution_status=ExecutionStatus.pending,
+        raw_minutes=120, weighted_minutes_before_round=Decimal(120),
+        credited_minutes=120, balance_minutes=120,
+    )
+    db_session.add(a)
+    db_session.commit()
+
+    n = runner.job_auto_complete(db=db_session)
+    assert n == 1
+    db_session.refresh(task)
+    assert task.status == TaskStatus.completed  # 同步推进
+
+
 def test_job_auto_complete_skips_future(db_session):
     """尚未结束的班次不应被处理。"""
     v = _venue(db_session)
