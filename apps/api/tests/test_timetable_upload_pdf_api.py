@@ -101,3 +101,102 @@ def test_parse_pdf_requires_login(client, db_session):
         files={"file": ("sample.pdf", FIXTURE.read_bytes(), "application/pdf")},
     )
     assert resp.status_code in (401, 403)  # 未登录或 CSRF 拦截
+
+
+def test_user_can_approve_own_upload(client, seed_admin, db_session):
+    """用户上传后可直接 approve 自己的课表（上传即生效）。"""
+    from sqlalchemy import select
+    from app.models.availability import AvailabilityBlock
+
+    sem = semester_service.create_semester(db_session, name="春", first_monday=date(2026, 2, 23))
+    db_session.commit()
+    _seed_user(db_session)
+
+    token = login(client, "202301070410", "pw123456")
+
+    # 1) 解析 PDF
+    parsed = client.post(
+        "/api/v1/timetables/parse-pdf",
+        headers=csrf_headers(token),
+        data={"semester_id": str(sem.id)},
+        files={"file": ("sample.pdf", FIXTURE.read_bytes(), "application/pdf")},
+    ).json()
+
+    # 2) 用解析结果创建 upload
+    upload = client.post(
+        "/api/v1/timetables/upload",
+        headers=csrf_headers(token),
+        json={
+            "semester_id": str(sem.id),
+            "file_name": "sample.pdf",
+            "entries": parsed["entries"],
+        },
+    ).json()
+    upload_id = upload["id"]
+
+    # 3) 普通用户 approve 自己的（之前会 403，现在应 200）
+    resp = client.post(f"/api/v1/timetables/{upload_id}/approve", headers=csrf_headers(token))
+    assert resp.status_code == 200, resp.text
+
+    # 4) 验证已生成不可值班区间（10 条课程规则，按各自周次展开）
+    blocks = list(db_session.scalars(select(AvailabilityBlock)))
+    assert len(blocks) > 0
+
+
+def test_user_cannot_approve_others_upload(client, seed_admin, db_session):
+    """普通用户不能 approve 别人的 upload。"""
+    from app.core.security import hash_password
+    from app.models.enums import UserRole
+    from app.models.person import PersonProfile
+    from app.models.user import User
+
+    sem = semester_service.create_semester(db_session, name="春", first_monday=date(2026, 2, 23))
+    db_session.commit()
+    _seed_user(db_session)
+
+    # 另一个用户
+    u2 = User(
+        username="20250002",
+        password_hash=hash_password("pw123456"),
+        role=UserRole.user,
+        is_active=True,
+    )
+    db_session.add(u2)
+    db_session.flush()
+    db_session.add(
+        PersonProfile(
+            user_id=u2.id,
+            student_no="20250002",
+            class_name="一班",
+            full_name="乙",
+            phone="13800000001",
+        )
+    )
+    db_session.commit()
+
+    # owner 上传
+    token_owner = login(client, "202301070410", "pw123456")
+    upload = client.post(
+        "/api/v1/timetables/upload",
+        headers=csrf_headers(token_owner),
+        json={
+            "semester_id": str(sem.id),
+            "file_name": "t.pdf",
+            "entries": [
+                {
+                    "weekday": 1,
+                    "period_start": 1,
+                    "period_end": 2,
+                    "week_expr": "1-4周",
+                    "location_code": "B101",
+                }
+            ],
+        },
+    ).json()
+
+    # 乙尝试 approve 甲的
+    token_other = login(client, "20250002", "pw123456")
+    resp = client.post(
+        f"/api/v1/timetables/{upload['id']}/approve", headers=csrf_headers(token_other)
+    )
+    assert resp.status_code == 403

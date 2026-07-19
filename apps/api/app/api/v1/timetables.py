@@ -224,17 +224,35 @@ def submit(
 
 @router.post("/{upload_id}/approve", response_model=MessageOut)
 def approve(
-    upload_id: uuid.UUID, actor: User = Depends(require_admin), db: Session = Depends(get_db)
+    upload_id: uuid.UUID,
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> MessageOut:
-    timetable_service.approve(db, upload_id, actor.id)
+    """生效课表：admin 或 upload 本人可调。
+
+    用户决策「上传即生效」，因此放开为本人可调；admin 仍可代审。
+    """
+    up = timetable_service._get_upload(db, upload_id)
+    if current.role != UserRole.admin:
+        prof = people_service.get_person_by_user(db, current.id)
+        if up.person_id != prof.id:
+            raise HTTPException(status_code=403, detail="无权操作他人课表")
+    timetable_service.approve(db, upload_id, current.id)
     db.commit()
     return MessageOut(message="课表已生效")
 
 
 @router.post("/{upload_id}/reject", response_model=MessageOut)
 def reject(
-    upload_id: uuid.UUID, _: User = Depends(require_admin), db: Session = Depends(get_db)
+    upload_id: uuid.UUID,
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> MessageOut:
+    up = timetable_service._get_upload(db, upload_id)
+    if current.role != UserRole.admin:
+        prof = people_service.get_person_by_user(db, current.id)
+        if up.person_id != prof.id:
+            raise HTTPException(status_code=403, detail="无权操作他人课表")
     timetable_service.reject(db, upload_id)
     db.commit()
     return MessageOut(message="课表已驳回")

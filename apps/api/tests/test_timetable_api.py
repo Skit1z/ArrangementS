@@ -46,8 +46,32 @@ def test_user_upload_and_admin_approve(client, seed_admin, db_session):
 
     client.post(f"/api/v1/timetables/{upload_id}/submit", headers=csrf_headers(token))
 
-    # 普通用户不能审核
-    assert client.post(f"/api/v1/timetables/{upload_id}/approve", headers=csrf_headers(token)).status_code == 403
+    # 另一个普通用户不能审核别人的（owner 本人现在可以 approve 自己的）
+    other = User(
+        username="20250099",
+        password_hash=hash_password("pw123456"),
+        role=UserRole.user,
+        is_active=True,
+    )
+    db_session.add(other)
+    db_session.flush()
+    db_session.add(
+        PersonProfile(
+            user_id=other.id,
+            student_no="20250099",
+            class_name="一班",
+            full_name="丙",
+            phone="13800000002",
+        )
+    )
+    db_session.commit()
+    other_token = login(client, "20250099", "pw123456")
+    assert (
+        client.post(
+            f"/api/v1/timetables/{upload_id}/approve", headers=csrf_headers(other_token)
+        ).status_code
+        == 403
+    )
 
     # admin 审核通过
     client.post("/api/v1/auth/logout", headers=csrf_headers(token))
