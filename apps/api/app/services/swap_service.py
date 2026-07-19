@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.models.enums import (
     AssignmentSource,
     ExecutionStatus,
+    PersonStatus,
     PlanAssignmentStatus,
     SlotStatus,
     SwapCandidateStatus,
@@ -125,6 +126,8 @@ def admin_approve(
     person = db.get(PersonProfile, final_person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="接替人员不存在")
+    if person.status != PersonStatus.active:
+        raise HTTPException(status_code=422, detail="接替人员当前非启用状态，不可换班")
 
     assignment = db.get(Assignment, swap.assignment_id)
     slot = db.get(DutySlot, assignment.duty_slot_id)
@@ -135,11 +138,15 @@ def admin_approve(
     if start <= now:
         raise HTTPException(status_code=422, detail="班次已开始，不可换班")
 
-    # 重新校验硬约束
+    # 重新校验硬约束（含课程/不可值班/场地硬约束）
     if not eligibility.check_person_available_for_slot(db, person, slot):
         raise HTTPException(status_code=422, detail="接替人员存在课程/不可值班/场地等硬冲突")
     if eligibility.has_time_overlap_with_person(db, person.id, slot, exclude_assignment_id=assignment.id):
         raise HTTPException(status_code=422, detail="接替人员在该时间已有排班，时间重叠")
+
+    # P1.5 补查：禁止同班搭档（接替人 vs 同 slot 的其它已分配人员）
+    if eligibility.violates_no_pair_with_existing(db, person.id, slot, exclude_assignment_id=assignment.id):
+        raise HTTPException(status_code=422, detail="接替人与现有同班人员存在禁止搭档关系")
 
     # 原子转移：工时归最终承担人员
     before = {"person_id": str(assignment.person_id)}

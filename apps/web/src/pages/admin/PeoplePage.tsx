@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Card, Form, Input, InputNumber, List, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TimePicker, Upload } from "antd";
+import { App, Button, Card, DatePicker, Form, Input, InputNumber, List, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TimePicker, Upload } from "antd";
 import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useState } from "react";
 
@@ -253,7 +253,7 @@ function RulesModal({
 
   const constraintsQ = useQuery({
     queryKey: ["people", person.id, "constraints"],
-    queryFn: async () => (await api.get(`/people/${person.id}/constraints`)).data,
+    queryFn: async () => (await api.get(`/admin/people/${person.id}/constraints`)).data,
   });
 
   const qc = useQueryClient();
@@ -266,6 +266,8 @@ function RulesModal({
         value = { venue_ids: values.venue_ids };
       } else if (type === "forbid_weekday") {
         value = { weekdays: values.weekdays };
+      } else if (type === "forbid_date") {
+        value = { dates: (values.dates ?? []).map((d: any) => d.format("YYYY-MM-DD")) };
       } else if (type === "forbid_time") {
         value = {
           ranges: [
@@ -279,12 +281,25 @@ function RulesModal({
         value = { person_ids: values.person_ids };
       } else if (type === "weekly_limit") {
         value = { limit: values.limit };
+      } else if (type === "suspend") {
+        value = null;
       }
 
-      await api.post(`/people/${person.id}/constraints`, {
+      const effective: { effective_start?: string; effective_end?: string } = {};
+      if (values.effective_range) {
+        if (values.effective_range[0]) effective.effective_start = values.effective_range[0].format("YYYY-MM-DD");
+        if (values.effective_range[1]) effective.effective_end = values.effective_range[1].format("YYYY-MM-DD");
+      } else if (type === "suspend" && values.suspend_range) {
+        // 暂停排班的起止直接作为约束有效期
+        if (values.suspend_range[0]) effective.effective_start = values.suspend_range[0].format("YYYY-MM-DD");
+        if (values.suspend_range[1]) effective.effective_end = values.suspend_range[1].format("YYYY-MM-DD");
+      }
+
+      await api.post(`/admin/people/${person.id}/constraints`, {
         constraint_type: type,
         constraint_value: value,
         is_hard: true,
+        ...effective,
       });
     },
     onSuccess: () => {
@@ -297,7 +312,7 @@ function RulesModal({
 
   const deleteM = useMutation({
     mutationFn: async (cid: string) => {
-      await api.delete(`/people/${person.id}/constraints/${cid}`);
+      await api.delete(`/admin/people/constraints/${cid}`);
     },
     onSuccess: () => {
       message.success("规则已删除");
@@ -318,38 +333,46 @@ function RulesModal({
 
   const renderConstraintValue = (c: any) => {
     const val = c.constraint_value || {};
-    if (c.constraint_type === "forbid_venue") {
+    let text: string;
+    if (c.constraint_type === "suspend") {
+      text = "暂停排班";
+    } else if (c.constraint_type === "forbid_venue") {
       const names = (val.venue_ids || [])
         .map((vid: string) => venuesQ.data?.find((v) => v.id === vid)?.name || vid)
         .join("、");
-      return `禁止在场地【${names}】值班`;
-    }
-    if (c.constraint_type === "only_venue") {
+      text = `禁止在场地【${names}】值班`;
+    } else if (c.constraint_type === "only_venue") {
       const names = (val.venue_ids || [])
         .map((vid: string) => venuesQ.data?.find((v) => v.id === vid)?.name || vid)
         .join("、");
-      return `只允许在场地【${names}】值班`;
-    }
-    if (c.constraint_type === "forbid_weekday") {
+      text = `只允许在场地【${names}】值班`;
+    } else if (c.constraint_type === "forbid_weekday") {
       const wNames = (val.weekdays || []).map((w: number) => weekdaysMap[w] || w).join("、");
-      return `禁止在【${wNames}】值班`;
-    }
-    if (c.constraint_type === "forbid_time") {
+      text = `禁止在【${wNames}】值班`;
+    } else if (c.constraint_type === "forbid_date") {
+      text = `禁止日期【${(val.dates || []).join("、")}】`;
+    } else if (c.constraint_type === "forbid_time") {
       const rangesStr = (val.ranges || [])
         .map((r: any) => `${r.start}–${r.end}`)
         .join("、");
-      return `禁止在时段【${rangesStr}】值班`;
-    }
-    if (c.constraint_type === "no_pair_with") {
+      text = `禁止在时段【${rangesStr}】值班`;
+    } else if (c.constraint_type === "no_pair_with") {
       const pNames = (val.person_ids || [])
         .map((pid: string) => allPeople.find((p) => p.id === pid)?.full_name || pid)
         .join("、");
-      return `禁止与【${pNames}】同班值班`;
+      text = `禁止与【${pNames}】同班值班`;
+    } else if (c.constraint_type === "weekly_limit") {
+      text = `每周最多值班：${val.limit} 次`;
+    } else {
+      text = JSON.stringify(val);
     }
-    if (c.constraint_type === "weekly_limit") {
-      return `每周最多值班：${val.limit} 次`;
+    // 追加有效期标注
+    if (c.effective_start || c.effective_end) {
+      const s = c.effective_start || "…";
+      const e = c.effective_end || "…";
+      text += `（生效：${s} ~ ${e}）`;
     }
-    return JSON.stringify(val);
+    return text;
   };
 
   const otherPeople = allPeople.filter((p) => p.id !== person.id);
@@ -389,14 +412,22 @@ function RulesModal({
         <Form form={form} layout="vertical" onFinish={(v) => addM.mutate(v)}>
           <Form.Item label="规则类型">
             <Select value={type} onChange={(val) => { setType(val); form.resetFields(); }}>
+              <Select.Option value="suspend">暂停排班（按日期范围）</Select.Option>
               <Select.Option value="forbid_venue">禁止值班场地</Select.Option>
               <Select.Option value="only_venue">仅限值班场地</Select.Option>
               <Select.Option value="forbid_weekday">禁止值班星期</Select.Option>
+              <Select.Option value="forbid_date">禁止具体日期</Select.Option>
               <Select.Option value="forbid_time">禁止值班时段</Select.Option>
               <Select.Option value="no_pair_with">禁止同班人员</Select.Option>
               <Select.Option value="weekly_limit">每周频次上限</Select.Option>
             </Select>
           </Form.Item>
+
+          {type === "suspend" && (
+            <Form.Item name="suspend_range" label="暂停起止日期" rules={[{ required: true, message: "请选择暂停起止" }]}>
+              <DatePicker.RangePicker format="YYYY-MM-DD" style={{ width: "100%" }} />
+            </Form.Item>
+          )}
 
           {(type === "forbid_venue" || type === "only_venue") && (
             <Form.Item name="venue_ids" label="选择场地" rules={[{ required: true, message: "请选择场地" }]}>
@@ -422,6 +453,12 @@ function RulesModal({
             </Form.Item>
           )}
 
+          {type === "forbid_date" && (
+            <Form.Item name="dates" label="选择具体日期" rules={[{ required: true, message: "请选择日期" }]}>
+              <DatePicker multiple format="YYYY-MM-DD" style={{ width: "100%" }} />
+            </Form.Item>
+          )}
+
           {type === "forbid_time" && (
             <Form.Item name="time_range" label="选择时段" rules={[{ required: true, message: "请选择时间段" }]}>
               <TimePicker.RangePicker format="HH:mm" minuteStep={15} style={{ width: "100%" }} />
@@ -443,6 +480,12 @@ function RulesModal({
           {type === "weekly_limit" && (
             <Form.Item name="limit" label="次数上限" rules={[{ required: true, message: "请输入次数" }]}>
               <InputNumber min={1} max={10} style={{ width: "100%" }} />
+            </Form.Item>
+          )}
+
+          {type !== "suspend" && (
+            <Form.Item name="effective_range" label="规则有效期（可选，不填=永久）">
+              <DatePicker.RangePicker format="YYYY-MM-DD" style={{ width: "100%" }} />
             </Form.Item>
           )}
 

@@ -2,11 +2,14 @@
 
 硬约束来源：审核通过的不可值班区间、暂停排班、禁止场地/星期/日期/时间、假期白名单、
 每周最多班次、禁止同班搭档。偏好约束不参与可行性（仅影响目标，后续可扩展）。
+
+P1.4 修复：所有约束都尊重 ``effective_start``/``effective_end`` —— 仅在区间内的约束
+生效，区间外的约束对当前排班透明。
 """
 from __future__ import annotations
 
 import uuid
-from datetime import time
+from datetime import date, time
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,13 +20,28 @@ from app.models.enums import AvailabilityStatus, PersonStatus
 from app.models.person import PersonProfile
 from app.models.schedule import Assignment, DutySlot
 from app.models.vacation import VacationPeriod
-from app.scheduling.slots import _active_vacation
+from app.scheduling.slots import BEIJING_TZ, _active_vacation
 from app.scheduling.solver import Position, SolverInput
 from app.services.intervals import overlaps
 from app.services.vacation_service import is_person_available
 
 
+def _is_constraint_in_effect(c: PersonConstraint, on_date: date) -> bool:
+    """约束是否在指定日期生效（effective_start/end 闭合区间；None 表示无界）。"""
+    if c.effective_start is not None and on_date < c.effective_start:
+        return False
+    if c.effective_end is not None and on_date > c.effective_end:
+        return False
+    return True
+
+
 def _hard_constraints(db: Session, person_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[PersonConstraint]]:
+    """加载硬约束（不按日期过滤——调用方在判定时按 slot 日期过滤 effective_*）。
+
+    保留无日期过滤是为了保持原 API：``build_solver_input`` 和 ``check_person_available_for_slot``
+    会通过 ``_is_constraint_in_effect`` 在评估时按 slot 日期过滤。这样既支持同一人配置多条
+    不同有效期的约束，又不必在 SQL 层做复杂 join。
+    """
     rows = db.scalars(
         select(PersonConstraint).where(
             PersonConstraint.person_id.in_(person_ids),
@@ -174,8 +192,14 @@ def _is_available(
     for bs, be in person_blocks:
         if overlaps(slot.slot_start_at, slot.slot_end_at, bs, be):
             return False
-    # 硬约束
+    # 硬约束（按 slot 日期过滤有效期）
+    if slot.slot_start_at.tzinfo is None:
+        slot_date = slot.slot_start_at.date()
+    else:
+        slot_date = slot.slot_start_at.astimezone(BEIJING_TZ).date()
     for c in person_constraints:
+        if not _is_constraint_in_effect(c, slot_date):
+            continue
         if _violates_constraint(c, slot):
             return False
     # 假期白名单：假期内仅登记时间段可用
@@ -213,6 +237,65 @@ def has_time_overlap_with_person(
             continue
         if overlaps(slot.slot_start_at, slot.slot_end_at, other_slot.slot_start_at, other_slot.slot_end_at):
             return True
+    return False
+
+
+def violates_no_pair_with_existing(
+    db: Session, person_id: uuid.UUID, slot: DutySlot, exclude_assignment_id: uuid.UUID | None = None
+) -> bool:
+    """接替人若与同 slot 的其它已分配人员存在「禁止同班」关系，返回 True。
+
+    双向检查：A 禁 B 或 B 禁 A 都视为违反。用于换班终审的补查。
+    """
+    from app.models.enums import PlanAssignmentStatus
+
+    # 同 slot 其它人员
+    other_person_ids = [
+        pid for (pid,) in db.execute(
+            select(Assignment.person_id).where(
+                Assignment.duty_slot_id == slot.id,
+                Assignment.person_id.is_not(None),
+                Assignment.plan_status.notin_(
+                    [PlanAssignmentStatus.vacant, PlanAssignmentStatus.cancelled, PlanAssignmentStatus.replaced]
+                ),
+            )
+        )
+        if pid is not None and (exclude_assignment_id is None or pid != person_id)
+    ]
+    if not other_person_ids:
+        return False
+    other_set = {str(pid) for pid in other_person_ids}
+
+    # 双方的 no_pair_with 约束（按 slot 日期过滤有效期）
+    slot_date = (
+        slot.slot_start_at.date()
+        if slot.slot_start_at.tzinfo is None
+        else slot.slot_start_at.astimezone(BEIJING_TZ).date()
+    )
+    all_ids = [person_id] + other_person_ids
+    rows = db.scalars(
+        select(PersonConstraint).where(
+            PersonConstraint.person_id.in_(all_ids),
+            PersonConstraint.is_active.is_(True),
+            PersonConstraint.is_hard.is_(True),
+            PersonConstraint.constraint_type == "no_pair_with",
+        )
+    )
+    for c in rows:
+        if not _is_constraint_in_effect(c, slot_date):
+            continue
+        forbidden = {str(pid) for pid in (c.constraint_value or {}).get("person_ids", [])}
+        if not forbidden:
+            continue
+        # c.person_id 禁止与 forbidden 中的人搭档
+        # 若 c.person_id 是接替人：检查 forbidden ∩ other_set
+        # 若 c.person_id 是某个现有同班：检查 forbidden 是否含接替人
+        if str(c.person_id) == str(person_id):
+            if forbidden & other_set:
+                return True
+        else:
+            if str(person_id) in forbidden:
+                return True
     return False
 
 

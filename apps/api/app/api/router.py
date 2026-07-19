@@ -7,6 +7,7 @@ from app.api.v1 import (
     admins,
     auth,
     config,
+    constraints,
     me,
     people,
     schedule,
@@ -36,3 +37,4 @@ api_router.include_router(workflow_admin.router)
 api_router.include_router(workflow_admin.assignments_router)
 api_router.include_router(statistics.router)
 api_router.include_router(overtime.router)
+api_router.include_router(constraints.router)
