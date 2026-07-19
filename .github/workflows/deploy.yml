@@ -1,0 +1,55 @@
+name: Deploy ArrangementS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: apps/web
+        run: pnpm vite build
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy frontend (upload dist)
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_deploy" \
+            apps/web/dist/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/1panel/www/sites/arrangements/
+
+      - name: Deploy backend (pull & restart)
+        run: |
+          ssh -i ~/.ssh/id_deploy ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd /opt/ArrangementS
+            git pull
+            systemctl restart arrangements-api
+          EOF
