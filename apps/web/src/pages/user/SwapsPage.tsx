@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Card, Empty, List, Space, Tabs, Tag, Typography } from "antd";
+import { App, Button, Card, Empty, List, Space, Tabs, Tag, Typography, Alert } from "antd";
 import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
 
 import { errorMessage } from "@/api/client";
 import { meApi, STATUS_COLOR, STATUS_LABEL, type SwapRequest } from "@/features/me/api";
@@ -8,6 +9,7 @@ import { meApi, STATUS_COLOR, STATUS_LABEL, type SwapRequest } from "@/features/
 export default function SwapsPage({ hideTitle }: { hideTitle?: boolean }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const invitations = useQuery({ queryKey: ["me", "invitations"], queryFn: meApi.invitations });
   const mine = useQuery({ queryKey: ["me", "swaps"], queryFn: meApi.swaps });
@@ -37,6 +39,18 @@ export default function SwapsPage({ hideTitle }: { hideTitle?: boolean }) {
           换班
         </Typography.Title>
       )}
+      <Alert
+        message="如何发起换班/替班？"
+        description="请前往「我的排班」页面，选择你要换出的班次并点击「指定换班」或「公开替班」按钮即可发起申请。"
+        type="info"
+        showIcon
+        action={
+          <Button size="small" type="primary" onClick={() => navigate("/app/schedule")}>
+            去选择班次
+          </Button>
+        }
+        style={{ marginBottom: 12 }}
+      />
       <Tabs
         items={[
           {
