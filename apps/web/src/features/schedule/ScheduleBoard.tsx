@@ -99,13 +99,18 @@ export default function ScheduleBoard({
     [conflicts],
   );
 
-  const fixedSlots = week.slots.filter((s) => s.source_type === "fixed_shift");
-  const taskSlots = week.slots.filter((s) => s.source_type === "venue_task");
+  const slotsByVenue = useMemo(() => {
+    const groups: Record<string, SlotView[]> = {};
+    for (const s of week.slots) {
+      if (!groups[s.venue_id]) groups[s.venue_id] = [];
+      groups[s.venue_id].push(s);
+    }
+    return groups;
+  }, [week.slots]);
 
-  const fixedVenues = useMemo(() => {
-    const venueIds = new Set(fixedSlots.map(s => s.venue_id));
-    return venues.filter(v => venueIds.has(v.id));
-  }, [fixedSlots, venues]);
+  const activeVenues = useMemo(() => {
+    return venues.filter((v) => slotsByVenue[v.id] && slotsByVenue[v.id].length > 0);
+  }, [venues, slotsByVenue]);
 
   const days = useMemo(() => {
     const start = dayjs(week.week_start);
@@ -134,6 +139,23 @@ export default function ScheduleBoard({
     history.current.push(board);
     setBoard(next);
     forceRerender((v) => v + 1);
+  }
+
+  function clearAll() {
+    Modal.confirm({
+      title: "确定清空当前所有排班吗？",
+      content: "该操作将清空本周草稿中的所有人员安排，保存后生效。",
+      okText: "确定清空",
+      okType: "danger",
+      cancelText: "取消",
+      onOk: () => {
+        const next = { ...board };
+        for (const key of Object.keys(next)) {
+          next[key] = null;
+        }
+        pushHistory(next);
+      },
+    });
   }
 
   function onDragStart(e: DragStartEvent) {
@@ -292,6 +314,11 @@ export default function ScheduleBoard({
         <Button onClick={redo} disabled={future.current.length === 0}>
           重做
         </Button>
+        {week.status === "draft" && (
+          <Button danger onClick={clearAll}>
+            清空所有
+          </Button>
+        )}
         <Button
           type="primary"
           disabled={!dirty}
@@ -305,9 +332,9 @@ export default function ScheduleBoard({
       </Space>
 
       <Row gutter={12}>
-        <Col flex="auto">
-          {fixedVenues.map((venue) => {
-            const vSlots = fixedSlots.filter(s => s.venue_id === venue.id);
+        <Col flex="auto" style={{ marginRight: 292 }}>
+          {activeVenues.map((venue) => {
+            const vSlots = slotsByVenue[venue.id] || [];
             const times = Array.from(new Set(vSlots.map(s => dayjs(s.slot_start_at).format("HH:mm")))).sort();
             return (
               <Card key={venue.id} size="small" title={venue.name} style={{ marginBottom: 12 }}>
@@ -356,32 +383,25 @@ export default function ScheduleBoard({
               </Card>
             );
           })}
-
-          {taskSlots.length > 0 && (
-            <Card size="small" title="场地任务（蓝厅 / 图书馆报告厅）">
-              <Row gutter={[8, 8]}>
-                {taskSlots.map((s) => (
-                  <Col key={s.id} span={6}>
-                    <div style={{ fontSize: 11, color: "#888" }}>
-                      {dayjs(s.slot_start_at).format("MM-DD")}
-                    </div>
-                    <SlotCell
-                      slot={s}
-                      board={board}
-                      activeVerdict={activeVerdict}
-                      conflictKeys={conflictKeys}
-                    />
-                  </Col>
-                ))}
-              </Row>
-            </Card>
-          )}
         </Col>
-        <Col flex="260px">
-          <div style={{ position: "sticky", top: 16 }}>
-            <PersonDrawer people={people} focusSlotId={focusSlotId} />
-          </div>
-        </Col>
+        <div
+          style={{
+            position: "fixed",
+            right: 16,
+            top: 80,
+            bottom: 16,
+            width: 260,
+            background: "#fff",
+            border: "1px solid #f0f0f0",
+            borderRadius: 8,
+            padding: 12,
+            zIndex: 100,
+            overflowY: "auto",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+          }}
+        >
+          <PersonDrawer people={people} focusSlotId={focusSlotId} />
+        </div>
       </Row>
 
       <DragOverlay>

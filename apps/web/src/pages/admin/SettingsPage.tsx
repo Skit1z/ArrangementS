@@ -52,7 +52,6 @@ export default function SettingsPage() {
           { key: "multipliers", label: "倍率规则", children: <MultipliersTab /> },
           { key: "special", label: "特殊日期", children: <SpecialDatesTab /> },
           { key: "semester", label: "学期设置", children: <SemesterTab /> },
-          { key: "vacations", label: "寒暑假管理", children: <VacationsTab /> },
           { key: "course_time", label: "课程时间", children: <CourseTimeTab /> },
         ]}
       />

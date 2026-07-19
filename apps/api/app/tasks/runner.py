@@ -61,22 +61,28 @@ def job_expire_semesters(db=None, today: date | None = None) -> list[str]:
     processed: list[str] = []
 
     def _do(session) -> list[str]:
-        rows = list(
-            session.scalars(
-                select(Semester).where(Semester.is_current.is_(True))
-            )
-        )
+        from app.models.timetable import TimetableUpload
+        from app.models.enums import ReviewStatus
+        from sqlalchemy import func
+        rows = list(session.scalars(select(Semester)))
         result: list[str] = []
         for sem in rows:
             end = sem.first_monday + timedelta(weeks=sem.week_count)
             if end <= today:
-                n = timetable_service.expire_semester_courses(session, sem.id)
-                sem.is_current = False
-                result.append(sem.name)
-                log.info(
-                    "expire_semester_courses: 学期「%s」已结束（%s），失效 %d 份课表",
-                    sem.name, end, n,
+                # Check if there are still approved uploads for this semester
+                has_active = session.scalar(
+                    select(func.count(TimetableUpload.id)).where(
+                        TimetableUpload.semester_id == sem.id,
+                        TimetableUpload.review_status == ReviewStatus.approved,
+                    )
                 )
+                if has_active > 0:
+                    n = timetable_service.expire_semester_courses(session, sem.id)
+                    result.append(sem.name)
+                    log.info(
+                        "expire_semester_courses: 学期「%s」已结束（%s），自动失效 %d 份课表",
+                        sem.name, end, n,
+                    )
         return result
 
     if db is not None:

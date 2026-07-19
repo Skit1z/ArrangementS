@@ -102,7 +102,32 @@ def update_semester(db: Session, semester_id: uuid.UUID, patch: dict) -> Semeste
 
 
 def get_current_semester(db: Session) -> Semester | None:
-    return db.scalar(select(Semester).where(Semester.is_current.is_(True)))
+    from datetime import date, timedelta
+    today = date.today()
+    all_semesters = db.scalars(select(Semester).order_by(Semester.first_monday.asc())).all()
+    if not all_semesters:
+        return None
+    
+    active_sem = None
+    for sem in all_semesters:
+        start_date = sem.first_monday
+        end_date = start_date + timedelta(weeks=sem.week_count)
+        if start_date <= today < end_date:
+            active_sem = sem
+            break
+            
+    if not active_sem:
+        active_sem = min(
+            all_semesters,
+            key=lambda s: abs((s.first_monday - today).days)
+        )
+        
+    if not active_sem.is_current:
+        for sem in all_semesters:
+            sem.is_current = (sem.id == active_sem.id)
+        db.flush()
+        
+    return active_sem
 
 
 def resolve_building_type(db: Session, semester_id: uuid.UUID, location_code: str) -> BuildingType | None:
