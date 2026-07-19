@@ -1,10 +1,10 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user, require_admin, require_person
+from app.core.deps import get_current_user, require_admin
 from app.db.session import get_db
 from app.models.enums import RequestStatus, SlotSourceType, SlotStatus, PlanAssignmentStatus, ExecutionStatus, AssignmentSource
 from app.models.overtime import OvertimeRequest
@@ -22,11 +22,15 @@ router = APIRouter(tags=["overtime"])
 @router.post("/me/overtime", response_model=MessageOut)
 def apply_overtime(
     payload: OvertimeRequestCreate,
-    person: PersonProfile = Depends(require_person),
+    u: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     if payload.end_at <= payload.start_at:
         raise HTTPException(status_code=400, detail="结束时间必须晚于开始时间")
+    
+    person = db.query(PersonProfile).filter(PersonProfile.user_id == u.id).first()
+    if not person:
+        raise HTTPException(status_code=403, detail="人员信息不存在")
     
     req = OvertimeRequest(
         person_id=person.id,
@@ -42,9 +46,13 @@ def apply_overtime(
 
 @router.get("/me/overtime", response_model=list[OvertimeRequestOut])
 def list_my_overtime(
-    person: PersonProfile = Depends(require_person),
+    u: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    person = db.query(PersonProfile).filter(PersonProfile.user_id == u.id).first()
+    if not person:
+        raise HTTPException(status_code=403, detail="人员信息不存在")
+
     reqs = (
         db.query(OvertimeRequest, Venue.name)
         .join(Venue, Venue.id == OvertimeRequest.venue_id)
