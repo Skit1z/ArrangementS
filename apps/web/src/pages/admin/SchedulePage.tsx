@@ -107,6 +107,15 @@ export default function SchedulePage() {
     onError: (e) => message.error(errorMessage(e)),
   });
 
+  const unpublish = useMutation({
+    mutationFn: async () => (await api.post(`/schedule/weeks/${week}/unpublish`)).data,
+    onSuccess: (d) => {
+      message.success(d.message);
+      qc.invalidateQueries({ queryKey: ["week", week] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
   const checkConflicts = useMutation({
     mutationFn: async () => (await api.post(`/schedule/weeks/${week}/validate`)).data as Conflict[],
     onSuccess: (d) => {
@@ -130,9 +139,15 @@ export default function SchedulePage() {
           <Button onClick={() => generate.mutate()} loading={generate.isPending}>
             自动生成
           </Button>
-          <Button type="primary" onClick={() => publish.mutate()} loading={publish.isPending} disabled={!data}>
-            发布
-          </Button>
+          {data?.status === "published" ? (
+            <Button danger onClick={() => unpublish.mutate()} loading={unpublish.isPending}>
+              撤销发布
+            </Button>
+          ) : (
+            <Button type="primary" onClick={() => publish.mutate()} loading={publish.isPending} disabled={!data}>
+              发布
+            </Button>
+          )}
           {data && <Tag color={data.status === "published" ? "green" : "orange"}>{data.status}</Tag>}
           {data && <span style={{ fontSize: 12 }}>修订号 {data.revision}</span>}
         </Space>

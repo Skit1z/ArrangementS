@@ -157,6 +157,23 @@ def publish(db: Session, week_start: date, actor_id: uuid.UUID | None) -> Weekly
     return plan
 
 
+def unpublish(db: Session, week_start: date, actor_id: uuid.UUID | None) -> WeeklyPlan:
+    plan = db.scalar(select(WeeklyPlan).where(WeeklyPlan.week_start == week_start))
+    if plan is None:
+        raise HTTPException(status_code=404, detail="周计划不存在")
+    if plan.status != PlanStatus.published:
+        raise HTTPException(status_code=400, detail="周计划尚未发布或已是草稿状态")
+    
+    plan.status = PlanStatus.draft
+    db.flush()
+    record_audit(
+        db, actor_user_id=actor_id, action="schedule.unpublish",
+        entity_type="weekly_plan", entity_id=plan.id,
+        after_data={"revision": plan.revision},
+    )
+    return plan
+
+
 def get_plan(db: Session, week_start: date) -> WeeklyPlan:
     plan = db.scalar(select(WeeklyPlan).where(WeeklyPlan.week_start == week_start))
     if plan is None:

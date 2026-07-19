@@ -100,6 +100,15 @@ def publish_week(
     return MessageOut(message=f"已发布（修订号 {plan.revision}）")
 
 
+@router.post("/weeks/{week_start}/unpublish", response_model=MessageOut)
+def unpublish_week(
+    week_start: date, actor: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> MessageOut:
+    plan = schedule_service.unpublish(db, week_start, actor.id)
+    db.commit()
+    return MessageOut(message="已撤销发布，恢复为草稿状态")
+
+
 assignments_router = APIRouter(prefix="/assignments", tags=["schedule"])
 
 

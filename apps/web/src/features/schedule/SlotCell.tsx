@@ -1,4 +1,4 @@
-import { useDroppable } from "@dnd-kit/core";
+import { useDroppable, useDndContext } from "@dnd-kit/core";
 import { LockOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -27,8 +27,8 @@ function Position({
   const verdict = activeVerdict?.key === key ? activeVerdict.verdict : null;
   const hasConflict = conflictKeys.has(key);
 
-  let background = occupant ? "#f6ffed" : "#fafafa";
-  let border = occupant ? "1px dashed #b7eb8f" : "1px dashed #d9d9d9";
+  let background = occupant ? "#e6f4ff" : "#fafafa"; // 淡蓝色背景
+  let border = occupant ? "1px solid #91caff" : "1px dashed #d9d9d9";
   if (verdict) {
     background = `${VERDICT_COLOR[verdict]}22`;
     border = `2px solid ${VERDICT_COLOR[verdict]}`;
@@ -54,11 +54,15 @@ function Position({
           id={`pos:${key}`}
           personId={occupant.person_id}
           label={occupant.person_name}
-          color={hasConflict ? "red" : "green"}
+          color={hasConflict ? "red" : "blue"}
           compact
         />
       ) : (
-        <span style={{ fontSize: 12, fontWeight: 600, color: "#ff4d4f", paddingLeft: 4 }}>空缺</span>
+        index < slot.required_people ? (
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#ff4d4f", paddingLeft: 4 }}>空缺</span>
+        ) : (
+          <span style={{ fontSize: 12, color: "#bfbfbf", paddingLeft: 4 }}>+ 拖拽至此添加</span>
+        )
       )}
     </div>
   );
@@ -66,11 +70,14 @@ function Position({
 
 export default function SlotCell(props: Props) {
   const { slot } = props;
+  const { active } = useDndContext();
+  const isDragging = !!active;
+
   const occupiedIndices = Object.keys(props.board)
     .filter((k) => k.startsWith(slot.id + ":") && props.board[k] !== null)
     .map((k) => parseInt(k.split(":")[1], 10));
   const maxIndex = occupiedIndices.length > 0 ? Math.max(...occupiedIndices) : -1;
-  const renderCount = Math.max(slot.required_people, maxIndex + 2);
+  const renderCount = Math.max(slot.required_people, maxIndex + (isDragging ? 2 : 1));
   const filled = occupiedIndices.length;
 
   return (

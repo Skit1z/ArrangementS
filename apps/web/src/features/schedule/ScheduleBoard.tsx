@@ -378,7 +378,9 @@ export default function ScheduleBoard({
           )}
         </Col>
         <Col flex="260px">
-          <PersonDrawer people={people} focusSlotId={focusSlotId} />
+          <div style={{ position: "sticky", top: 16 }}>
+            <PersonDrawer people={people} focusSlotId={focusSlotId} />
+          </div>
         </Col>
       </Row>
 

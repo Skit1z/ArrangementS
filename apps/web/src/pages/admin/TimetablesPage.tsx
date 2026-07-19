@@ -22,6 +22,8 @@ export default function TimetablesPage() {
 
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
 
+  const [viewMode, setViewMode] = useState<"busy" | "free">("busy");
+
   if (isLoading) {
     return <Spin style={{ display: "block", margin: "100px auto" }} />;
   }
@@ -29,7 +31,7 @@ export default function TimetablesPage() {
   const allPeople = data ?? [];
 
   // Build grid data
-  // grid[weekday][period] = list of { person_name, course_name }
+  // grid[weekday][period] = list of { personName, courseName }
   const grid: Record<number, Record<number, { personName: string; courseName: string }[]>> = {};
   for (const wd of WEEKDAYS) {
     grid[wd.value] = {};
@@ -57,13 +59,23 @@ export default function TimetablesPage() {
 
   return (
     <Card 
-      title={<span style={{ fontSize: '20px', fontWeight: 600 }}>全员课表 (忙碌时间)</span>}
+      title={<span style={{ fontSize: '20px', fontWeight: 600 }}>全员课表</span>}
       bordered={false}
       style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 12 }}
     >
       <div style={{ marginBottom: 16 }}>
-        <Space>
-          <span>人员筛选：</span>
+        <Space wrap>
+          <span>视图：</span>
+          <Select
+            value={viewMode}
+            onChange={(v) => setViewMode(v as "busy" | "free")}
+            options={[
+              { label: "忙碌时间 (有课)", value: "busy" },
+              { label: "空闲时间 (无课)", value: "free" },
+            ]}
+            style={{ width: 140 }}
+          />
+          <span style={{ marginLeft: 16 }}>人员筛选：</span>
           <Select
             allowClear
             showSearch
@@ -80,7 +92,9 @@ export default function TimetablesPage() {
             }
           />
           <span style={{ color: "#888", fontSize: 13, marginLeft: 8 }}>
-            * 显示由于上课而不可排班的人员。未在表格中出现的人员即为该时段“空闲”。
+            {viewMode === "busy" 
+              ? "* 显示由于上课而不可排班的人员。" 
+              : "* 显示当前时段无课可排班的人员。"}
           </span>
         </Space>
       </div>
@@ -107,13 +121,21 @@ export default function TimetablesPage() {
                 </td>
                 {WEEKDAYS.map((wd) => {
                   const busyPeople = grid[wd.value][period];
+                  const busyNames = new Set(busyPeople.map((b) => b.personName));
+                  const freePeople = peopleToDisplay.filter((p) => !busyNames.has(p.person_name));
+                  
+                  const displayPeople = viewMode === "busy" ? busyPeople : freePeople.map(p => ({ personName: p.person_name, courseName: "" }));
+                  const cellBg = viewMode === "busy" 
+                    ? (displayPeople.length > 0 ? "#fff2f0" : "#fff")
+                    : (displayPeople.length > 0 ? "#f6ffed" : "#fff");
+
                   return (
-                    <td key={wd.value} style={{ border: "1px solid #f0f0f0", padding: 8, verticalAlign: "top" }}>
+                    <td key={wd.value} style={{ border: "1px solid #f0f0f0", padding: 8, verticalAlign: "top", background: cellBg }}>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {busyPeople.map((b, idx) => (
-                          <Tag key={idx} color={selectedPerson ? "blue" : "default"}>
+                        {displayPeople.map((b, idx) => (
+                          <Tag key={idx} color={viewMode === "busy" ? "red" : "green"}>
                             {b.personName}
-                            {selectedPerson && ` (${b.courseName})`}
+                            {viewMode === "busy" && selectedPerson && ` (${b.courseName})`}
                           </Tag>
                         ))}
                       </div>
