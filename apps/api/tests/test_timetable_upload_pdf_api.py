@@ -180,7 +180,6 @@ def test_user_cannot_approve_others_upload(client, seed_admin, db_session):
         "/api/v1/timetables/upload",
         headers=csrf_headers(token_owner),
         json={
-            "semester_id": str(sem.id),
             "file_name": "t.pdf",
             "entries": [
                 {
@@ -200,3 +199,71 @@ def test_user_cannot_approve_others_upload(client, seed_admin, db_session):
         f"/api/v1/timetables/{upload['id']}/approve", headers=csrf_headers(token_other)
     )
     assert resp.status_code == 403
+
+
+def test_upload_without_semester_uses_current(client, seed_admin, db_session):
+    """不传 semester_id 时，/upload 自动用当前学期。"""
+    semester_service.create_semester(
+        db_session, name="春", first_monday=date(2026, 2, 23), is_current=True
+    )
+    db_session.commit()
+    _seed_user(db_session)
+
+    token = login(client, "202301070410", "pw123456")
+    resp = client.post(
+        "/api/v1/timetables/upload",
+        headers=csrf_headers(token),
+        json={
+            "file_name": "t.pdf",
+            "entries": [
+                {
+                    "weekday": 1,
+                    "period_start": 1,
+                    "period_end": 2,
+                    "week_expr": "1-4周",
+                    "location_code": "B101",
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["review_status"] == "draft"
+
+
+def test_end_to_end_pdf_upload_and_apply(client, seed_admin, db_session):
+    """端到端：解析 PDF → upload → approve（上传者本人）→ /me/timetable 反映。"""
+    from sqlalchemy import select
+    from app.models.availability import AvailabilityBlock
+
+    semester_service.create_semester(
+        db_session, name="春", first_monday=date(2026, 2, 23), is_current=True
+    )
+    db_session.commit()
+    _seed_user(db_session)
+
+    token = login(client, "202301070410", "pw123456")
+
+    parsed = client.post(
+        "/api/v1/timetables/parse-pdf",
+        headers=csrf_headers(token),
+        files={"file": ("sample.pdf", FIXTURE.read_bytes(), "application/pdf")},
+    ).json()
+
+    upload = client.post(
+        "/api/v1/timetables/upload",
+        headers=csrf_headers(token),
+        json={"file_name": "sample.pdf", "entries": parsed["entries"]},
+    ).json()
+
+    resp = client.post(
+        f"/api/v1/timetables/{upload['id']}/approve", headers=csrf_headers(token)
+    )
+    assert resp.status_code == 200, resp.text
+
+    # 已生成不可值班区间
+    blocks = list(db_session.scalars(select(AvailabilityBlock)))
+    assert len(blocks) > 0
+
+    mine = client.get("/api/v1/me/timetable").json()
+    assert mine["review_status"] == "approved"
+    assert len(mine["entries"]) == 10

@@ -20,7 +20,7 @@ class RawEntryIn(BaseModel):
 
 
 class TimetableUploadIn(BaseModel):
-    semester_id: uuid.UUID
+    semester_id: uuid.UUID | None = None  # 不传则用当前学期
     person_id: uuid.UUID | None = None  # admin 代传时指定；普通用户忽略
     file_name: str = "timetable.pdf"
     entries: list[RawEntryIn]

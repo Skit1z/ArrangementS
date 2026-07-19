@@ -106,13 +106,23 @@ def upload(
     else:
         person_id = people_service.get_person_by_user(db, current.id).id
 
+    # 学期：未传则取当前学期
+    semester_id = payload.semester_id
+    if semester_id is None:
+        from app.services import semester_service
+
+        sem = semester_service.get_current_semester(db)
+        if sem is None:
+            raise HTTPException(status_code=400, detail="当前无激活学期，请联系管理员")
+        semester_id = sem.id
+
     result = ManualEntryExtractor().extract_from_entries(
         [e.model_dump() for e in payload.entries]
     )
     up = timetable_service.create_upload_from_entries(
         db,
         person_id=person_id,
-        semester_id=payload.semester_id,
+        semester_id=semester_id,
         uploader_user_id=current.id,
         file_name=payload.file_name,
         entries=result.entries,
