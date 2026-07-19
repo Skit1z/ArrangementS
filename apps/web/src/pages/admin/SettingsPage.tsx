@@ -52,7 +52,6 @@ export default function SettingsPage() {
           { key: "multipliers", label: "倍率规则", children: <MultipliersTab /> },
           { key: "special", label: "特殊日期", children: <SpecialDatesTab /> },
           { key: "semester", label: "学期设置", children: <SemesterTab /> },
-          { key: "course_time", label: "课程时间", children: <CourseTimeTab /> },
         ]}
       />
       <div style={{ marginTop: 40, textAlign: 'center', color: '#8c8c8c', fontSize: '13px' }}>
@@ -812,12 +811,4 @@ function VacationsTab() {
   );
 }
 
-// ============ 课程时间 Tab（占位）============
-function CourseTimeTab() {
-  return (
-    <div style={{ padding: '40px 0', textAlign: 'center', color: '#8c8c8c' }}>
-      <p style={{ fontSize: '16px' }}>课程时间设置功能正在开发中，将支持配置不同节次的具体时间段。</p>
-      <Button type="primary" disabled>新增课程时间规则</Button>
-    </div>
-  );
-}
+

@@ -13,9 +13,11 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { LeftOutlined, RightOutlined } from "@ant-design/icons";
-import { App, Button, Card, Col, Empty, Input, Modal, Row, Space, Spin, Tag, Tabs } from "antd";
+import { App, Button, Card, Col, DatePicker, Divider, Empty, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Switch, Table, Tag, Tabs } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, errorMessage } from "@/api/client";
 
 import PersonDrawer from "./PersonDrawer";
 import SlotCell from "./SlotCell";
@@ -31,7 +33,7 @@ import {
   type WeekPerson,
   type WeekView,
 } from "./types";
-import { type Venue } from "@/features/admin/api";
+import { adminApi, TASK_STATUS_COLOR, TASK_STATUS_LABEL, type Venue } from "@/features/admin/api";
 
 const MAX_HISTORY = 50;
 
@@ -57,6 +59,8 @@ interface Props {
   onSave: (ops: DraftOperation[]) => void;
   saving: boolean;
   checkingConflicts?: boolean;
+  activeVenueId: string | null;
+  setActiveVenueId: (id: string | null) => void;
 }
 
 export default function ScheduleBoard({
@@ -70,6 +74,8 @@ export default function ScheduleBoard({
   onSave,
   saving,
   checkingConflicts,
+  activeVenueId,
+  setActiveVenueId,
 }: Props) {
   const { message } = App.useApp();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -81,10 +87,25 @@ export default function ScheduleBoard({
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(260);
   const [isResizing, setIsResizing] = useState(false);
+  const [drawerPos, setDrawerPos] = useState({ x: window.innerWidth - 290, y: 120 });
+  const [isDraggingPos, setIsDraggingPos] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   const startResize = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
+  };
+
+  const startDrag = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest(".drag-handle")) {
+      e.preventDefault();
+      setIsDraggingPos(true);
+      setDragOffset({
+        x: e.clientX - drawerPos.x,
+        y: e.clientY - drawerPos.y
+      });
+    }
   };
 
   useEffect(() => {
@@ -105,6 +126,25 @@ export default function ScheduleBoard({
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isResizing]);
+
+  useEffect(() => {
+    if (!isDraggingPos) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      setDrawerPos({
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y
+      });
+    };
+    const handleMouseUp = () => {
+      setIsDraggingPos(false);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDraggingPos, dragOffset]);
 
   // 撤销 / 重做栈（至少 50 步）
   const history = useRef<Board[]>([]);
@@ -142,13 +182,7 @@ export default function ScheduleBoard({
     return venues;
   }, [venues]);
 
-  const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (activeVenues.length > 0 && !activeVenueId) {
-      setActiveVenueId(activeVenues[0].id);
-    }
-  }, [activeVenues, activeVenueId]);
 
   const days = useMemo(() => {
     const start = dayjs(week.week_start);
@@ -338,7 +372,7 @@ export default function ScheduleBoard({
   const realConflicts = useMemo(() => conflicts.filter((c) => c.kind !== "vacancy"), [conflicts]);
   const dirty = ops.length > 0;
 
-  const marginRightValue = drawerCollapsed ? 0 : drawerWidth + 12;
+  const marginRightValue = 0;
 
   return (
     <DndContext
@@ -384,7 +418,6 @@ export default function ScheduleBoard({
           flex="auto"
           style={{
             marginRight: marginRightValue,
-            transition: isResizing ? "none" : "margin-right 0.2s",
           }}
         >
           <Tabs
@@ -398,89 +431,90 @@ export default function ScheduleBoard({
                 key: venue.id,
                 label: venue.name,
                 children: (
-                  times.length === 0 ? (
-                    <Card size="small" bordered={false} style={{ marginBottom: 12 }}>
-                      <Empty description="该场地本周暂无排班任务，您可以点击上方“新增临时值班”来添加" style={{ padding: "40px 0" }} />
-                    </Card>
-                  ) : (
-                    <Card size="small" bordered={false} style={{ marginBottom: 12 }}>
-                      <div style={{ overflowX: "auto" }}>
-                        <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 1100 }}>
-                          <thead>
-                            <tr>
-                              <th style={{ width: 56 }} />
-                              {days.map((d) => (
-                                <th key={d.format()} style={{ fontSize: 12, fontWeight: 500, minWidth: 140 }}>
-                                  {d.format("MM-DD")} 周{"日一二三四五六"[d.day()]}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {times.map((t) => (
-                              <tr key={t}>
-                                <td style={{ fontSize: 11, color: "#888" }}>{t}</td>
-                                {days.map((d) => {
-                                  const slot = vSlots.find(
-                                    (s) =>
-                                      dayjs(s.slot_start_at).format("YYYY-MM-DD") === d.format("YYYY-MM-DD") &&
-                                      dayjs(s.slot_start_at).format("HH:mm") === t,
-                                  );
-                                  return (
-                                    <td key={d.format() + t} style={{ verticalAlign: "top" }}>
-                                      {slot ? (
-                                        <SlotCell
-                                          slot={slot}
-                                          board={board}
-                                          activeVerdict={activeVerdict}
-                                          conflictKeys={conflictKeys}
-                                        />
-                                      ) : (
-                                        <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>
-                                      )}
-                                    </td>
-                                  );
-                                })}
+                  <>
+                    {times.length === 0 ? (
+                      <Card size="small" bordered={false} style={{ marginBottom: 12 }}>
+                        <Empty description="该场地本周暂无排班任务，您可以点击上方“新增临时值班”来添加" style={{ padding: "40px 0" }} />
+                      </Card>
+                    ) : (
+                      <Card size="small" bordered={false} style={{ marginBottom: 12 }}>
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 1100 }}>
+                            <thead>
+                              <tr>
+                                <th style={{ width: 56 }} />
+                                {days.map((d) => (
+                                  <th key={d.format()} style={{ fontSize: 12, fontWeight: 500, minWidth: 140 }}>
+                                    {d.format("MM-DD")} 周{"日一二三四五六"[d.day()]}
+                                  </th>
+                                ))}
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </Card>
-                  )
+                            </thead>
+                            <tbody>
+                              {times.map((t) => (
+                                <tr key={t}>
+                                  <td style={{ fontSize: 11, color: "#888" }}>{t}</td>
+                                  {days.map((d) => {
+                                    const slot = vSlots.find(
+                                      (s) =>
+                                        dayjs(s.slot_start_at).format("YYYY-MM-DD") === d.format("YYYY-MM-DD") &&
+                                        dayjs(s.slot_start_at).format("HH:mm") === t,
+                                    );
+                                    return (
+                                      <td key={d.format() + t} style={{ verticalAlign: "top" }}>
+                                        {slot ? (
+                                          <SlotCell
+                                            slot={slot}
+                                            board={board}
+                                            activeVerdict={activeVerdict}
+                                            conflictKeys={conflictKeys}
+                                          />
+                                        ) : (
+                                          <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </Card>
+                    )}
+                    {venue.venue_type === "event_based" && (
+                      <VenueTasksSection
+                        venue={venue}
+                        weekStart={week.week_start}
+                        weekEnd={week.week_end}
+                        onTaskChanged={() => {
+                          const qc = useQueryClient();
+                          qc.invalidateQueries({ queryKey: ["week", week.week_start] });
+                        }}
+                      />
+                    )}
+                  </>
                 )
               };
             })}
           />
         </Col>
+        
+        {/* Floating Draggable & Resizable Person Drawer Wrapper */}
         <div
           style={{
             position: "fixed",
-            right: drawerCollapsed ? -drawerWidth - 10 : 16,
-            top: 80,
-            bottom: 16,
-            width: drawerWidth,
-            zIndex: 100,
-            transition: isResizing ? "none" : "right 0.2s, width 0.2s",
+            left: drawerCollapsed ? undefined : drawerPos.x,
+            right: drawerCollapsed ? 0 : undefined,
+            top: drawerCollapsed ? "40%" : drawerPos.y,
+            transform: drawerCollapsed ? "translateY(-50%)" : undefined,
+            width: drawerCollapsed ? 0 : drawerWidth,
+            height: drawerCollapsed ? 0 : 520,
+            zIndex: 1000,
+            transition: isResizing || isDraggingPos ? "none" : "left 0.2s, top 0.2s, width 0.2s, height 0.2s",
             overflow: "visible",
           }}
         >
-          {!drawerCollapsed && (
-            <div
-              style={{
-                position: "absolute",
-                left: -3,
-                top: 0,
-                bottom: 0,
-                width: 6,
-                cursor: "col-resize",
-                zIndex: 120,
-                background: isResizing ? "#1890ff" : "transparent",
-                transition: "background 0.2s",
-              }}
-              onMouseDown={startResize}
-            />
-          )}
           <Button
             type="primary"
             shape="circle"
@@ -488,32 +522,78 @@ export default function ScheduleBoard({
             size="small"
             style={{
               position: "absolute",
-              left: -14,
-              top: "50%",
+              left: drawerCollapsed ? -28 : -14,
+              top: drawerCollapsed ? 0 : "50%",
               transform: "translateY(-50%)",
-              zIndex: 110,
+              zIndex: 1010,
               boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
               cursor: "pointer",
             }}
             onClick={() => setDrawerCollapsed(!drawerCollapsed)}
           />
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              background: "#fff",
-              border: "1px solid #f0f0f0",
-              borderRadius: 8,
-              padding: "12px 12px 12px 16px",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            }}
-          >
-            <div style={{ flex: 1, overflowY: "auto" }}>
-              <PersonDrawer people={people} focusSlotId={focusSlotId} />
-            </div>
-          </div>
+
+          {!drawerCollapsed && (
+            <>
+              {/* Resize Handle */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: -3,
+                  top: 0,
+                  bottom: 0,
+                  width: 6,
+                  cursor: "col-resize",
+                  zIndex: 1020,
+                  background: isResizing ? "#1890ff" : "transparent",
+                  transition: "background 0.2s",
+                }}
+                onMouseDown={startResize}
+              />
+              
+              {/* Card Container */}
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  background: "#fff",
+                  border: "1px solid #f0f0f0",
+                  borderRadius: 8,
+                  display: "flex",
+                  flexDirection: "column",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                }}
+              >
+                {/* Header (Drag Handle) */}
+                <div
+                  className="drag-handle"
+                  onMouseDown={startDrag}
+                  style={{
+                    padding: "8px 12px",
+                    background: "#fafafa",
+                    borderBottom: "1px solid #f0f0f0",
+                    borderTopLeftRadius: 7,
+                    borderTopRightRadius: 7,
+                    cursor: "move",
+                    userSelect: "none",
+                    fontWeight: "bold",
+                    color: "#333",
+                    fontSize: "12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span>人员库 (按住拖动)</span>
+                  <span style={{ fontSize: "10px", color: "#999" }}>边缘拉伸</span>
+                </div>
+                
+                {/* Scrollable Content */}
+                <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+                  <PersonDrawer people={people} focusSlotId={focusSlotId} />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </Row>
 
@@ -521,5 +601,202 @@ export default function ScheduleBoard({
         {activePerson ? <Tag color="blue">{activePerson.name}</Tag> : null}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+function VenueTasksSection({
+  venue,
+  weekStart,
+  weekEnd,
+  onTaskChanged,
+}: {
+  venue: Venue;
+  weekStart: string;
+  weekEnd: string;
+  onTaskChanged: () => void;
+}) {
+  const { message } = App.useApp();
+  const [creating, setCreating] = useState(false);
+  const [form] = Form.useForm();
+
+  const tasksQ = useQuery({
+    queryKey: ["admin", "venue-tasks", venue.id, weekStart],
+    queryFn: () =>
+      adminApi.tasks.list({
+        venue_id: venue.id,
+        from: weekStart,
+        to: weekEnd,
+        include_cancelled: true,
+      }),
+  });
+
+  const createM = useMutation({
+    mutationFn: async (values: any) => {
+      const range: [dayjs.Dayjs, dayjs.Dayjs] = values.booking_range;
+      return await adminApi.tasks.create({
+        venue_id: venue.id,
+        title: values.title,
+        booking_start_at: range[0].toISOString(),
+        booking_end_at: range[1].toISOString(),
+        prep_minutes: values.prep_minutes,
+        cleanup_minutes: values.cleanup_minutes,
+        required_people: values.required_people,
+        is_temporary: values.is_temporary,
+        organization: values.organization,
+        contact_name: values.contact_name,
+        contact_phone: values.contact_phone,
+        requirements: values.requirements,
+        notes: values.notes,
+      });
+    },
+    onSuccess: () => {
+      message.success("任务已创建");
+      setCreating(false);
+      form.resetFields();
+      tasksQ.refetch();
+      onTaskChanged();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const cancelM = useMutation({
+    mutationFn: (id: string) => adminApi.tasks.cancel(id),
+    onSuccess: () => {
+      message.success("任务已取消");
+      tasksQ.refetch();
+      onTaskChanged();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const openCreate = () => {
+    form.resetFields();
+    form.setFieldsValue({
+      title: "",
+      booking_range: undefined,
+      prep_minutes: venue.default_prep_minutes ?? 30,
+      cleanup_minutes: venue.default_cleanup_minutes ?? 30,
+      required_people: venue.default_required_people ?? 2,
+      is_temporary: false,
+    });
+    setCreating(true);
+  };
+
+  const submit = async () => {
+    const values = await form.validateFields();
+    createM.mutate(values);
+  };
+
+  const columns = [
+    { title: "任务标题", dataIndex: "title" },
+    {
+      title: "预约时间",
+      key: "booking_time",
+      render: (_: any, r: any) =>
+        `${dayjs(r.booking_start_at).format("MM-DD HH:mm")}–${dayjs(r.booking_end_at).format("HH:mm")}`,
+    },
+    { title: "需求人数", dataIndex: "required_people", width: 90 },
+    {
+      title: "状态",
+      dataIndex: "status",
+      width: 90,
+      render: (s: string) => (
+        <Tag color={TASK_STATUS_COLOR[s as keyof typeof TASK_STATUS_COLOR] ?? "default"}>
+          {TASK_STATUS_LABEL[s as keyof typeof TASK_STATUS_LABEL] ?? s}
+        </Tag>
+      ),
+    },
+    {
+      title: "操作",
+      width: 100,
+      render: (_: any, r: any) => (
+        r.status !== "cancelled" && r.status !== "completed" && (
+          <Popconfirm title="确认取消该任务？" onConfirm={() => cancelM.mutate(r.id)}>
+            <Button size="small" danger>
+              取消
+            </Button>
+          </Popconfirm>
+        )
+      ),
+    },
+  ];
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <Divider orientation="left" style={{ margin: "0 0 16px 0" }}>
+        <Space>
+          <span style={{ fontSize: "16px", fontWeight: 600 }}>场地任务管理 ({venue.name})</span>
+          <Button type="primary" size="small" onClick={openCreate}>
+            新建任务
+          </Button>
+        </Space>
+      </Divider>
+      
+      <Table
+        size="small"
+        rowKey="id"
+        loading={tasksQ.isLoading}
+        dataSource={tasksQ.data ?? []}
+        columns={columns}
+        pagination={false}
+        locale={{ emptyText: "本周该场地暂无任务记录" }}
+      />
+
+      {creating && (
+        <Modal
+          title={`新建场地任务 - ${venue.name}`}
+          open
+          onOk={submit}
+          onCancel={() => setCreating(false)}
+          confirmLoading={createM.isPending}
+          destroyOnClose
+          width={600}
+        >
+          <Form form={form} layout="vertical">
+            <Form.Item name="title" label="标题" rules={[{ required: true }]}>
+              <Input placeholder="如：重要会议技术保障" />
+            </Form.Item>
+            <Form.Item
+              name="booking_range"
+              label="预约起止时间"
+              rules={[{ required: true, message: "请选择预约时间" }]}
+            >
+              <DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: "100%" }} />
+            </Form.Item>
+            <Space wrap>
+              <Form.Item name="prep_minutes" label="提前到岗(分钟)" rules={[{ required: true }]}>
+                <InputNumber min={0} />
+              </Form.Item>
+              <Form.Item name="cleanup_minutes" label="收尾(分钟)" rules={[{ required: true }]}>
+                <InputNumber min={0} />
+              </Form.Item>
+              <Form.Item name="required_people" label="需求人数" rules={[{ required: true }]}>
+                <InputNumber min={1} />
+              </Form.Item>
+              <Form.Item name="is_temporary" label="临时任务" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+            </Space>
+            <Form.Item name="organization" label="主办方">
+              <Input />
+            </Form.Item>
+            <Space wrap>
+              <Form.Item name="contact_name" label="联系人">
+                <Input />
+              </Form.Item>
+              <Form.Item name="contact_phone" label="联系电话">
+                <Input />
+              </Form.Item>
+            </Space>
+            <Form.Item name="requirements" label="特殊要求">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+            <Form.Item name="notes" label="备注">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+          </Form>
+        </Modal>
+      )}
+    </div>
   );
 }

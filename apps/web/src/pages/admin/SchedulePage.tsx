@@ -42,6 +42,7 @@ export default function SchedulePage() {
   const [baseline, setBaseline] = useState<Board>({});
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [creatingManual, setCreatingManual] = useState(false);
+  const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
 
   const weekQuery = useQuery<WeekView>({
     queryKey: ["week", week],
@@ -60,6 +61,13 @@ export default function SchedulePage() {
     queryKey: ["admin", "venues"],
     queryFn: adminApi.venues.list,
   });
+
+  // Default activeVenueId to the first venue when fetched
+  useEffect(() => {
+    if (venuesQuery.data && venuesQuery.data.length > 0 && !activeVenueId) {
+      setActiveVenueId(venuesQuery.data[0].id);
+    }
+  }, [venuesQuery.data, activeVenueId]);
 
   // 服务端数据变化时重置棋盘与基线
   useEffect(() => {
@@ -176,6 +184,8 @@ export default function SchedulePage() {
           onSave={(ops) => save.mutate(ops)}
           saving={save.isPending}
           checkingConflicts={checkConflicts.isPending}
+          activeVenueId={activeVenueId}
+          setActiveVenueId={setActiveVenueId}
         />
       )}
 
@@ -183,6 +193,7 @@ export default function SchedulePage() {
         <ManualSlotModal
           weekStart={week}
           venues={venuesQuery.data ?? []}
+          defaultVenueId={activeVenueId}
           onClose={() => setCreatingManual(false)}
           onSuccess={() => {
             setCreatingManual(false);
@@ -197,11 +208,13 @@ export default function SchedulePage() {
 function ManualSlotModal({
   weekStart,
   venues,
+  defaultVenueId,
   onClose,
   onSuccess,
 }: {
   weekStart: string;
   venues: Venue[];
+  defaultVenueId: string | null;
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -237,7 +250,7 @@ function ManualSlotModal({
         form={form}
         layout="vertical"
         onFinish={(values) => createM.mutate(values)}
-        initialValues={{ required_people: 1 }}
+        initialValues={{ required_people: 1, venue_id: defaultVenueId || undefined }}
       >
         <Form.Item name="venue_id" label="场地" rules={[{ required: true }]}>
           <Select
