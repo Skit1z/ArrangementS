@@ -3,7 +3,13 @@ import { Card, Select, Spin, Tag, Space } from "antd";
 import { useState } from "react";
 import { adminApi, type ActiveTimetableOut } from "@/features/admin/api";
 
-const PERIODS = Array.from({ length: 14 }, (_, i) => i + 1);
+const PERIOD_BLOCKS = [
+  { label: "1-2 节", start: 1, end: 2 },
+  { label: "3-4 节", start: 3, end: 4 },
+  { label: "5-6 节", start: 5, end: 6 },
+  { label: "7-8 节", start: 7, end: 8 },
+  { label: "9-10 节", start: 9, end: 10 },
+];
 const WEEKDAYS = [
   { label: "周一", value: 1 },
   { label: "周二", value: 2 },
@@ -30,32 +36,9 @@ export default function TimetablesPage() {
 
   const allPeople = data ?? [];
 
-  // Build grid data
-  // grid[weekday][period] = list of { personName, courseName }
-  const grid: Record<number, Record<number, { personName: string; courseName: string }[]>> = {};
-  for (const wd of WEEKDAYS) {
-    grid[wd.value] = {};
-    for (const p of PERIODS) {
-      grid[wd.value][p] = [];
-    }
-  }
-
   const peopleToDisplay = selectedPerson
     ? allPeople.filter((p) => p.person_id === selectedPerson)
     : allPeople;
-
-  for (const person of peopleToDisplay) {
-    for (const rule of person.rules) {
-      for (let p = rule.period_start; p <= rule.period_end; p++) {
-        if (grid[rule.weekday] && grid[rule.weekday][p]) {
-          grid[rule.weekday][p].push({
-            personName: person.person_name,
-            courseName: rule.course_name ?? "未知课程",
-          });
-        }
-      }
-    }
-  }
 
   return (
     <Card 
@@ -114,17 +97,32 @@ export default function TimetablesPage() {
             </tr>
           </thead>
           <tbody>
-            {PERIODS.map((period) => (
-              <tr key={period}>
+            {PERIOD_BLOCKS.map((block) => (
+              <tr key={block.label}>
                 <td style={{ border: "1px solid #f0f0f0", padding: 8, textAlign: "center", background: "#fafafa" }}>
-                  第 {period} 节
+                  {block.label}
                 </td>
                 {WEEKDAYS.map((wd) => {
-                  const busyPeople = grid[wd.value][period];
-                  const busyNames = new Set(busyPeople.map((b) => b.personName));
+                  const busyPeopleInBlock: { personName: string; courseName: string }[] = [];
+                  
+                  for (const person of peopleToDisplay) {
+                    const overlappingRule = person.rules.find(
+                      (rule) =>
+                        rule.weekday === wd.value &&
+                        !(rule.period_end < block.start || rule.period_start > block.end)
+                    );
+                    if (overlappingRule) {
+                      busyPeopleInBlock.push({
+                        personName: person.person_name,
+                        courseName: overlappingRule.course_name ?? "未知课程",
+                      });
+                    }
+                  }
+
+                  const busyNames = new Set(busyPeopleInBlock.map((b) => b.personName));
                   const freePeople = peopleToDisplay.filter((p) => !busyNames.has(p.person_name));
                   
-                  const displayPeople = viewMode === "busy" ? busyPeople : freePeople.map(p => ({ personName: p.person_name, courseName: "" }));
+                  const displayPeople = viewMode === "busy" ? busyPeopleInBlock : freePeople.map(p => ({ personName: p.person_name, courseName: "" }));
                   const cellBg = viewMode === "busy" 
                     ? (displayPeople.length > 0 ? "#fff2f0" : "#fff")
                     : (displayPeople.length > 0 ? "#f6ffed" : "#fff");
