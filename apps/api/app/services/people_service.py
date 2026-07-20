@@ -270,14 +270,14 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
     from app.models.constraint import PersonConstraint
     from app.models.import_batch import ImportBatch
     from app.models.leave import LeaveRequest
-    from app.models.overtime import OvertimeRecord
+    from app.models.overtime import OvertimeRequest
     from app.models.schedule import Assignment
     from app.models.statistics import PersonMonthSummary
     from app.models.swap import ShiftExchangeRequest
     from app.models.timetable import Timetable, TimetablePeriod
     from sqlalchemy import delete, update
 
-    # 1. 级联清理人员档案关联数据（约束、排班分配、换班申请、请假申请、加班记录、月度统计、不可值班）
+    # 1. 级联清理人员档案关联数据（约束、排班分配、换班申请、请假申请、加班申请、月度统计、不可值班）
     db.execute(delete(PersonConstraint).where(PersonConstraint.person_id == person_id))
     db.execute(delete(Assignment).where(Assignment.person_id == person_id))
     db.execute(
@@ -287,7 +287,7 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
         )
     )
     db.execute(delete(LeaveRequest).where(LeaveRequest.person_id == person_id))
-    db.execute(delete(OvertimeRecord).where(OvertimeRecord.person_id == person_id))
+    db.execute(delete(OvertimeRequest).where(OvertimeRequest.person_id == person_id))
     db.execute(delete(PersonMonthSummary).where(PersonMonthSummary.person_id == person_id))
     db.execute(delete(AvailabilityBlock).where(AvailabilityBlock.person_id == person_id))
     db.execute(delete(AvailabilityRequest).where(AvailabilityRequest.person_id == person_id))
