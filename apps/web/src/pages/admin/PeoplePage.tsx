@@ -616,10 +616,9 @@ function AddPersonModal({
 
         <Form.Item
           name="class_name"
-          label="班级"
-          rules={[{ required: true, message: "请输入班级" }]}
+          label="班级（可选）"
         >
-          <Input placeholder="例如：计科2301" />
+          <Input placeholder="例如：计科2301（非必填）" />
         </Form.Item>
 
         <Form.Item

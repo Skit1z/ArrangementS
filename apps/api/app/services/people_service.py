@@ -22,7 +22,7 @@ def create_person(
     db: Session,
     *,
     student_no: str,
-    class_name: str,
+    class_name: str = "",
     full_name: str,
     phone: str,
     difficulty_level: str | None = None,
@@ -31,12 +31,12 @@ def create_person(
     is_in_scheduling_pool: bool = True,
 ) -> tuple[PersonProfile, str]:
     student_no = student_no.strip()
-    class_name = class_name.strip()
+    class_name = (class_name or "").strip()
     full_name = full_name.strip()
     phone = phone.strip()
 
-    if not student_no or not class_name or not full_name or not phone:
-        raise HTTPException(status_code=400, detail="学号、班级、姓名、手机号不能为空")
+    if not student_no or not full_name or not phone:
+        raise HTTPException(status_code=400, detail="学号、姓名、手机号不能为空")
 
     existing = db.scalar(select(PersonProfile).where(PersonProfile.student_no == student_no))
     if existing is not None:

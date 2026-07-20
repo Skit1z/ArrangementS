@@ -404,7 +404,7 @@ export const adminApi = {
     list: async () => (await api.get<AdminPerson[]>("/people")).data,
     create: async (payload: {
       student_no: string;
-      class_name: string;
+      class_name?: string;
       full_name: string;
       phone: string;
       difficulty_level?: string | null;

@@ -51,7 +51,7 @@ class PersonOut(BaseModel):
 
 class PersonCreateIn(BaseModel):
     student_no: str = Field(..., description="学号")
-    class_name: str = Field(..., description="班级")
+    class_name: str = Field("", description="班级（可选）")
     full_name: str = Field(..., description="姓名")
     phone: str = Field(..., description="手机号")
     difficulty_level: str | None = None
