@@ -5,7 +5,7 @@ import { useState } from "react";
 import { errorMessage } from "@/api/client";
 import { PdfFilePicker } from "@/components/PdfFilePicker";
 import { TimetableEntryEditor } from "@/components/TimetableEntryEditor";
-import { adminApi, type ActiveTimetableOut } from "@/features/admin/api";
+import { adminApi, type ActiveTimetableOut, type CourseRuleOut } from "@/features/admin/api";
 import type { ParsedEntry } from "@/features/me/api";
 
 const PERIOD_BLOCKS = [
@@ -25,6 +25,25 @@ const WEEKDAYS = [
   { label: "周日", value: 7 },
 ];
 
+function isRuleActiveOnWeek(rule: CourseRuleOut, targetWeek: number): boolean {
+  if (rule.week_start !== null && rule.week_start !== undefined && targetWeek < rule.week_start) {
+    return false;
+  }
+  if (rule.week_end !== null && rule.week_end !== undefined && targetWeek > rule.week_end) {
+    return false;
+  }
+  if (rule.week_parity === "odd" && targetWeek % 2 !== 1) {
+    return false;
+  }
+  if (rule.week_parity === "even" && targetWeek % 2 !== 0) {
+    return false;
+  }
+  if (rule.explicit_weeks && rule.explicit_weeks.length > 0) {
+    return rule.explicit_weeks.includes(targetWeek);
+  }
+  return true;
+}
+
 export default function TimetablesPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -39,6 +58,7 @@ export default function TimetablesPage() {
 
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"busy" | "free">("busy");
+  const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
 
   // admin 代传 state
   const [proxyOpen, setProxyOpen] = useState(false);
@@ -61,9 +81,13 @@ export default function TimetablesPage() {
 
   const confirmMut = useMutation({
     mutationFn: async () => {
-      if (!proxyParsed?.length || proxyParsed.some((entry) =>
-        entry.period_start > entry.period_end || !entry.week_expr.trim()
-      )) {
+      if (
+        !proxyParsed?.length ||
+        proxyParsed.some(
+          (entry) =>
+            entry.period_start > entry.period_end || !entry.week_expr.trim()
+        )
+      ) {
         throw new Error("请检查节次范围和周次，至少保留一条有效课程时段");
       }
       const up = await adminApi.timetables.uploadFor(
@@ -110,14 +134,27 @@ export default function TimetablesPage() {
               { label: "有课表", value: "busy" },
               { label: "无课表", value: "free" },
             ]}
-            style={{ width: 110 }}
+            style={{ width: 100 }}
           />
-          <span style={{ marginLeft: 16 }}>人员筛选：</span>
+          <span style={{ marginLeft: 8 }}>周次：</span>
+          <Select
+            value={selectedWeek}
+            onChange={(v) => setSelectedWeek(v as number | "all")}
+            style={{ width: 140 }}
+            options={[
+              { label: "全学期 (所有周)", value: "all" },
+              ...Array.from({ length: 20 }, (_, i) => ({
+                label: `第 ${i + 1} 周`,
+                value: i + 1,
+              })),
+            ]}
+          />
+          <span style={{ marginLeft: 8 }}>人员筛选：</span>
           <Select
             allowClear
             showSearch
             placeholder="查看所有人"
-            style={{ width: 200 }}
+            style={{ width: 180 }}
             value={selectedPerson}
             onChange={setSelectedPerson}
             options={selectablePeople.map((p) => ({ label: p.full_name, value: p.id }))}
@@ -133,12 +170,12 @@ export default function TimetablesPage() {
             ghost
             icon={<DownloadOutlined />}
             onClick={async () => {
+              const weekParam = selectedWeek === "all" ? undefined : selectedWeek;
               try {
-                await adminApi.timetables.exportFree();
+                await adminApi.timetables.exportFree(weekParam);
                 message.success("全员无课表 Excel 已生成并开始下载");
               } catch (_e) {
-                // 后端尚未部署或重启时，降级使用前端直接生成高质量 Excel 表格
-                exportFreeClientFallback(allPeople, selectablePeople, WEEKDAYS, PERIOD_BLOCKS);
+                exportFreeClientFallback(allPeople, selectablePeople, WEEKDAYS, PERIOD_BLOCKS, weekParam);
                 message.success("全员无课表 Excel 已生成并开始下载");
               }
             }}
@@ -201,11 +238,14 @@ export default function TimetablesPage() {
                 {WEEKDAYS.map((wd) => {
                   const busyPeopleInBlock: { personName: string; courseName: string }[] = [];
                   for (const person of peopleToDisplay) {
-                    const overlappingRule = person.rules.find(
-                      (rule) =>
-                        rule.weekday === wd.value &&
-                        !(rule.period_end < block.start || rule.period_start > block.end)
-                    );
+                    const overlappingRule = person.rules.find((rule) => {
+                      if (rule.weekday !== wd.value) return false;
+                      if (rule.period_end < block.start || rule.period_start > block.end) return false;
+                      if (selectedWeek !== "all") {
+                        if (!isRuleActiveOnWeek(rule, selectedWeek)) return false;
+                      }
+                      return true;
+                    });
                     if (overlappingRule) {
                       busyPeopleInBlock.push({
                         personName: person.person_name,
@@ -301,9 +341,11 @@ function exportFreeClientFallback(
   allPeople: ActiveTimetableOut[],
   selectablePeople: { id: string; full_name: string }[],
   weekdays: { label: string; value: number }[],
-  periodBlocks: { label: string; start: number; end: number }[]
+  periodBlocks: { label: string; start: number; end: number }[],
+  week?: number
 ) {
   const today = new Date().toISOString().slice(0, 10);
+  const weekSubtitle = week ? `第 ${week} 周` : "全学期";
   let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
@@ -315,13 +357,12 @@ function exportFreeClientFallback(
         .sub { font-size: 10px; color: #595959; text-align: center; height: 24px; font-style: italic; }
         .header { background-color: #1F497D; color: #FFFFFF; font-weight: bold; text-align: center; }
         .period { background-color: #F2F2F2; font-weight: bold; text-align: center; vertical-align: middle; }
-        .total { background-color: #E9ECEF; font-weight: bold; text-align: center; color: #1F497D; }
       </style>
     </head>
     <body>
       <table>
-        <tr><td colspan="8" class="title">全员无课表（可排班人员汇总表）</td></tr>
-        <tr><td colspan="8" class="sub">导出日期：${today}  |  人员总数：${selectablePeople.length}人  |  说明：列表中为对应时间段无课、可参与班次排班的人员名单</td></tr>
+        <tr><td colspan="8" class="title">全员无课表（可排班人员汇总表） - ${weekSubtitle}</td></tr>
+        <tr><td colspan="8" class="sub">导出日期：${today}  |  人员总数：${selectablePeople.length}人  |  范围：${weekSubtitle}  |  说明：列表中为对应时间段无课、可参与班次排班的人员名单</td></tr>
         <tr><th></th></tr>
         <tr class="header">
           <th style="width: 140px;">节次 / 时间</th>
@@ -329,37 +370,35 @@ function exportFreeClientFallback(
         </tr>
   `;
 
-  const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
-
   for (const block of periodBlocks) {
     html += `<tr><td class="period">${block.label}</td>`;
     for (const wd of weekdays) {
       const freePeople = selectablePeople.filter((person) => {
         const rules = allPeople.find((p) => p.person_id === person.id)?.rules ?? [];
-        const hasCourse = rules.some(
-          (r) => r.weekday === wd.value && !(r.period_end < block.start || r.period_start > block.end)
-        );
+        const hasCourse = rules.some((r) => {
+          if (r.weekday !== wd.value) return false;
+          if (r.period_end < block.start || r.period_start > block.end) return false;
+          if (week !== undefined) {
+            if (!isRuleActiveOnWeek(r, week)) return false;
+          }
+          return true;
+        });
         return !hasCourse;
       });
 
-      counts[wd.value] += freePeople.length;
       const names = freePeople.map((p) => p.full_name).join("、");
-      html += `<td><b>【共 ${freePeople.length} 人无课】</b><br/>${names || "（无）"}</td>`;
+      html += `<td>${names || "（无）"}</td>`;
     }
     html += `</tr>`;
   }
 
-  html += `<tr class="total"><td class="period">人次小计</td>`;
-  for (const wd of weekdays) {
-    html += `<td>共 ${counts[wd.value]} 人次</td>`;
-  }
-  html += `</tr></table></body></html>`;
+  html += `</table></body></html>`;
 
   const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `全员无课表_${today}.xls`;
+  a.download = `全员无课表_${week ? `第${week}周_` : ""}${today}.xls`;
   document.body.appendChild(a);
   a.click();
   a.remove();

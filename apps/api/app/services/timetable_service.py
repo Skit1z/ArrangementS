@@ -316,7 +316,7 @@ def _get_upload(db: Session, upload_id: uuid.UUID) -> TimetableUpload:
     return upload
 
 
-def build_free_timetable_excel(db: Session) -> bytes:
+def build_free_timetable_excel(db: Session, week: int | None = None) -> bytes:
     import io
     from datetime import date
     from openpyxl import Workbook
@@ -327,8 +327,10 @@ def build_free_timetable_excel(db: Session) -> bytes:
     from app.models.person import PersonProfile
     from app.models.timetable import TimetableUpload
     from app.services import semester_service
+    from app.timetable.week_parser import parse_weeks
 
     current_sem = semester_service.get_current_semester(db)
+    max_week = current_sem.week_count if current_sem else 20
     active_people = list(
         db.scalars(
             select(PersonProfile)
@@ -374,9 +376,10 @@ def build_free_timetable_excel(db: Session) -> bytes:
     ws1.title = "全员无课表 (按节次)"
 
     sem_name = current_sem.name if current_sem else "当前学期"
+    week_subtitle = f"第 {week} 周" if week else "全学期"
     ws1.merge_cells("A1:H1")
     title_cell = ws1["A1"]
-    title_cell.value = f"全员无课表（可排班人员汇总表） - {sem_name}"
+    title_cell.value = f"全员无课表（可排班人员汇总表） - {sem_name} ({week_subtitle})"
     title_cell.font = Font(name="微软雅黑", size=15, bold=True, color="1F497D")
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
     title_cell.fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
@@ -384,7 +387,7 @@ def build_free_timetable_excel(db: Session) -> bytes:
 
     ws1.merge_cells("A2:H2")
     sub_cell = ws1["A2"]
-    sub_cell.value = f"导出日期：{date.today().isoformat()}  |  人员总数：{len(active_people)}人  |  说明：列表中为对应时间段无课、可参与班次排班的人员名单"
+    sub_cell.value = f"导出日期：{date.today().isoformat()}  |  人员总数：{len(active_people)}人  |  范围：{week_subtitle}  |  说明：列表中为对应时间段无课、可参与班次排班的人员名单"
     sub_cell.font = Font(name="微软雅黑", size=9, italic=True, color="595959")
     sub_cell.alignment = Alignment(horizontal="center", vertical="center")
     ws1.row_dimensions[2].height = 20
@@ -411,11 +414,24 @@ def build_free_timetable_excel(db: Session) -> bytes:
         cell.border = thin_border
 
     row_idx = 5
-    weekday_free_counts = {wd[0]: 0 for wd in WEEKDAYS}
+
+    def _rule_matches(rule, block_start: int, block_end: int, wd_val: int) -> bool:
+        if rule.weekday != wd_val:
+            return False
+        if rule.period_end < block_start or rule.period_start > block_end:
+            return False
+        if week is not None and rule.week_expr:
+            try:
+                spec = parse_weeks(rule.week_expr, max_week)
+                if week not in spec.weeks:
+                    return False
+            except Exception:
+                pass
+        return True
 
     for block in PERIOD_BLOCKS:
         row_data = [f"{block['label']}\n({block['time']})"]
-        ws1.row_dimensions[row_idx].height = 75
+        ws1.row_dimensions[row_idx].height = 65
 
         cell_a = ws1.cell(row=row_idx, column=1, value=row_data[0])
         cell_a.font = Font(name="微软雅黑", size=10, bold=True, color="333333")
@@ -428,39 +444,19 @@ def build_free_timetable_excel(db: Session) -> bytes:
             for person in active_people:
                 rules = person_rules.get(person.id, [])
                 has_course = any(
-                    r.weekday == wd_val
-                    and not (r.period_end < block["start"] or r.period_start > block["end"])
+                    _rule_matches(r, block["start"], block["end"], wd_val)
                     for r in rules
                 )
                 if not has_course:
                     free_names.append(person.full_name)
 
-            weekday_free_counts[wd_val] += len(free_names)
-            content = f"【共 {len(free_names)} 人无课】\n" + (
-                "、".join(free_names) if free_names else "（无）"
-            )
+            content = "、".join(free_names) if free_names else "（无）"
             cell_data = ws1.cell(row=row_idx, column=col_i, value=content)
             cell_data.font = Font(name="微软雅黑", size=10, color="262626")
             cell_data.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
             cell_data.border = thin_border
 
         row_idx += 1
-
-    ws1.row_dimensions[row_idx].height = 28
-    tot_cell = ws1.cell(row=row_idx, column=1, value="人次小计")
-    tot_cell.font = Font(name="微软雅黑", size=10, bold=True, color="1F497D")
-    tot_cell.fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
-    tot_cell.alignment = Alignment(horizontal="center", vertical="center")
-    tot_cell.border = thin_border
-
-    for col_i, (wd_val, _) in enumerate(WEEKDAYS, start=2):
-        cell_tot = ws1.cell(
-            row=row_idx, column=col_i, value=f"共 {weekday_free_counts[wd_val]} 人次"
-        )
-        cell_tot.font = Font(name="微软雅黑", size=10, bold=True, color="1F497D")
-        cell_tot.fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
-        cell_tot.alignment = Alignment(horizontal="center", vertical="center")
-        cell_tot.border = thin_border
 
     ws1.column_dimensions["A"].width = 16
     for col_letter in ["B", "C", "D", "E", "F", "G", "H"]:

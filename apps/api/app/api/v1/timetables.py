@@ -180,6 +180,7 @@ def get_active(
 
 @router.get("/export-free")
 def export_free_timetable(
+    week: int | None = None,
     _: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -187,8 +188,8 @@ def export_free_timetable(
     from datetime import date
     from fastapi import Response
 
-    content = timetable_service.build_free_timetable_excel(db)
-    filename = f"free_timetable_{date.today().isoformat()}.xlsx"
+    content = timetable_service.build_free_timetable_excel(db, week=week)
+    filename = f"free_timetable_{'week_' + str(week) if week else 'all'}_{date.today().isoformat()}.xlsx"
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
