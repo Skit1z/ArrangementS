@@ -169,7 +169,7 @@ def test_reimport_updates_not_duplicates(db_session):
 def test_missing_required_column_rejected(db_session):
     wb = Workbook()
     ws = wb.active
-    ws.append(["学号", "姓名"])  # 缺列
+    ws.append(["学号"])  # 缺姓名列
     ws.append(["20230008", "孙八"])
     buf = io.BytesIO()
     wb.save(buf)
