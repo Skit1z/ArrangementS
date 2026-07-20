@@ -1,5 +1,6 @@
 import { useDroppable } from "@dnd-kit/core";
-import { Card, Empty, Input, Select, Space, Tooltip } from "antd";
+import { DownOutlined, UpOutlined } from "@ant-design/icons";
+import { Button, Empty, Input, Select, Space, Tooltip } from "antd";
 import { useMemo, useState } from "react";
 
 import PersonChip from "./PersonChip";
@@ -9,13 +10,22 @@ interface Props {
   people: WeekPerson[];
   /** 当前拖拽悬停的岗位（用于按该岗位可用性过滤） */
   focusSlotId: string | null;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  startDrag: (e: React.MouseEvent) => void;
 }
 
 function hours(minutes: number) {
   return (minutes / 60).toFixed(1);
 }
 
-export default function PersonDrawer({ people, focusSlotId }: Props) {
+export default function PersonDrawer({
+  people,
+  focusSlotId,
+  collapsed,
+  onToggleCollapse,
+  startDrag,
+}: Props) {
   const [keyword, setKeyword] = useState("");
   const [className, setClassName] = useState<string | undefined>();
   const [onlyAvailable, setOnlyAvailable] = useState(false);
@@ -40,57 +50,97 @@ export default function PersonDrawer({ people, focusSlotId }: Props) {
   }, [people, keyword, className, onlyAvailable, onlyUnscheduled, focusSlotId]);
 
   return (
-    <Card
-      size="small"
-      title="人员抽屉"
-      styles={{ body: { maxHeight: "calc(100vh - 260px)", overflowY: "auto" } }}
+    <div
       ref={setNodeRef as never}
-      style={{ outline: isOver ? "2px solid #1677ff" : "none" }}
+      style={{
+        background: "#fff",
+        border: "1px solid #e8e8e8",
+        borderRadius: 8,
+        boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+        outline: isOver ? "2px solid #1677ff" : "none",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+      }}
     >
-      <Space direction="vertical" style={{ width: "100%", marginBottom: 8 }} size={6}>
-        <Input.Search placeholder="姓名 / 学号" allowClear onSearch={setKeyword} size="small" />
-        <Select
-          allowClear
+      {/* 标题栏：作为抓手按住拖动 + 向上折叠按钮 */}
+      <div
+        onMouseDown={startDrag}
+        style={{
+          padding: "8px 12px",
+          background: "#fafafa",
+          borderBottom: collapsed ? "none" : "1px solid #f0f0f0",
+          cursor: "move",
+          userSelect: "none",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <span style={{ fontWeight: 600, fontSize: 13, color: "#333" }}>
+          👥 人员库 ({people.length}人)
+        </span>
+        <Button
+          type="text"
           size="small"
-          placeholder="班级"
-          style={{ width: "100%" }}
-          value={className}
-          onChange={setClassName}
-          options={classes.map((c) => ({ value: c, label: c }))}
+          icon={collapsed ? <DownOutlined /> : <UpOutlined />}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCollapse();
+          }}
+          aria-label={collapsed ? "展开人员库" : "折叠人员库"}
         />
-        <Space size={4} wrap>
-          <a onClick={() => setOnlyAvailable((v) => !v)} style={{ fontSize: 12 }}>
-            {onlyAvailable ? "✓ " : ""}当前岗位可用
-          </a>
-          <a onClick={() => setOnlyUnscheduled((v) => !v)} style={{ fontSize: 12 }}>
-            {onlyUnscheduled ? "✓ " : ""}本周未排
-          </a>
-        </Space>
-        <div style={{ fontSize: 11, color: "#999" }}>拖动人员到班次；拖回此处取消安排</div>
-      </Space>
+      </div>
 
-      {filtered.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配人员" />}
-      {filtered.map((p) => {
-        const unavailable = focusSlotId ? p.unavailable_slot_ids.includes(focusSlotId) : false;
-        return (
-          <div key={p.person_id} style={{ marginBottom: 4 }}>
-            <Tooltip
-              title={`${p.class_name} · 本周 ${p.week_shift_count} 班${
-                unavailable ? " · 该岗位不可用" : ""
-              }${p.in_scheduling_pool ? "" : " · 未参与自动排班"}`}
-            >
-              <span>
-                <PersonChip
-                  id={`drawer:${p.person_id}`}
-                  personId={p.person_id}
-                  label={`${p.full_name} ${hours(p.month_balance_minutes)}h`}
-                  color={unavailable ? "red" : p.in_scheduling_pool ? "blue" : "orange"}
-                />
-              </span>
-            </Tooltip>
-          </div>
-        );
-      })}
-    </Card>
+      {!collapsed && (
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px" }}>
+          <Space direction="vertical" style={{ width: "100%", marginBottom: 8 }} size={6}>
+            <Input.Search placeholder="姓名 / 学号" allowClear onSearch={setKeyword} size="small" />
+            <Select
+              allowClear
+              size="small"
+              placeholder="班级"
+              style={{ width: "100%" }}
+              value={className}
+              onChange={setClassName}
+              options={classes.map((c) => ({ value: c, label: c }))}
+            />
+            <Space size={4} wrap>
+              <a onClick={() => setOnlyAvailable((v) => !v)} style={{ fontSize: 12 }}>
+                {onlyAvailable ? "✓ " : ""}当前岗位可用
+              </a>
+              <a onClick={() => setOnlyUnscheduled((v) => !v)} style={{ fontSize: 12 }}>
+                {onlyUnscheduled ? "✓ " : ""}本周未排
+              </a>
+            </Space>
+            <div style={{ fontSize: 11, color: "#999" }}>拖动人员到班次；拖回此处取消安排</div>
+          </Space>
+
+          {filtered.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配人员" />}
+          {filtered.map((p) => {
+            const unavailable = focusSlotId ? p.unavailable_slot_ids.includes(focusSlotId) : false;
+            return (
+              <div key={p.person_id} style={{ marginBottom: 4 }}>
+                <Tooltip
+                  title={`${p.class_name} · 本周 ${p.week_shift_count} 班${
+                    unavailable ? " · 该岗位不可用" : ""
+                  }${p.in_scheduling_pool ? "" : " · 未参与自动排班"}`}
+                >
+                  <span>
+                    <PersonChip
+                      id={`drawer:${p.person_id}`}
+                      personId={p.person_id}
+                      label={`${p.full_name} ${hours(p.month_balance_minutes)}h`}
+                      color={unavailable ? "red" : p.in_scheduling_pool ? "blue" : "orange"}
+                    />
+                  </span>
+                </Tooltip>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

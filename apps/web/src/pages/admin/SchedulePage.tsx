@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   App,
-  Alert,
   Button,
   Card,
   DatePicker,
@@ -27,11 +26,58 @@ import {
   type WeekPerson,
   type WeekView,
 } from "@/features/schedule/types";
-import { adminApi, type Venue } from "@/features/admin/api";
+import { adminApi, type Semester, type Venue } from "@/features/admin/api";
 
 function mondayOf(d: Dayjs): string {
   const day = d.day() === 0 ? 7 : d.day();
   return d.subtract(day - 1, "day").format("YYYY-MM-DD");
+}
+
+function computeWeekLabel(weekStartStr: string, semesters: Semester[]): string {
+  const target = dayjs(weekStartStr);
+  if (!semesters || semesters.length === 0) {
+    return target.format("YYYY年 第WW周");
+  }
+
+  // 排序学期
+  const sorted = [...semesters].sort((a, b) =>
+    dayjs(a.first_monday).diff(dayjs(b.first_monday))
+  );
+
+  // 1. 是否落在某个学期内
+  for (const sem of sorted) {
+    const start = dayjs(sem.first_monday);
+    const end = start.add(sem.week_count, "week");
+    if (target.isSame(start, "day") || (target.isAfter(start) && target.isBefore(end))) {
+      const weekNum = Math.floor(target.diff(start, "day") / 7) + 1;
+      return `${sem.name} 第 ${weekNum} 周`;
+    }
+  }
+
+  // 2. 是否落在学期后的假期
+  const pastSems = sorted.filter((s) => !dayjs(s.first_monday).isAfter(target));
+  if (pastSems.length > 0) {
+    const latest = pastSems[pastSems.length - 1];
+    const semEnd = dayjs(latest.first_monday).add(latest.week_count, "week");
+    if (target.isSame(semEnd, "day") || target.isAfter(semEnd)) {
+      const vacWeek = Math.floor(target.diff(semEnd, "day") / 7) + 1;
+      const isWinter = [1, 2, 3, 11, 12].includes(semEnd.month() + 1);
+      const vacName = isWinter ? "寒假" : "暑假";
+      return `${latest.name}后 ${vacName}第 ${vacWeek} 周`;
+    }
+  }
+
+  // 3. 在第一个学期之前
+  const first = sorted[0];
+  const firstStart = dayjs(first.first_monday);
+  if (target.isBefore(firstStart)) {
+    const vacWeeks = Math.floor(firstStart.diff(target, "day") / 7);
+    const isWinter = [2, 3].includes(firstStart.month() + 1);
+    const vacName = isWinter ? "寒假" : "暑假";
+    return `${first.name}前 ${vacName}第 ${vacWeeks} 周`;
+  }
+
+  return target.format("YYYY年 第WW周");
 }
 
 export default function SchedulePage() {
@@ -43,6 +89,11 @@ export default function SchedulePage() {
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [creatingManual, setCreatingManual] = useState(false);
   const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
+
+  const semestersQuery = useQuery<Semester[]>({
+    queryKey: ["admin", "semesters"],
+    queryFn: adminApi.semesters.list,
+  });
 
   const weekQuery = useQuery<WeekView>({
     queryKey: ["week", week],
@@ -62,14 +113,12 @@ export default function SchedulePage() {
     queryFn: adminApi.venues.list,
   });
 
-  // Default activeVenueId to the first venue when fetched
   useEffect(() => {
     if (venuesQuery.data && venuesQuery.data.length > 0 && !activeVenueId) {
       setActiveVenueId(venuesQuery.data[0].id);
     }
   }, [venuesQuery.data, activeVenueId]);
 
-  // 服务端数据变化时重置棋盘与基线
   useEffect(() => {
     if (weekQuery.data) {
       const b = boardFromWeek(weekQuery.data);
@@ -124,16 +173,6 @@ export default function SchedulePage() {
     onError: (e) => message.error(errorMessage(e)),
   });
 
-  const toggleLock = useMutation({
-    mutationFn: async ({ assignmentId, locked }: { assignmentId: string; locked: boolean }) =>
-      (await api.post(`/assignments/${assignmentId}/${locked ? "lock" : "unlock"}`)).data,
-    onSuccess: (_data, variables) => {
-      message.success(variables.locked ? "已锁定，重新生成时会保留" : "已解锁");
-      qc.invalidateQueries({ queryKey: ["week", week] });
-    },
-    onError: (e) => message.error(errorMessage(e)),
-  });
-
   const checkConflicts = useMutation({
     mutationFn: async () => (await api.post(`/schedule/weeks/${week}/validate`)).data as Conflict[],
     onSuccess: (d) => {
@@ -153,8 +192,10 @@ export default function SchedulePage() {
             picker="week"
             value={dayjs(week)}
             onChange={(d) => d && setWeek(mondayOf(d))}
-            format={() => data?.week_label ?? dayjs(week).format("YYYY-wo")}
-            style={{ width: 260 }}
+            format={() =>
+              data?.week_label || computeWeekLabel(week, semestersQuery.data ?? [])
+            }
+            style={{ width: 280 }}
           />
           <Button onClick={() => setWeek(mondayOf(dayjs()))}>本周</Button>
           <Button onClick={() => setCreatingManual(true)} disabled={!data}>
@@ -177,10 +218,7 @@ export default function SchedulePage() {
         </Space>
       }
     >
-      {weekQuery.isLoading && <Spin />}
-      {weekQuery.error && (
-        <Alert type="info" showIcon message="该周尚无排班计划，点击「自动生成」创建草稿" />
-      )}
+      {weekQuery.isLoading && <Spin style={{ display: "block", margin: "40px auto" }} />}
       {data && data.slots.length === 0 && <Empty description="本周暂无岗位" />}
       {data && data.slots.length > 0 && (
         <ScheduleBoard
@@ -196,15 +234,6 @@ export default function SchedulePage() {
           checkingConflicts={checkConflicts.isPending}
           activeVenueId={activeVenueId}
           setActiveVenueId={setActiveVenueId}
-          onToggleLock={(slot) => {
-            const assignment = slot.assignments.find((a) => a.person_id) ?? slot.assignments[0];
-            if (!assignment) {
-              message.error("该岗位没有可操作的分配");
-              return;
-            }
-            toggleLock.mutate({ assignmentId: assignment.id, locked: !slot.is_locked });
-          }}
-          lockPending={toggleLock.isPending}
         />
       )}
 

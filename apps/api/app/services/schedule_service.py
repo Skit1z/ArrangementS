@@ -291,7 +291,9 @@ def add_task_to_plan(db: Session, task_id: uuid.UUID, actor_id: uuid.UUID | None
 def get_plan(db: Session, week_start: date) -> WeeklyPlan:
     plan = db.scalar(select(WeeklyPlan).where(WeeklyPlan.week_start == week_start))
     if plan is None:
-        raise HTTPException(status_code=404, detail="周计划不存在")
+        plan, _created = _get_or_create_plan(db, week_start)
+        slots.generate_slots(db, plan)
+        db.flush()
     return plan
 
 

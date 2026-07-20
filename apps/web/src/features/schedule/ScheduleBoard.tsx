@@ -12,7 +12,6 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { LeftOutlined, RightOutlined } from "@ant-design/icons";
 import { App, Button, Card, Col, DatePicker, Divider, Empty, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Switch, Table, Tag, Tabs } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -61,8 +60,6 @@ interface Props {
   checkingConflicts?: boolean;
   activeVenueId: string | null;
   setActiveVenueId: (id: string | null) => void;
-  onToggleLock: (slot: SlotView) => void;
-  lockPending?: boolean;
 }
 
 export default function ScheduleBoard({
@@ -78,8 +75,6 @@ export default function ScheduleBoard({
   checkingConflicts,
   activeVenueId,
   setActiveVenueId,
-  onToggleLock,
-  lockPending,
 }: Props) {
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -473,13 +468,11 @@ export default function ScheduleBoard({
                                     return (
                                       <td key={d.format() + t} style={{ verticalAlign: "top" }}>
                                         {slot ? (
-                    <SlotCell
+                                          <SlotCell
                                             slot={slot}
                                             board={board}
                                             activeVerdict={activeVerdict}
-                      conflictKeys={conflictKeys}
-                      onToggleLock={onToggleLock}
-                      lockPending={lockPending}
+                                            conflictKeys={conflictKeys}
                                           />
                                         ) : (
                                           <div style={{ fontSize: 11, color: "#ccc", textAlign: "center" }}>—</div>
@@ -515,96 +508,39 @@ export default function ScheduleBoard({
         <div
           style={{
             position: "fixed",
-            left: drawerCollapsed ? undefined : drawerPos.x,
-            right: drawerCollapsed ? 0 : undefined,
-            top: drawerCollapsed ? "40%" : drawerPos.y,
-            transform: drawerCollapsed ? "translateY(-50%)" : undefined,
-            width: drawerCollapsed ? 0 : drawerWidth,
-            height: drawerCollapsed ? 0 : 520,
+            left: drawerPos.x,
+            top: drawerPos.y,
+            width: drawerWidth,
+            height: drawerCollapsed ? 42 : 520,
             zIndex: 1000,
             transition: isResizing || isDraggingPos ? "none" : "left 0.2s, top 0.2s, width 0.2s, height 0.2s",
             overflow: "visible",
           }}
         >
-          <Button
-            type="primary"
-            shape="circle"
-            icon={drawerCollapsed ? <LeftOutlined /> : <RightOutlined />}
-            size="small"
-            style={{
-              position: "absolute",
-              left: drawerCollapsed ? -28 : -14,
-              top: drawerCollapsed ? 0 : "50%",
-              transform: "translateY(-50%)",
-              zIndex: 1010,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-              cursor: "pointer",
-            }}
-            onClick={() => setDrawerCollapsed(!drawerCollapsed)}
-          />
-
           {!drawerCollapsed && (
-            <>
-              {/* Resize Handle */}
-              <div
-                style={{
-                  position: "absolute",
-                  left: -3,
-                  top: 0,
-                  bottom: 0,
-                  width: 6,
-                  cursor: "col-resize",
-                  zIndex: 1020,
-                  background: isResizing ? "#1890ff" : "transparent",
-                  transition: "background 0.2s",
-                }}
-                onMouseDown={startResize}
-              />
-              
-              {/* Card Container */}
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  background: "#fff",
-                  border: "1px solid #f0f0f0",
-                  borderRadius: 8,
-                  display: "flex",
-                  flexDirection: "column",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-                }}
-              >
-                {/* Header (Drag Handle) */}
-                <div
-                  className="drag-handle"
-                  onMouseDown={startDrag}
-                  style={{
-                    padding: "8px 12px",
-                    background: "#fafafa",
-                    borderBottom: "1px solid #f0f0f0",
-                    borderTopLeftRadius: 7,
-                    borderTopRightRadius: 7,
-                    cursor: "move",
-                    userSelect: "none",
-                    fontWeight: "bold",
-                    color: "#333",
-                    fontSize: "12px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span>人员库 (按住拖动)</span>
-                  <span style={{ fontSize: "10px", color: "#999" }}>边缘拉伸</span>
-                </div>
-                
-                {/* Scrollable Content */}
-                <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
-                  <PersonDrawer people={people} focusSlotId={focusSlotId} />
-                </div>
-              </div>
-            </>
+            <div
+              style={{
+                position: "absolute",
+                left: -3,
+                top: 0,
+                bottom: 0,
+                width: 6,
+                cursor: "col-resize",
+                zIndex: 1020,
+                background: isResizing ? "#1890ff" : "transparent",
+                transition: "background 0.2s",
+              }}
+              onMouseDown={startResize}
+            />
           )}
+
+          <PersonDrawer
+            people={people}
+            focusSlotId={focusSlotId}
+            collapsed={drawerCollapsed}
+            onToggleCollapse={() => setDrawerCollapsed(!drawerCollapsed)}
+            startDrag={startDrag}
+          />
         </div>
       </Row>
 

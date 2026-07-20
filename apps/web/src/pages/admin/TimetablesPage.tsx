@@ -145,7 +145,8 @@ export default function TimetablesPage() {
                   border: "1px solid #f0f0f0",
                   padding: "12px 8px",
                   background: "#fafafa",
-                  width: 60,
+                  width: 90,
+                  whiteSpace: "nowrap",
                 }}
               >
                 节次
@@ -174,6 +175,8 @@ export default function TimetablesPage() {
                     padding: 8,
                     textAlign: "center",
                     background: "#fafafa",
+                    whiteSpace: "nowrap",
+                    width: 90,
                   }}
                 >
                   {block.label}
