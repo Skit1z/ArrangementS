@@ -36,7 +36,7 @@ function mondayOf(d: Dayjs): string {
 function computeWeekLabel(weekStartStr: string, semesters: Semester[]): string {
   const target = dayjs(weekStartStr);
   if (!semesters || semesters.length === 0) {
-    return target.format("YYYY年 第WW周");
+    return `${target.format("YYYY年")} 第 ${target.isoWeek()} 周`;
   }
 
   // 排序学期
@@ -77,7 +77,7 @@ function computeWeekLabel(weekStartStr: string, semesters: Semester[]): string {
     return `${first.name}前 ${vacName}第 ${vacWeeks} 周`;
   }
 
-  return target.format("YYYY年 第WW周");
+  return `${target.format("YYYY年")} 第 ${target.isoWeek()} 周`;
 }
 
 export default function SchedulePage() {
