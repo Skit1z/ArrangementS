@@ -203,15 +203,6 @@ export default function TimetablesPage() {
                     viewMode === "busy"
                       ? busyPeopleInBlock
                       : freePeople.map((p) => ({ personName: p.person_name, courseName: "" }));
-                  const cellBg =
-                    viewMode === "busy"
-                      ? displayPeople.length > 0
-                        ? "#fff2f0"
-                        : "#fff"
-                      : displayPeople.length > 0
-                        ? "#f6ffed"
-                        : "#fff";
-
                   return (
                     <td
                       key={wd.value}
@@ -219,14 +210,13 @@ export default function TimetablesPage() {
                         border: "1px solid #f0f0f0",
                         padding: 8,
                         verticalAlign: "top",
-                        background: cellBg,
+                        background: "#fff",
                       }}
                     >
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                         {displayPeople.map((b, idx) => (
                           <Tag key={idx} color={viewMode === "busy" ? "red" : "green"}>
                             {b.personName}
-                            {viewMode === "busy" && selectedPerson && ` (${b.courseName})`}
                           </Tag>
                         ))}
                       </div>
