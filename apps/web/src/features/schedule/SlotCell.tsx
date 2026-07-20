@@ -122,7 +122,10 @@ export default function SlotCell(props: Props) {
   });
 
   const filled = slotOccupants.length;
-  const renderCount = Math.max(slot.required_people, filled + (isDragging ? 2 : 1));
+  // 未满员时显示所需名额数；满员时平时绝不主动展示多余灰框，仅在拖拽中准备放置时展示 +1 个拖投点
+  const renderCount = filled < slot.required_people
+    ? slot.required_people
+    : filled + (isDragging ? 1 : 0);
 
   const effectiveProps = { ...props, board: effectiveBoard };
 

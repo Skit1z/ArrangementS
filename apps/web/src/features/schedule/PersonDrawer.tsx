@@ -102,9 +102,6 @@ export default function PersonDrawer({
           >
             {people.length} 人
           </span>
-          <span style={{ fontSize: 11, opacity: 0.75, color: "#e6f4ff", marginLeft: 2, whiteSpace: "nowrap" }}>
-            ⠿ 拖动
-          </span>
         </div>
 
         <Button
