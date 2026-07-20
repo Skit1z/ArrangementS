@@ -267,10 +267,11 @@ export default function TimetablesPage() {
                 options={selectablePeople.map((p) => ({ label: p.full_name, value: p.id }))}
               />
             </div>
-            <Upload
+            <Upload.Dragger
               accept=".pdf"
               maxCount={1}
               showUploadList={false}
+              disabled={!proxyPersonId || parseMut.isPending}
               beforeUpload={(file) => {
                 if (!proxyPersonId) {
                   message.error("请先选择人员");
@@ -280,11 +281,20 @@ export default function TimetablesPage() {
                 parseMut.mutate(file);
                 return false;
               }}
+              style={{ padding: "16px 0", marginTop: 8 }}
             >
-              <Button icon={<UploadOutlined />} loading={parseMut.isPending} disabled={!proxyPersonId}>
-                选择 PDF 文件
-              </Button>
-            </Upload>
+              {parseMut.isPending ? (
+                <Spin tip="正在解析 PDF 课表..." />
+              ) : (
+                <>
+                  <p style={{ fontSize: 36, color: proxyPersonId ? "#1677ff" : "#ccc", margin: "4px 0" }}>📄</p>
+                  <p style={{ color: proxyPersonId ? "#333" : "#999", margin: "4px 0", fontWeight: 500 }}>
+                    {proxyPersonId ? "点击或拖拽 PDF 课表文件至此" : "请先在上方选择人员"}
+                  </p>
+                  <p style={{ color: "#888", fontSize: 12, margin: 0 }}>仅支持教务系统导出的 PDF 文件 (10MB 以内)</p>
+                </>
+              )}
+            </Upload.Dragger>
           </>
         ) : (
           <TimetableEntryEditor value={proxyParsed} onChange={setProxyParsed} maxHeight={300} />
