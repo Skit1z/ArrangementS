@@ -276,7 +276,8 @@ def get_my_timetable(
     if sem is None:
         return None
 
-    stmt = (
+    # 1. 优先获取当前学期已生效 (approved) 课表
+    up = db.scalars(
         select(TimetableUpload)
         .where(
             TimetableUpload.person_id == prof.id,
@@ -286,8 +287,18 @@ def get_my_timetable(
         .options(selectinload(TimetableUpload.course_rules))
         .order_by(TimetableUpload.confirmed_at.desc().nulls_last())
         .limit(1)
-    )
-    up = db.scalars(stmt).first()
+    ).first()
+
+    # 2. 保底：若当前学期无 approved 课表，获取该用户最新上传的任意课表（含任意学期或草稿）
+    if up is None:
+        up = db.scalars(
+            select(TimetableUpload)
+            .where(TimetableUpload.person_id == prof.id)
+            .options(selectinload(TimetableUpload.course_rules))
+            .order_by(TimetableUpload.created_at.desc())
+            .limit(1)
+        ).first()
+
     if up is None:
         return None
     return MyTimetableOut(

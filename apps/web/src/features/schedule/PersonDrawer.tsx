@@ -162,28 +162,33 @@ export default function PersonDrawer({
             <div style={{ fontSize: 11, color: "#999" }}>拖动人员到班次；拖回此处取消安排</div>
           </Space>
 
-          {filtered.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配人员" />}
-          {filtered.map((p) => {
-            const unavailable = focusSlotId ? p.unavailable_slot_ids.includes(focusSlotId) : false;
-            return (
-              <div key={p.person_id} style={{ marginBottom: 4 }}>
-                <Tooltip
-                  title={`${p.class_name} · 本周 ${p.week_shift_count} 班${
-                    unavailable ? " · 该岗位不可用" : ""
-                  }${p.in_scheduling_pool ? "" : " · 未参与自动排班"}`}
-                >
-                  <span>
-                    <PersonChip
-                      id={`drawer:${p.person_id}`}
-                      personId={p.person_id}
-                      label={`${p.full_name} ${hours(p.month_balance_minutes)}h`}
-                      color={unavailable ? "red" : p.in_scheduling_pool ? "blue" : "orange"}
-                    />
-                  </span>
-                </Tooltip>
-              </div>
-            );
-          })}
+          {filtered.length === 0 ? (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配人员" />
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(105px, 1fr))", gap: 6 }}>
+              {filtered.map((p) => {
+                const unavailable = focusSlotId ? p.unavailable_slot_ids.includes(focusSlotId) : false;
+                return (
+                  <Tooltip
+                    key={p.person_id}
+                    title={`${p.class_name} · 本周 ${p.week_shift_count} 班${
+                      unavailable ? " · 该岗位不可用" : ""
+                    }${p.in_scheduling_pool ? "" : " · 未参与自动排班"}`}
+                  >
+                    <div>
+                      <PersonChip
+                        id={`drawer:${p.person_id}`}
+                        personId={p.person_id}
+                        label={`${p.full_name} ${hours(p.month_balance_minutes)}h`}
+                        color={unavailable ? "red" : p.in_scheduling_pool ? "blue" : "orange"}
+                        compact
+                      />
+                    </div>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
