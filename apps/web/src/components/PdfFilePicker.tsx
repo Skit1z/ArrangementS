@@ -1,6 +1,5 @@
-import { UploadOutlined } from "@ant-design/icons";
-import { App, Button, Spin } from "antd";
-import { useRef, useState } from "react";
+import { App, Spin } from "antd";
+import { useState } from "react";
 
 interface Props {
   disabled?: boolean;
@@ -16,16 +15,7 @@ export function PdfFilePicker({
   onSelectFile,
 }: Props) {
   const { message } = App.useApp();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-
-  const triggerFileSelect = () => {
-    if (disabled || isPending) {
-      if (disabledReason) message.error(disabledReason);
-      return;
-    }
-    inputRef.current?.click();
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -33,6 +23,12 @@ export function PdfFilePicker({
       onSelectFile(file);
     }
     e.target.value = "";
+  };
+
+  const handleDisabledClick = () => {
+    if (disabled && disabledReason) {
+      message.error(disabledReason);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -50,7 +46,7 @@ export function PdfFilePicker({
 
   return (
     <div
-      onClick={triggerFileSelect}
+      onClick={disabled ? handleDisabledClick : undefined}
       onDragOver={(e) => {
         e.preventDefault();
         if (!disabled && !isPending) setIsDragOver(true);
@@ -58,48 +54,47 @@ export function PdfFilePicker({
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}
       style={{
+        position: "relative",
         border: `2px dashed ${isDragOver ? "#1677ff" : disabled ? "#d9d9d9" : "#91caff"}`,
         borderRadius: 8,
         background: isDragOver ? "#e6f4ff" : disabled ? "#fafafa" : "#f0f7ff",
-        padding: "24px 16px",
+        padding: "28px 16px",
         textAlign: "center",
         cursor: disabled || isPending ? "not-allowed" : "pointer",
         transition: "all 0.2s",
         marginTop: 12,
         userSelect: "none",
+        overflow: "hidden",
       }}
     >
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".pdf,application/pdf"
-        disabled={disabled || isPending}
-        onChange={handleFileChange}
-        style={{ display: "none" }}
-      />
+      {!disabled && !isPending && (
+        <input
+          type="file"
+          accept=".pdf,application/pdf"
+          onChange={handleFileChange}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            opacity: 0,
+            cursor: "pointer",
+            zIndex: 10,
+          }}
+        />
+      )}
       {isPending ? (
         <Spin tip="正在智能解析 PDF 课表，请稍候..." />
       ) : (
         <>
-          <p style={{ fontSize: 38, color: disabled ? "#ccc" : "#1677ff", margin: "4px 0" }}>📄</p>
-          <p style={{ color: disabled ? "#999" : "#1677ff", margin: "4px 0", fontWeight: 600, fontSize: 15 }}>
-            {disabled ? disabledReason || "当前不可上传" : "点击选择 或 拖拽 PDF 课表文件至此"}
+          <p style={{ fontSize: 42, color: disabled ? "#ccc" : "#1677ff", margin: "4px 0" }}>📄</p>
+          <p style={{ color: disabled ? "#999" : "#1677ff", margin: "6px 0", fontWeight: 600, fontSize: 16 }}>
+            {disabled ? disabledReason || "当前不可上传" : "点击此区域选择 或 拖拽 PDF 课表文件至此"}
           </p>
-          <p style={{ color: "#888", fontSize: 12, margin: "4px 0 12px" }}>
-            仅支持学校教务系统导出的 PDF 课表 (10MB 以内)
+          <p style={{ color: "#888", fontSize: 13, margin: "4px 0 0" }}>
+            仅支持学校教务系统导出的 PDF 格式课表 (10MB 以内)
           </p>
-          {!disabled && (
-            <Button
-              type="primary"
-              icon={<UploadOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                triggerFileSelect();
-              }}
-            >
-              选择 PDF 文件
-            </Button>
-          )}
         </>
       )}
     </div>
