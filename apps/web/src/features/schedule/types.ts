@@ -95,9 +95,10 @@ export function diffBoard(
   current: Board,
   forcedReasons: Record<PositionKey, string>,
 ): DraftOperation[] {
+  const allKeys = Array.from(new Set([...Object.keys(baseline), ...Object.keys(current)]));
   const unassigns: DraftOperation[] = [];
   const assigns: DraftOperation[] = [];
-  for (const key of Object.keys(current)) {
+  for (const key of allKeys) {
     const before = baseline[key] ?? null;
     const after = current[key] ?? null;
     if (before?.person_id === after?.person_id) continue;
