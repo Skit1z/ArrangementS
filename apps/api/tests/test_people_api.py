@@ -70,3 +70,29 @@ def test_create_and_activate_semester_via_api(client, seed_admin):
     sem_id = resp.json()["id"]
     rules = client.get(f"/api/v1/semesters/{sem_id}/period-rules").json()
     assert len(rules) == 6
+
+
+def test_delete_person_cascading(client, seed_admin):
+    token = login(client, "admin", "admin1234")
+    resp = client.post(
+        "/api/v1/people",
+        json={
+            "student_no": "20269999",
+            "full_name": "测试删除",
+            "class_name": "软件班",
+            "phone": "13800138999",
+        },
+        headers=csrf_headers(token),
+    )
+    assert resp.status_code == 201, resp.text
+    person_id = resp.json()["person"]["id"]
+
+    client.post(
+        f"/api/v1/people/{person_id}/constraints",
+        json={"constraint_type": "no_night", "is_hard": True},
+        headers=csrf_headers(token),
+    )
+
+    del_resp = client.delete(f"/api/v1/people/{person_id}", headers=csrf_headers(token))
+    assert del_resp.status_code == 200, del_resp.text
+    assert del_resp.json()["message"] == "人员及关联账号已删除"
