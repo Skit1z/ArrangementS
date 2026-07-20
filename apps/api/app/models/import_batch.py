@@ -1,4 +1,5 @@
 """人员导入批次记录。"""
+
 from __future__ import annotations
 
 import uuid
@@ -32,6 +33,4 @@ class ImportBatch(Base, TimestampMixin):
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    confirmed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

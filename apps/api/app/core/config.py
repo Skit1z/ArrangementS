@@ -1,4 +1,5 @@
 """应用配置：全部通过环境变量注入，敏感项不落盘。"""
+
 from __future__ import annotations
 
 from functools import lru_cache

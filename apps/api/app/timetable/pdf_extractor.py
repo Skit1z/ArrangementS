@@ -13,6 +13,7 @@
 
 公开入口：``PdfTimetableExtractor().extract(file_bytes, file_name) -> ExtractResult``。
 """
+
 from __future__ import annotations
 
 import re
@@ -25,8 +26,13 @@ from app.timetable.extractor import ExtractResult, RawCourseEntry
 
 # 星期中文 -> 数字（1=周一 .. 7=周日）
 _WEEKDAY_CN = {
-    "星期一": 1, "星期二": 2, "星期三": 3, "星期四": 4,
-    "星期五": 5, "星期六": 6, "星期日": 7,
+    "星期一": 1,
+    "星期二": 2,
+    "星期三": 3,
+    "星期四": 4,
+    "星期五": 5,
+    "星期六": 6,
+    "星期日": 7,
 }
 
 # 课程描述行：(3-4节)2-13周 或 (3-4节)3-13周(单) 或 (1-2节)10-12周
@@ -44,8 +50,16 @@ _COURSE_MARKERS = "★○●◇◆"
 _COURSE_NAME_RE = re.compile(r"([^()/：:\d][^()/：:]{1,29}?)([★○●◇◆])")
 # 课程名清理：去掉前导的星期头、节次相关残留
 _NAME_PREFIX_NOISE = (
-    "星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日",
-    "重修", "标记", "课表",
+    "星期一",
+    "星期二",
+    "星期三",
+    "星期四",
+    "星期五",
+    "星期六",
+    "星期日",
+    "重修",
+    "标记",
+    "课表",
 )
 # 课程名中可能残留的学生姓名 + 「课表」标题（如 "王文博课表星期四电子商务"）
 # 由于课程名只是 best-effort 辅助字段、前端不展示，这里只做基础清理。
@@ -159,7 +173,7 @@ class PdfTimetableExtractor:
             week_expr = m.group(3)
 
             # 场地在描述行之后的 200 字符内查找
-            tail = full_text[m.end():m.end() + 200]
+            tail = full_text[m.end() : m.end() + 200]
             loc_m = _LOCATION_RE.search(tail)
             location_code = loc_m.group(1).strip() if loc_m else None
 
@@ -171,7 +185,7 @@ class PdfTimetableExtractor:
                     # 去掉前导噪声（星期头、重修残留等）
                     for noise in _NAME_PREFIX_NOISE:
                         if candidate.startswith(noise):
-                            candidate = candidate[len(noise):]
+                            candidate = candidate[len(noise) :]
                     candidate = candidate.strip()
                     if candidate:
                         course_name = candidate

@@ -2,6 +2,7 @@
 
 令牌通过 HttpOnly Cookie 传递（access_token）。CSRF 在写操作中间件层校验。
 """
+
 from __future__ import annotations
 
 import uuid

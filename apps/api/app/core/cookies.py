@@ -1,4 +1,5 @@
 """认证 Cookie 与 CSRF 令牌管理（双提交 Cookie 方案）。"""
+
 from __future__ import annotations
 
 import hashlib
@@ -65,6 +66,4 @@ def set_auth_cookies(response: Response, access: str, refresh: str) -> str:
 def clear_auth_cookies(response: Response) -> None:
     for name in (ACCESS_COOKIE_NAME, CSRF_COOKIE_NAME):
         response.delete_cookie(name, domain=settings.cookie_domain)
-    response.delete_cookie(
-        REFRESH_COOKIE_NAME, path="/api/v1/auth", domain=settings.cookie_domain
-    )
+    response.delete_cookie(REFRESH_COOKIE_NAME, path="/api/v1/auth", domain=settings.cookie_domain)

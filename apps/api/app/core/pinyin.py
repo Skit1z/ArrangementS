@@ -5,6 +5,7 @@
 - 非中文字符保留字母并转小写。
 - 空格、点号、连字符从缩写中移除。
 """
+
 from __future__ import annotations
 
 import re

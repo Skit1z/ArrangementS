@@ -1,4 +1,5 @@
 """工时计算引擎单元测试（覆盖方案 19.1 的关键场景）。"""
+
 from __future__ import annotations
 
 from datetime import datetime

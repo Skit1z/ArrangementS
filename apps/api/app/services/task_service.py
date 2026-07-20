@@ -1,4 +1,5 @@
 """蓝厅 / 图书馆报告厅临时任务（方案 2.3 / 7.2）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -36,6 +37,7 @@ def _ensure_tz(dt: datetime) -> datetime:
     """naive datetime（前端未带时区的 ISO）按北京时间解释；aware 原样返回。"""
     return dt.replace(tzinfo=BEIJING_TZ) if dt.tzinfo is None else dt
 
+
 # list 默认隐藏的状态（已完成/已取消的任务默认不在管理列表里噪声）
 _HIDDEN_BY_DEFAULT = (TaskStatus.cancelled,)
 
@@ -49,7 +51,9 @@ ACTIVE_STATUSES = (
 )
 
 
-def _duty_window(booking_start: datetime, booking_end: datetime, prep: int, cleanup: int) -> tuple[datetime, datetime]:
+def _duty_window(
+    booking_start: datetime, booking_end: datetime, prep: int, cleanup: int
+) -> tuple[datetime, datetime]:
     return booking_start - timedelta(minutes=prep), booking_end + timedelta(minutes=cleanup)
 
 
@@ -168,16 +172,26 @@ def create_task(
     return task
 
 
-def update_task(db: Session, task_id: uuid.UUID, patch: dict, expected_version: int | None = None) -> VenueTask:
+def update_task(
+    db: Session, task_id: uuid.UUID, patch: dict, expected_version: int | None = None
+) -> VenueTask:
     task = get_task(db, task_id)
     if task.status not in (TaskStatus.draft, TaskStatus.confirmed):
-        raise HTTPException(status_code=422, detail="任务加入排班后不得直接修改，请先取消并新建任务")
+        raise HTTPException(
+            status_code=422, detail="任务加入排班后不得直接修改，请先取消并新建任务"
+        )
     if expected_version is not None and task.version != expected_version:
         raise HTTPException(status_code=409, detail="任务已被他人修改，请刷新后重试")
 
     for k in (
-        "title", "organization", "contact_name", "contact_phone", "requirements", "notes",
-        "is_temporary", "status",
+        "title",
+        "organization",
+        "contact_name",
+        "contact_phone",
+        "requirements",
+        "notes",
+        "is_temporary",
+        "status",
     ):
         if k in patch and patch[k] is not None:
             setattr(task, k, patch[k])
@@ -185,12 +199,28 @@ def update_task(db: Session, task_id: uuid.UUID, patch: dict, expected_version: 
     booking_start = _ensure_tz(patch.get("booking_start_at") or task.booking_start_at)
     booking_end = _ensure_tz(patch.get("booking_end_at") or task.booking_end_at)
     prep = patch.get("prep_minutes") if patch.get("prep_minutes") is not None else task.prep_minutes
-    cleanup = patch.get("cleanup_minutes") if patch.get("cleanup_minutes") is not None else task.cleanup_minutes
-    people = patch.get("required_people") if patch.get("required_people") is not None else task.required_people
+    cleanup = (
+        patch.get("cleanup_minutes")
+        if patch.get("cleanup_minutes") is not None
+        else task.cleanup_minutes
+    )
+    people = (
+        patch.get("required_people")
+        if patch.get("required_people") is not None
+        else task.required_people
+    )
     duty_start, duty_end = _duty_window(booking_start, booking_end, prep, cleanup)
 
     _validate_and_check_overlap(
-        db, task.venue_id, duty_start, duty_end, booking_start, booking_end, prep, cleanup, people,
+        db,
+        task.venue_id,
+        duty_start,
+        duty_end,
+        booking_start,
+        booking_end,
+        prep,
+        cleanup,
+        people,
         exclude_task_id=task.id,
     )
     task.booking_start_at = booking_start
@@ -212,10 +242,14 @@ def cancel_task(db: Session, task_id: uuid.UUID) -> VenueTask:
     task.status = TaskStatus.cancelled
     task.version += 1
 
-    slots = list(db.scalars(select(DutySlot).where(
-        DutySlot.source_type == SlotSourceType.venue_task,
-        DutySlot.source_id == task.id,
-    )))
+    slots = list(
+        db.scalars(
+            select(DutySlot).where(
+                DutySlot.source_type == SlotSourceType.venue_task,
+                DutySlot.source_id == task.id,
+            )
+        )
+    )
     for slot in slots:
         slot.status = SlotStatus.cancelled
         assignment_ids: list[uuid.UUID] = []
@@ -227,27 +261,36 @@ def cancel_task(db: Session, task_id: uuid.UUID) -> VenueTask:
             assignment.balance_minutes = 0
             assignment.version += 1
         if assignment_ids:
-            leaves = db.scalars(select(LeaveRequest).where(
-                LeaveRequest.assignment_id.in_(assignment_ids),
-                LeaveRequest.status.in_((LeaveStatus.pending, LeaveStatus.approved)),
-            ))
+            leaves = db.scalars(
+                select(LeaveRequest).where(
+                    LeaveRequest.assignment_id.in_(assignment_ids),
+                    LeaveRequest.status.in_((LeaveStatus.pending, LeaveStatus.approved)),
+                )
+            )
             for leave in leaves:
                 leave.status = LeaveStatus.cancelled
                 leave.review_comment = "关联任务已取消"
-            swaps = list(db.scalars(select(SwapRequest).where(
-                SwapRequest.assignment_id.in_(assignment_ids),
-                SwapRequest.status.in_((
-                    SwapStatus.awaiting_target,
-                    SwapStatus.open_collecting,
-                    SwapStatus.pending_admin,
-                )),
-            )))
+            swaps = list(
+                db.scalars(
+                    select(SwapRequest).where(
+                        SwapRequest.assignment_id.in_(assignment_ids),
+                        SwapRequest.status.in_(
+                            (
+                                SwapStatus.awaiting_target,
+                                SwapStatus.open_collecting,
+                                SwapStatus.pending_admin,
+                            )
+                        ),
+                    )
+                )
+            )
             for swap in swaps:
                 swap.status = SwapStatus.expired
                 for candidate in swap.candidates:
                     if candidate.status == SwapCandidateStatus.applied:
                         candidate.status = SwapCandidateStatus.expired
         from app.services.schedule_service import mark_plan_changed
+
         mark_plan_changed(db, slot.plan)
     db.flush()
     return task
@@ -277,10 +320,12 @@ def transition_task(db: Session, task_id: uuid.UUID, target: TaskStatus) -> Venu
             detail=f"任务当前状态「{task.status.value}」不能直接转到「{target.value}」",
         )
     if target == TaskStatus.scheduled:
-        has_slot = db.scalar(select(DutySlot.id).where(
-            DutySlot.source_type == SlotSourceType.venue_task,
-            DutySlot.source_id == task.id,
-        ))
+        has_slot = db.scalar(
+            select(DutySlot.id).where(
+                DutySlot.source_type == SlotSourceType.venue_task,
+                DutySlot.source_id == task.id,
+            )
+        )
         if has_slot is None:
             raise HTTPException(status_code=422, detail="任务尚未加入周排班，不能标记为已排班")
     task.status = target

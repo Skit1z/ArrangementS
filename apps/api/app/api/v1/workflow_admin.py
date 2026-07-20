@@ -1,4 +1,5 @@
 """admin 审核路由：不可值班申请、请假、换班；未到岗/完成标记。"""
+
 from __future__ import annotations
 
 import uuid
@@ -40,24 +41,40 @@ def pending_availability(_: User = Depends(require_admin), db: Session = Depends
 
 
 @router.post("/availability-requests/{request_id}/approve", response_model=AvailabilityRequestOut)
-def approve_availability(request_id: uuid.UUID, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
+def approve_availability(
+    request_id: uuid.UUID, actor: User = Depends(require_admin), db: Session = Depends(get_db)
+):
     req = availability_service.approve(db, actor.id, request_id)
     db.commit()
     return req
 
 
 @router.post("/availability-requests/{request_id}/reject", response_model=AvailabilityRequestOut)
-def reject_availability(request_id: uuid.UUID, payload: ReviewIn, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
+def reject_availability(
+    request_id: uuid.UUID,
+    payload: ReviewIn,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     req = availability_service.reject(db, actor.id, request_id, payload.comment)
     db.commit()
     return req
 
 
 @router.post("/people/{person_id}/availability-blocks", response_model=MessageOut)
-def admin_create_block(person_id: uuid.UUID, payload: AdminBlockIn, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
+def admin_create_block(
+    person_id: uuid.UUID,
+    payload: AdminBlockIn,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     availability_service.admin_create_block(
-        db, actor_id=actor.id, person_id=person_id, start_at=payload.start_at,
-        end_at=payload.end_at, reason=payload.reason,
+        db,
+        actor_id=actor.id,
+        person_id=person_id,
+        start_at=payload.start_at,
+        end_at=payload.end_at,
+        reason=payload.reason,
     )
     db.commit()
     return MessageOut(message="已设置不可值班区间")
@@ -70,21 +87,36 @@ def pending_leaves(_: User = Depends(require_admin), db: Session = Depends(get_d
 
 
 @router.post("/leave-requests/{leave_id}/approve", response_model=LeaveOut)
-def approve_leave(leave_id: uuid.UUID, payload: ReviewIn, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
+def approve_leave(
+    leave_id: uuid.UUID,
+    payload: ReviewIn,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     leave = leave_service.approve(db, actor.id, leave_id, payload.comment)
     db.commit()
     return leave
 
 
 @router.post("/leave-requests/{leave_id}/reject", response_model=LeaveOut)
-def reject_leave(leave_id: uuid.UUID, payload: ReviewIn, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
+def reject_leave(
+    leave_id: uuid.UUID,
+    payload: ReviewIn,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     leave = leave_service.reject(db, actor.id, leave_id, payload.comment)
     db.commit()
     return leave
 
 
 @router.post("/leave-requests/{leave_id}/revoke-approval", response_model=LeaveOut)
-def revoke_leave_approval(leave_id: uuid.UUID, payload: ReviewIn, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
+def revoke_leave_approval(
+    leave_id: uuid.UUID,
+    payload: ReviewIn,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     leave = leave_service.revoke_approval(db, actor.id, leave_id, payload.comment)
     db.commit()
     return leave
@@ -97,15 +129,29 @@ def open_swaps(_: User = Depends(require_admin), db: Session = Depends(get_db)):
 
 
 @router.post("/swap-requests/{swap_id}/approve", response_model=SwapOut)
-def approve_swap(swap_id: uuid.UUID, payload: SwapApproveIn, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
-    swap = swap_service.admin_approve(db, actor_id=actor.id, swap_id=swap_id, selected_person_id=payload.selected_person_id)
+def approve_swap(
+    swap_id: uuid.UUID,
+    payload: SwapApproveIn,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    swap = swap_service.admin_approve(
+        db, actor_id=actor.id, swap_id=swap_id, selected_person_id=payload.selected_person_id
+    )
     db.commit()
     return swap
 
 
 @router.post("/swap-requests/{swap_id}/reject", response_model=SwapOut)
-def reject_swap(swap_id: uuid.UUID, payload: ReviewIn, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
-    swap = swap_service.admin_reject(db, actor_id=actor.id, swap_id=swap_id, comment=payload.comment)
+def reject_swap(
+    swap_id: uuid.UUID,
+    payload: ReviewIn,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    swap = swap_service.admin_reject(
+        db, actor_id=actor.id, swap_id=swap_id, comment=payload.comment
+    )
     db.commit()
     return swap
 
@@ -115,17 +161,29 @@ assignments_router = APIRouter(prefix="/assignments", tags=["admin-workflow"])
 
 
 @assignments_router.post("/{assignment_id}/mark-absent", response_model=MessageOut)
-def mark_absent(assignment_id: uuid.UUID, payload: ReviewIn, request: Request, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
+def mark_absent(
+    assignment_id: uuid.UUID,
+    payload: ReviewIn,
+    request: Request,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     execution_service.mark_absent(
-        db, actor_id=actor.id, assignment_id=assignment_id, reason=payload.comment,
-        ip=request.client.host if request.client else None, ua=request.headers.get("user-agent"),
+        db,
+        actor_id=actor.id,
+        assignment_id=assignment_id,
+        reason=payload.comment,
+        ip=request.client.host if request.client else None,
+        ua=request.headers.get("user-agent"),
     )
     db.commit()
     return MessageOut(message="已标记未到岗")
 
 
 @assignments_router.post("/{assignment_id}/mark-completed", response_model=MessageOut)
-def mark_completed(assignment_id: uuid.UUID, actor: User = Depends(require_admin), db: Session = Depends(get_db)):
+def mark_completed(
+    assignment_id: uuid.UUID, actor: User = Depends(require_admin), db: Session = Depends(get_db)
+):
     execution_service.mark_completed(db, actor_id=actor.id, assignment_id=assignment_id)
     db.commit()
     return MessageOut(message="已标记完成")

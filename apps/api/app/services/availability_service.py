@@ -1,4 +1,5 @@
 """不可值班申请与区间（方案 5.2）。用户提交 -> admin 审核 -> 生成不可值班区间。"""
+
 from __future__ import annotations
 
 import uuid
@@ -14,7 +15,12 @@ from app.services.audit_service import record_audit
 
 
 def create_request(
-    db: Session, *, person_id: uuid.UUID, start_at: datetime, end_at: datetime, reason: str,
+    db: Session,
+    *,
+    person_id: uuid.UUID,
+    start_at: datetime,
+    end_at: datetime,
+    reason: str,
     recurrence_rule: str | None = None,
 ) -> AvailabilityRequest:
     if end_at <= start_at:
@@ -25,8 +31,12 @@ def create_request(
         raise HTTPException(status_code=422, detail="不能对已过期时间提交申请")
     _expand_intervals(start_at, end_at, recurrence_rule)  # 提交时即校验规则，避免审核时才失败
     req = AvailabilityRequest(
-        person_id=person_id, start_at=start_at, end_at=end_at, reason=reason,
-        recurrence_rule=recurrence_rule, status=RequestStatus.pending,
+        person_id=person_id,
+        start_at=start_at,
+        end_at=end_at,
+        reason=reason,
+        recurrence_rule=recurrence_rule,
+        status=RequestStatus.pending,
     )
     db.add(req)
     db.flush()
@@ -45,7 +55,9 @@ def list_my(db: Session, person_id: uuid.UUID) -> list[AvailabilityRequest]:
 
 def list_pending(db: Session) -> list[AvailabilityRequest]:
     return list(
-        db.scalars(select(AvailabilityRequest).where(AvailabilityRequest.status == RequestStatus.pending))
+        db.scalars(
+            select(AvailabilityRequest).where(AvailabilityRequest.status == RequestStatus.pending)
+        )
     )
 
 
@@ -70,15 +82,26 @@ def approve(db: Session, actor_id: uuid.UUID | None, request_id: uuid.UUID) -> A
     req.reviewed_at = now
     intervals = _expand_intervals(req.start_at, req.end_at, req.recurrence_rule)
     for start_at, end_at in intervals:
-        db.add(AvailabilityBlock(
-            person_id=req.person_id, source=AvailabilitySource.user_request,
-            start_at=start_at, end_at=end_at, status=AvailabilityStatus.active,
-            reason=req.reason, source_ref_id=req.id, approved_by=actor_id, approved_at=now,
-        ))
+        db.add(
+            AvailabilityBlock(
+                person_id=req.person_id,
+                source=AvailabilitySource.user_request,
+                start_at=start_at,
+                end_at=end_at,
+                status=AvailabilityStatus.active,
+                reason=req.reason,
+                source_ref_id=req.id,
+                approved_by=actor_id,
+                approved_at=now,
+            )
+        )
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="availability_request.approve",
-        entity_type="availability_request", entity_id=req.id,
+        db,
+        actor_user_id=actor_id,
+        action="availability_request.approve",
+        entity_type="availability_request",
+        entity_id=req.id,
     )
     return req
 
@@ -118,7 +141,9 @@ def _expand_intervals(
     return result
 
 
-def reject(db: Session, actor_id: uuid.UUID | None, request_id: uuid.UUID, comment: str | None = None) -> AvailabilityRequest:
+def reject(
+    db: Session, actor_id: uuid.UUID | None, request_id: uuid.UUID, comment: str | None = None
+) -> AvailabilityRequest:
     req = _get(db, request_id)
     if req.status != RequestStatus.pending:
         raise HTTPException(status_code=422, detail="仅待审核申请可拒绝")
@@ -131,16 +156,27 @@ def reject(db: Session, actor_id: uuid.UUID | None, request_id: uuid.UUID, comme
 
 
 def admin_create_block(
-    db: Session, *, actor_id: uuid.UUID | None, person_id: uuid.UUID, start_at: datetime,
-    end_at: datetime, reason: str | None = None,
+    db: Session,
+    *,
+    actor_id: uuid.UUID | None,
+    person_id: uuid.UUID,
+    start_at: datetime,
+    end_at: datetime,
+    reason: str | None = None,
 ) -> AvailabilityBlock:
     """admin 直接设置不可值班区间（直接生效）。"""
     if end_at <= start_at:
         raise HTTPException(status_code=422, detail="结束时间必须晚于开始时间")
     now = datetime.now(timezone.utc)
     block = AvailabilityBlock(
-        person_id=person_id, source=AvailabilitySource.admin, start_at=start_at, end_at=end_at,
-        status=AvailabilityStatus.active, reason=reason, approved_by=actor_id, approved_at=now,
+        person_id=person_id,
+        source=AvailabilitySource.admin,
+        start_at=start_at,
+        end_at=end_at,
+        status=AvailabilityStatus.active,
+        reason=reason,
+        approved_by=actor_id,
+        approved_at=now,
     )
     db.add(block)
     db.flush()

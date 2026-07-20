@@ -1,4 +1,5 @@
 """假期与假期可值班白名单（方案 4.8）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -41,13 +42,16 @@ def sync_vacation_periods(db: Session) -> list[VacationPeriod]:
         else:
             default_name = f"{vac_start.year}年寒假"
 
-        existing = db.scalar(
-            select(VacationPeriod).where(VacationPeriod.semester_id == sem_i.id)
-        )
+        existing = db.scalar(select(VacationPeriod).where(VacationPeriod.semester_id == sem_i.id))
         if existing:
             existing.start_date = vac_start
             existing.end_date = vac_end
-            if not existing.name or "寒假" in existing.name or "暑假" in existing.name or "假期" in existing.name:
+            if (
+                not existing.name
+                or "寒假" in existing.name
+                or "暑假" in existing.name
+                or "假期" in existing.name
+            ):
                 existing.name = default_name
         else:
             vac = VacationPeriod(

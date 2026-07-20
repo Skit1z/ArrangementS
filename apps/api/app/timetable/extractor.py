@@ -5,6 +5,7 @@
 
 本文件定义统一数据结构与协议；具体 PDF/OCR 实现为可选重依赖，接入真实样例时补全。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -1,4 +1,5 @@
 """换班申请与公开替班报名（方案 6.2 / 12.1）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -28,9 +29,7 @@ class SwapRequest(Base, TimestampMixin):
     selected_person_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("person_profiles.id", ondelete="SET NULL"), nullable=True
     )
-    status: Mapped[SwapStatus] = mapped_column(
-        Enum(SwapStatus, name="swap_status"), nullable=False
-    )
+    status: Mapped[SwapStatus] = mapped_column(Enum(SwapStatus, name="swap_status"), nullable=False)
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     reviewer_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -55,15 +54,25 @@ class SwapRequest(Base, TimestampMixin):
 
     @property
     def venue_name(self) -> str | None:
-        return self.assignment.slot.venue.name if (self.assignment and self.assignment.slot and self.assignment.slot.venue) else None
+        return (
+            self.assignment.slot.venue.name
+            if (self.assignment and self.assignment.slot and self.assignment.slot.venue)
+            else None
+        )
 
     @property
     def slot_start_at(self) -> datetime | None:
-        return self.assignment.slot.slot_start_at if (self.assignment and self.assignment.slot) else None
+        return (
+            self.assignment.slot.slot_start_at
+            if (self.assignment and self.assignment.slot)
+            else None
+        )
 
     @property
     def slot_end_at(self) -> datetime | None:
-        return self.assignment.slot.slot_end_at if (self.assignment and self.assignment.slot) else None
+        return (
+            self.assignment.slot.slot_end_at if (self.assignment and self.assignment.slot) else None
+        )
 
 
 class SwapCandidate(Base):

@@ -1,4 +1,5 @@
 """周岗位生成：黄楼固定班次（含特殊日期/假期规则）+ 场地任务（方案 8.2 / 4.8）。"""
+
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
@@ -38,6 +39,7 @@ def generate_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
     generated: list[DutySlot] = []
     generated.extend(_generate_fixed_slots(db, plan))
     generated.extend(_generate_task_slots(db, plan))
+
     def identity(s: DutySlot) -> tuple:
         # SQLite 测试库会丢失 tzinfo；以墙上时间比较，避免同一锁定岗位被重复生成。
         return (
@@ -57,9 +59,7 @@ def generate_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
             )
         )
     }
-    slots = [
-        s for s in generated if identity(s) not in existing_keys
-    ]
+    slots = [s for s in generated if identity(s) not in existing_keys]
     for s in slots:
         db.add(s)
     db.flush()
@@ -67,10 +67,16 @@ def generate_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
 
 
 def _generate_fixed_slots(db: Session, plan: WeeklyPlan) -> list[DutySlot]:
-    venues = list(db.scalars(select(Venue).where(Venue.venue_type == VenueType.fixed_shift, Venue.is_active.is_(True))))
+    venues = list(
+        db.scalars(
+            select(Venue).where(
+                Venue.venue_type == VenueType.fixed_shift, Venue.is_active.is_(True)
+            )
+        )
+    )
     if not venues:
         return []
-    
+
     result: list[DutySlot] = []
     for venue in venues:
         templates = list(

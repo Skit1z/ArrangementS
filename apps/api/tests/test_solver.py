@@ -1,4 +1,5 @@
 """OR-Tools 排班求解器测试（方案 19.3）。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -6,11 +7,18 @@ from datetime import datetime, timedelta
 from app.scheduling.solver import Position, SolverInput, solve
 
 
-def pos(pid: str, slot: str, start_h: int, dur_h: int = 2, credited: int = 120, month="2026-03") -> Position:
+def pos(
+    pid: str, slot: str, start_h: int, dur_h: int = 2, credited: int = 120, month="2026-03"
+) -> Position:
     start = datetime(2026, 3, 2, start_h, 0)
     return Position(
-        id=pid, slot_id=slot, month_key=month, credited_minutes=credited,
-        venue_id="HL", start_at=start, end_at=start + timedelta(hours=dur_h),
+        id=pid,
+        slot_id=slot,
+        month_key=month,
+        credited_minutes=credited,
+        venue_id="HL",
+        start_at=start,
+        end_at=start + timedelta(hours=dur_h),
     )
 
 
@@ -21,7 +29,11 @@ def all_available(persons, positions):
 def test_weekday_two_people_distinct():
     persons = ["a", "b", "c"]
     positions = [pos("s1-0", "s1", 8), pos("s1-1", "s1", 8)]  # 同班两个岗位
-    result = solve(SolverInput(positions=positions, persons=persons, available=all_available(persons, positions)))
+    result = solve(
+        SolverInput(
+            positions=positions, persons=persons, available=all_available(persons, positions)
+        )
+    )
     assigned = [result.assignments["s1-0"], result.assignments["s1-1"]]
     assert None not in assigned
     assert assigned[0] != assigned[1]  # 不同人
@@ -40,7 +52,11 @@ def test_time_overlap_excluded():
     persons = ["a"]
     # 两个时间重叠的岗位，只有一个人 → 一个必然空缺
     positions = [pos("p1", "s1", 8, dur_h=2), pos("p2", "s2", 9, dur_h=2)]
-    result = solve(SolverInput(positions=positions, persons=persons, available=all_available(persons, positions)))
+    result = solve(
+        SolverInput(
+            positions=positions, persons=persons, available=all_available(persons, positions)
+        )
+    )
     filled = [v for v in result.assignments.values() if v == "a"]
     assert len(filled) == 1  # a 只能在一个重叠岗位
     assert len(result.vacancies) == 1
@@ -49,10 +65,14 @@ def test_time_overlap_excluded():
 def test_weekly_limit():
     persons = ["a", "b"]
     positions = [pos("p1", "s1", 8), pos("p2", "s2", 12), pos("p3", "s3", 16)]  # 互不重叠
-    result = solve(SolverInput(
-        positions=positions, persons=persons, available=all_available(persons, positions),
-        weekly_limit={"a": 1, "b": 1},
-    ))
+    result = solve(
+        SolverInput(
+            positions=positions,
+            persons=persons,
+            available=all_available(persons, positions),
+            weekly_limit={"a": 1, "b": 1},
+        )
+    )
     # 每人最多 1 班 → 3 个岗位只能填 2 个
     assert len(result.vacancies) == 1
 
@@ -60,10 +80,14 @@ def test_weekly_limit():
 def test_forbidden_pair_same_slot():
     persons = ["a", "b", "c"]
     positions = [pos("s1-0", "s1", 8), pos("s1-1", "s1", 8)]
-    result = solve(SolverInput(
-        positions=positions, persons=persons, available=all_available(persons, positions),
-        forbidden_pairs=[("a", "b")],
-    ))
+    result = solve(
+        SolverInput(
+            positions=positions,
+            persons=persons,
+            available=all_available(persons, positions),
+            forbidden_pairs=[("a", "b")],
+        )
+    )
     filled = {result.assignments["s1-0"], result.assignments["s1-1"]}
     assert not ({"a", "b"} <= filled)  # a、b 不同时出现
 
@@ -71,7 +95,11 @@ def test_forbidden_pair_same_slot():
 def test_vacancy_when_infeasible():
     persons = ["a"]
     positions = [pos("s1-0", "s1", 8), pos("s1-1", "s1", 8)]  # 同班需 2 人但只有 1 人
-    result = solve(SolverInput(positions=positions, persons=persons, available=all_available(persons, positions)))
+    result = solve(
+        SolverInput(
+            positions=positions, persons=persons, available=all_available(persons, positions)
+        )
+    )
     assert len(result.vacancies) == 1  # 一个空缺，绝不违反硬约束
 
 
@@ -79,10 +107,14 @@ def test_fairness_balances_hours():
     persons = ["a", "b"]
     # 4 个互不重叠岗位，历史：a 已有 240，b 有 0 → 应多分给 b
     positions = [pos(f"p{i}", f"s{i}", 8 + i * 2) for i in range(4)]  # 8,10,12,14
-    result = solve(SolverInput(
-        positions=positions, persons=persons, available=all_available(persons, positions),
-        history_minutes={"a": 240, "b": 0},
-    ))
+    result = solve(
+        SolverInput(
+            positions=positions,
+            persons=persons,
+            available=all_available(persons, positions),
+            history_minutes={"a": 240, "b": 0},
+        )
+    )
     counts = {"a": 0, "b": 0}
     for v in result.assignments.values():
         if v:
@@ -93,7 +125,9 @@ def test_fairness_balances_hours():
 def test_reproducible_with_seed():
     persons = ["a", "b", "c", "d"]
     positions = [pos(f"p{i}", f"s{i}", 8 + i * 2) for i in range(3)]
-    inp = lambda: SolverInput(positions=positions, persons=persons, available=all_available(persons, positions), seed=123)  # noqa: E731
+    inp = lambda: SolverInput(
+        positions=positions, persons=persons, available=all_available(persons, positions), seed=123
+    )  # noqa: E731
     r1 = solve(inp())
     r2 = solve(inp())
     assert r1.assignments == r2.assignments
@@ -102,21 +136,27 @@ def test_reproducible_with_seed():
 def test_locked_assignment_respected():
     persons = ["a", "b"]
     positions = [pos("s1-0", "s1", 8), pos("s1-1", "s1", 8)]
-    result = solve(SolverInput(
-        positions=positions, persons=persons, available=all_available(persons, positions),
-        locked={"s1-0": "a"},
-    ))
+    result = solve(
+        SolverInput(
+            positions=positions,
+            persons=persons,
+            available=all_available(persons, positions),
+            locked={"s1-0": "a"},
+        )
+    )
     assert result.assignments["s1-0"] == "a"
 
 
 def test_locked_assignment_overrides_new_unavailability():
     positions = [pos("s1-0", "s1", 8)]
-    result = solve(SolverInput(
-        positions=positions,
-        persons=["a"],
-        available={("a", "s1-0"): False},
-        locked={"s1-0": "a"},
-    ))
+    result = solve(
+        SolverInput(
+            positions=positions,
+            persons=["a"],
+            available={("a", "s1-0"): False},
+            locked={"s1-0": "a"},
+        )
+    )
     assert result.assignments["s1-0"] == "a"
 
 
@@ -124,12 +164,14 @@ def test_locked_person_outside_pool_is_explicit_error():
     import pytest
 
     with pytest.raises(ValueError, match="人员不在可排班人员池"):
-        solve(SolverInput(
-            positions=[pos("s1-0", "s1", 8)],
-            persons=["b"],
-            available={("b", "s1-0"): True},
-            locked={"s1-0": "a"},
-        ))
+        solve(
+            SolverInput(
+                positions=[pos("s1-0", "s1", 8)],
+                persons=["b"],
+                available={("b", "s1-0"): True},
+                locked={"s1-0": "a"},
+            )
+        )
 
 
 # --- P1.3：多维公平目标测试 ---
@@ -140,17 +182,26 @@ def test_daily_max_per_person_enforced():
 
     start = datetime(2026, 3, 2, 8, 0)
     positions = [
-        Position(id=f"p{i}", slot_id=f"s{i}", month_key="2026-03", credited_minutes=120,
-                 venue_id="HL", start_at=start + timedelta(hours=i * 3),
-                 end_at=start + timedelta(hours=i * 3 + 2))
+        Position(
+            id=f"p{i}",
+            slot_id=f"s{i}",
+            month_key="2026-03",
+            credited_minutes=120,
+            venue_id="HL",
+            start_at=start + timedelta(hours=i * 3),
+            end_at=start + timedelta(hours=i * 3 + 2),
+        )
         for i in range(3)
     ]
     persons = ["a", "b", "c"]
-    result = solve(SolverInput(
-        positions=positions, persons=persons,
-        available={(p, pos.id): True for p in persons for pos in positions},
-        daily_max_per_person=1,
-    ))
+    result = solve(
+        SolverInput(
+            positions=positions,
+            persons=persons,
+            available={(p, pos.id): True for p in persons for pos in positions},
+            daily_max_per_person=1,
+        )
+    )
     counts: dict[str, int] = {}
     for pos in positions:
         chosen = result.assignments[pos.id]
@@ -167,17 +218,26 @@ def test_weekend_balance_distributes_evenly():
 
     start = datetime(2026, 3, 7, 8, 0)
     positions = [
-        Position(id=f"p{i}", slot_id=f"s{i}", month_key="2026-03", credited_minutes=120,
-                 venue_id="HL", start_at=start + timedelta(days=i, hours=i * 3),
-                 end_at=start + timedelta(days=i, hours=i * 3 + 2),
-                 is_weekend=True)
+        Position(
+            id=f"p{i}",
+            slot_id=f"s{i}",
+            month_key="2026-03",
+            credited_minutes=120,
+            venue_id="HL",
+            start_at=start + timedelta(days=i, hours=i * 3),
+            end_at=start + timedelta(days=i, hours=i * 3 + 2),
+            is_weekend=True,
+        )
         for i in range(4)
     ]
     persons = ["a", "b"]
-    result = solve(SolverInput(
-        positions=positions, persons=persons,
-        available={(p, pos.id): True for p in persons for pos in positions},
-    ))
+    result = solve(
+        SolverInput(
+            positions=positions,
+            persons=persons,
+            available={(p, pos.id): True for p in persons for pos in positions},
+        )
+    )
     counts = {"a": 0, "b": 0}
     for pos in positions:
         c = result.assignments[pos.id]
@@ -192,12 +252,22 @@ def test_preference_soft_objective_preferred_person_picked():
     from app.scheduling.solver import Position, SolverInput, solve
 
     start = datetime(2026, 3, 2, 9, 0)
-    pos = Position(id="p0", slot_id="s0", month_key="2026-03", credited_minutes=120,
-                   venue_id="V1", start_at=start, end_at=start + timedelta(hours=2))
+    pos = Position(
+        id="p0",
+        slot_id="s0",
+        month_key="2026-03",
+        credited_minutes=120,
+        venue_id="V1",
+        start_at=start,
+        end_at=start + timedelta(hours=2),
+    )
     persons = ["a", "b"]
-    result = solve(SolverInput(
-        positions=[pos], persons=persons,
-        available={(p, pos.id): True for p in persons},
-        preferences={"a": {"V1": 10}},
-    ))
+    result = solve(
+        SolverInput(
+            positions=[pos],
+            persons=persons,
+            available={(p, pos.id): True for p in persons},
+            preferences={"a": {"V1": 10}},
+        )
+    )
     assert result.assignments["p0"] == "a"

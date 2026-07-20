@@ -1,4 +1,5 @@
 """PDF 课表解析端点测试。"""
+
 from __future__ import annotations
 
 from datetime import date
@@ -150,7 +151,7 @@ def test_user_cannot_approve_others_upload(client, seed_admin, db_session):
     from app.models.person import PersonProfile
     from app.models.user import User
 
-    sem = semester_service.create_semester(db_session, name="春", first_monday=date(2026, 2, 23))
+    semester_service.create_semester(db_session, name="春", first_monday=date(2026, 2, 23))
     db_session.commit()
     _seed_user(db_session)
 
@@ -255,9 +256,7 @@ def test_end_to_end_pdf_upload_and_apply(client, seed_admin, db_session):
         json={"file_name": "sample.pdf", "entries": parsed["entries"]},
     ).json()
 
-    resp = client.post(
-        f"/api/v1/timetables/{upload['id']}/approve", headers=csrf_headers(token)
-    )
+    resp = client.post(f"/api/v1/timetables/{upload['id']}/approve", headers=csrf_headers(token))
     assert resp.status_code == 200, resp.text
 
     # 已生成不可值班区间

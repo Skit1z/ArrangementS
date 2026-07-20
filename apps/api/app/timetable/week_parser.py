@@ -9,6 +9,7 @@
 
 输出规范化为具体周次集合（受 max_week 限制），并保留 parity 与首尾周供展示。
 """
+
 from __future__ import annotations
 
 import re

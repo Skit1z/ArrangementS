@@ -3,6 +3,7 @@
 admin 最终审核；审核时重新校验时间冲突/课程冲突/不可值班/场地限制/每周上限/暂停/禁止搭档/
 班次是否已开始；通过后原子化转移，工时归最终承担人员，其他公开报名自动失效。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -39,24 +40,34 @@ def _owned_assignment(db: Session, person_id: uuid.UUID, assignment_id: uuid.UUI
         raise HTTPException(status_code=404, detail="排班分配不存在")
     if a.person_id != person_id:
         raise HTTPException(status_code=403, detail="只能换本人的班次")
-    if a.plan_status in (
-        PlanAssignmentStatus.vacant,
-        PlanAssignmentStatus.replaced,
-        PlanAssignmentStatus.cancelled,
-    ) or a.execution_status != ExecutionStatus.pending:
+    if (
+        a.plan_status
+        in (
+            PlanAssignmentStatus.vacant,
+            PlanAssignmentStatus.replaced,
+            PlanAssignmentStatus.cancelled,
+        )
+        or a.execution_status != ExecutionStatus.pending
+    ):
         raise HTTPException(status_code=422, detail="该班次已取消、请假、换班或结束")
     slot = db.get(DutySlot, a.duty_slot_id)
-    start = slot.slot_start_at.replace(tzinfo=timezone.utc) if slot.slot_start_at.tzinfo is None else slot.slot_start_at
+    start = (
+        slot.slot_start_at.replace(tzinfo=timezone.utc)
+        if slot.slot_start_at.tzinfo is None
+        else slot.slot_start_at
+    )
     if start <= datetime.now(timezone.utc):
         raise HTTPException(status_code=422, detail="班次已开始，不可创建换班申请")
     active_swap = db.scalar(
         select(SwapRequest).where(
             SwapRequest.assignment_id == assignment_id,
-            SwapRequest.status.in_((
-                SwapStatus.awaiting_target,
-                SwapStatus.open_collecting,
-                SwapStatus.pending_admin,
-            )),
+            SwapRequest.status.in_(
+                (
+                    SwapStatus.awaiting_target,
+                    SwapStatus.open_collecting,
+                    SwapStatus.pending_admin,
+                )
+            ),
         )
     )
     if active_swap is not None:
@@ -72,15 +83,20 @@ def _owned_assignment(db: Session, person_id: uuid.UUID, assignment_id: uuid.UUI
     return a
 
 
-def create_targeted(db, *, requester_person_id, assignment_id, target_person_id, reason=None) -> SwapRequest:
+def create_targeted(
+    db, *, requester_person_id, assignment_id, target_person_id, reason=None
+) -> SwapRequest:
     _owned_assignment(db, requester_person_id, assignment_id)
     if target_person_id == requester_person_id:
         raise HTTPException(status_code=422, detail="不能指定自己")
     if db.get(PersonProfile, target_person_id) is None:
         raise HTTPException(status_code=404, detail="接替人员不存在")
     swap = SwapRequest(
-        assignment_id=assignment_id, requester_person_id=requester_person_id,
-        mode=SwapMode.targeted, target_person_id=target_person_id, reason=reason,
+        assignment_id=assignment_id,
+        requester_person_id=requester_person_id,
+        mode=SwapMode.targeted,
+        target_person_id=target_person_id,
+        reason=reason,
         status=SwapStatus.awaiting_target,
     )
     db.add(swap)
@@ -91,8 +107,11 @@ def create_targeted(db, *, requester_person_id, assignment_id, target_person_id,
 def create_open(db, *, requester_person_id, assignment_id, reason=None) -> SwapRequest:
     _owned_assignment(db, requester_person_id, assignment_id)
     swap = SwapRequest(
-        assignment_id=assignment_id, requester_person_id=requester_person_id,
-        mode=SwapMode.open, reason=reason, status=SwapStatus.open_collecting,
+        assignment_id=assignment_id,
+        requester_person_id=requester_person_id,
+        mode=SwapMode.open,
+        reason=reason,
+        status=SwapStatus.open_collecting,
     )
     db.add(swap)
     db.flush()
@@ -126,19 +145,32 @@ def apply_open(db, *, candidate_person_id, swap_id) -> SwapCandidate:
     assignment = db.get(Assignment, swap.assignment_id)
     if assignment is None or assignment.person_id != swap.requester_person_id:
         raise HTTPException(status_code=422, detail="原分配已变更，不能报名替班")
-    if assignment.plan_status in (PlanAssignmentStatus.replaced, PlanAssignmentStatus.cancelled) or assignment.execution_status != ExecutionStatus.pending:
+    if (
+        assignment.plan_status in (PlanAssignmentStatus.replaced, PlanAssignmentStatus.cancelled)
+        or assignment.execution_status != ExecutionStatus.pending
+    ):
         raise HTTPException(status_code=422, detail="原分配已取消、请假或结束，不能报名替班")
     slot = db.get(DutySlot, assignment.duty_slot_id)
-    start = slot.slot_start_at.replace(tzinfo=timezone.utc) if slot.slot_start_at.tzinfo is None else slot.slot_start_at
+    start = (
+        slot.slot_start_at.replace(tzinfo=timezone.utc)
+        if slot.slot_start_at.tzinfo is None
+        else slot.slot_start_at
+    )
     if start <= datetime.now(timezone.utc):
         raise HTTPException(status_code=422, detail="班次已开始，不能报名替班")
     if not eligibility.check_person_available_for_slot(db, person, slot):
         raise HTTPException(status_code=422, detail="你的课程、不可值班时段或场地限制与该班次冲突")
-    if eligibility.has_time_overlap_with_person(db, person.id, slot, exclude_assignment_id=assignment.id):
+    if eligibility.has_time_overlap_with_person(
+        db, person.id, slot, exclude_assignment_id=assignment.id
+    ):
         raise HTTPException(status_code=422, detail="你在该时间已有排班")
-    if eligibility.violates_no_pair_with_existing(db, person.id, slot, exclude_assignment_id=assignment.id):
+    if eligibility.violates_no_pair_with_existing(
+        db, person.id, slot, exclude_assignment_id=assignment.id
+    ):
         raise HTTPException(status_code=422, detail="你与该班次现有人员存在禁止搭档关系")
-    if eligibility.would_exceed_weekly_limit(db, person.id, slot, exclude_assignment_id=assignment.id):
+    if eligibility.would_exceed_weekly_limit(
+        db, person.id, slot, exclude_assignment_id=assignment.id
+    ):
         raise HTTPException(status_code=422, detail="你已达到每周排班上限")
     exists = db.scalar(
         select(SwapCandidate).where(
@@ -196,26 +228,39 @@ def admin_approve(
     assignment = db.get(Assignment, swap.assignment_id)
     if assignment is None or assignment.person_id != swap.requester_person_id:
         raise HTTPException(status_code=422, detail="原分配已变更，不能批准换班")
-    if assignment.plan_status in (PlanAssignmentStatus.replaced, PlanAssignmentStatus.cancelled) or assignment.execution_status != ExecutionStatus.pending:
+    if (
+        assignment.plan_status in (PlanAssignmentStatus.replaced, PlanAssignmentStatus.cancelled)
+        or assignment.execution_status != ExecutionStatus.pending
+    ):
         raise HTTPException(status_code=422, detail="原分配已取消、请假或结束，不能批准换班")
     slot = db.get(DutySlot, assignment.duty_slot_id)
 
     # 班次是否已开始
     now = datetime.now(timezone.utc)
-    start = slot.slot_start_at.replace(tzinfo=timezone.utc) if slot.slot_start_at.tzinfo is None else slot.slot_start_at
+    start = (
+        slot.slot_start_at.replace(tzinfo=timezone.utc)
+        if slot.slot_start_at.tzinfo is None
+        else slot.slot_start_at
+    )
     if start <= now:
         raise HTTPException(status_code=422, detail="班次已开始，不可换班")
 
     # 重新校验硬约束（含课程/不可值班/场地硬约束）
     if not eligibility.check_person_available_for_slot(db, person, slot):
         raise HTTPException(status_code=422, detail="接替人员存在课程/不可值班/场地等硬冲突")
-    if eligibility.has_time_overlap_with_person(db, person.id, slot, exclude_assignment_id=assignment.id):
+    if eligibility.has_time_overlap_with_person(
+        db, person.id, slot, exclude_assignment_id=assignment.id
+    ):
         raise HTTPException(status_code=422, detail="接替人员在该时间已有排班，时间重叠")
 
     # P1.5 补查：禁止同班搭档（接替人 vs 同 slot 的其它已分配人员）
-    if eligibility.violates_no_pair_with_existing(db, person.id, slot, exclude_assignment_id=assignment.id):
+    if eligibility.violates_no_pair_with_existing(
+        db, person.id, slot, exclude_assignment_id=assignment.id
+    ):
         raise HTTPException(status_code=422, detail="接替人与现有同班人员存在禁止搭档关系")
-    if eligibility.would_exceed_weekly_limit(db, person.id, slot, exclude_assignment_id=assignment.id):
+    if eligibility.would_exceed_weekly_limit(
+        db, person.id, slot, exclude_assignment_id=assignment.id
+    ):
         raise HTTPException(status_code=422, detail="接替人员已达到每周排班上限")
 
     # 原子转移：工时归最终承担人员
@@ -249,9 +294,13 @@ def admin_approve(
 
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="swap.approve",
-        entity_type="swap_request", entity_id=swap.id,
-        before_data=before, after_data={"person_id": str(person.id)},
+        db,
+        actor_user_id=actor_id,
+        action="swap.approve",
+        entity_type="swap_request",
+        entity_id=swap.id,
+        before_data=before,
+        after_data={"person_id": str(person.id)},
     )
     return swap
 
@@ -273,16 +322,24 @@ def admin_reject(db, *, actor_id, swap_id, comment=None) -> SwapRequest:
 
 
 def list_open(db) -> list[SwapRequest]:
-    return list(db.scalars(select(SwapRequest).where(
-        SwapRequest.mode == SwapMode.open,
-        SwapRequest.status == SwapStatus.open_collecting,
-    )))
+    return list(
+        db.scalars(
+            select(SwapRequest).where(
+                SwapRequest.mode == SwapMode.open,
+                SwapRequest.status == SwapStatus.open_collecting,
+            )
+        )
+    )
 
 
 def list_reviewable(db) -> list[SwapRequest]:
-    return list(db.scalars(select(SwapRequest).where(
-        SwapRequest.status.in_((SwapStatus.open_collecting, SwapStatus.pending_admin))
-    )))
+    return list(
+        db.scalars(
+            select(SwapRequest).where(
+                SwapRequest.status.in_((SwapStatus.open_collecting, SwapStatus.pending_admin))
+            )
+        )
+    )
 
 
 def expire_started(db, now: datetime | None = None) -> int:
@@ -294,11 +351,13 @@ def expire_started(db, now: datetime | None = None) -> int:
             .join(Assignment, SwapRequest.assignment_id == Assignment.id)
             .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
             .where(
-                SwapRequest.status.in_((
-                    SwapStatus.awaiting_target,
-                    SwapStatus.open_collecting,
-                    SwapStatus.pending_admin,
-                )),
+                SwapRequest.status.in_(
+                    (
+                        SwapStatus.awaiting_target,
+                        SwapStatus.open_collecting,
+                        SwapStatus.pending_admin,
+                    )
+                ),
                 DutySlot.slot_start_at <= now,
             )
         )

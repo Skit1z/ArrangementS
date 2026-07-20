@@ -1,4 +1,5 @@
 """请假 / 换班 / 不可值班申请的请求 / 响应。"""
+
 from __future__ import annotations
 
 import uuid

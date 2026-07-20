@@ -2,6 +2,7 @@
 
 幂等：已存在则跳过。运行：`python -m app.db.init_data`。
 """
+
 from __future__ import annotations
 
 from datetime import time
@@ -51,23 +52,45 @@ def ensure_venues(db: Session) -> None:
         print("场地已存在，跳过初始化")
         return
     yellow = Venue(
-        name="黄楼", code="HL", venue_type=VenueType.fixed_shift,
-        default_required_people=2, sort_order=1,
+        name="黄楼",
+        code="HL",
+        venue_type=VenueType.fixed_shift,
+        default_required_people=2,
+        sort_order=1,
     )
     db.add(yellow)
     db.flush()
     for idx, (name, start, end) in enumerate(YELLOW_SHIFTS):
         db.add(
             ShiftTemplate(
-                venue_id=yellow.id, name=name, start_time=start, end_time=end,
-                credited_minutes=120, weekday_required_people=2, weekend_required_people=1,
+                venue_id=yellow.id,
+                name=name,
+                start_time=start,
+                end_time=end,
+                credited_minutes=120,
+                weekday_required_people=2,
+                weekend_required_people=1,
                 sort_order=idx,
             )
         )
-    db.add(Venue(name="蓝厅", code="LT", venue_type=VenueType.event_based,
-                 default_required_people=2, sort_order=2))
-    db.add(Venue(name="图书馆报告厅", code="TSG", venue_type=VenueType.event_based,
-                 default_required_people=2, sort_order=3))
+    db.add(
+        Venue(
+            name="蓝厅",
+            code="LT",
+            venue_type=VenueType.event_based,
+            default_required_people=2,
+            sort_order=2,
+        )
+    )
+    db.add(
+        Venue(
+            name="图书馆报告厅",
+            code="TSG",
+            venue_type=VenueType.event_based,
+            default_required_people=2,
+            sort_order=3,
+        )
+    )
     print("已初始化三场地与黄楼六班次")
 
 
@@ -75,14 +98,26 @@ def ensure_multiplier_rules(db: Session) -> None:
     if db.scalar(select(MultiplierRule)):
         print("倍率规则已存在，跳过初始化")
         return
-    db.add(MultiplierRule(
-        name="早间双倍", start_time=time(0, 0), end_time=time(8, 0),
-        multiplier=Decimal("2.0"), priority=10, is_active=True,
-    ))
-    db.add(MultiplierRule(
-        name="晚间双倍", start_time=time(19, 0), end_time=time(0, 0),  # 00:00 表示 24:00
-        multiplier=Decimal("2.0"), priority=10, is_active=True,
-    ))
+    db.add(
+        MultiplierRule(
+            name="早间双倍",
+            start_time=time(0, 0),
+            end_time=time(8, 0),
+            multiplier=Decimal("2.0"),
+            priority=10,
+            is_active=True,
+        )
+    )
+    db.add(
+        MultiplierRule(
+            name="晚间双倍",
+            start_time=time(19, 0),
+            end_time=time(0, 0),  # 00:00 表示 24:00
+            multiplier=Decimal("2.0"),
+            priority=10,
+            is_active=True,
+        )
+    )
     print("已初始化默认倍率规则（早间/晚间双倍）")
 
 

@@ -1,4 +1,5 @@
 """课表上传与解析出的课程规则（方案 4.4 / 4.5 / 12.1）。"""
+
 from __future__ import annotations
 
 import uuid

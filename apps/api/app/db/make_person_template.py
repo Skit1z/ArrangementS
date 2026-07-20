@@ -1,4 +1,5 @@
 """生成人员导入 Excel 模板（方案 3.1）。运行：python -m app.db.make_person_template <输出路径>"""
+
 from __future__ import annotations
 
 import sys

@@ -1,12 +1,11 @@
 """时间区间工具：合并重叠或相邻区间、判断相交。"""
+
 from __future__ import annotations
 
 from datetime import datetime
 
 
-def merge_intervals(
-    intervals: list[tuple[datetime, datetime]]
-) -> list[tuple[datetime, datetime]]:
+def merge_intervals(intervals: list[tuple[datetime, datetime]]) -> list[tuple[datetime, datetime]]:
     """合并重叠或首尾相接的区间，返回按开始时间排序的最小集合。"""
     valid = [(s, e) for s, e in intervals if e > s]
     if not valid:

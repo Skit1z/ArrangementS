@@ -1,4 +1,5 @@
 """认证相关的请求 / 响应模型。"""
+
 from __future__ import annotations
 
 import uuid

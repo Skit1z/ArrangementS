@@ -1,4 +1,5 @@
 """最终不可值班区间与用户不可值班申请（方案 5.1 / 5.2 / 12.1）。"""
+
 from __future__ import annotations
 
 import uuid

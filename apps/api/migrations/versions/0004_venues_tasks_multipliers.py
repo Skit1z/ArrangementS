@@ -4,6 +4,7 @@ Revision ID: 0004
 Revises: 0003
 Create Date: 2026-07-17
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -39,14 +40,20 @@ def upgrade() -> None:
         sa.Column("sort_order", sa.Integer(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("description", sa.String(255), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
 
     op.create_table(
         "shift_templates",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("venue_id", sa.Uuid(), sa.ForeignKey("venues.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "venue_id", sa.Uuid(), sa.ForeignKey("venues.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("name", sa.String(64), nullable=False),
         sa.Column("start_time", sa.Time(), nullable=False),
         sa.Column("end_time", sa.Time(), nullable=False),
@@ -66,7 +73,9 @@ def upgrade() -> None:
         sa.Column("custom_required_people", sa.Integer(), nullable=True),
         sa.Column("reason", sa.String(255), nullable=True),
         sa.Column("source", special_date_source, nullable=False),
-        sa.Column("confirmed_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "confirmed_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ),
         sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ix_special_dates_date", "special_dates", ["date"], unique=True)
@@ -74,7 +83,9 @@ def upgrade() -> None:
     op.create_table(
         "venue_tasks",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("venue_id", sa.Uuid(), sa.ForeignKey("venues.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column(
+            "venue_id", sa.Uuid(), sa.ForeignKey("venues.id", ondelete="RESTRICT"), nullable=False
+        ),
         sa.Column("title", sa.String(128), nullable=False),
         sa.Column("booking_start_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("booking_end_at", sa.DateTime(timezone=True), nullable=False),
@@ -90,10 +101,16 @@ def upgrade() -> None:
         sa.Column("notes", sa.String(512), nullable=True),
         sa.Column("is_temporary", sa.Boolean(), nullable=False),
         sa.Column("status", task_status, nullable=False),
-        sa.Column("created_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "created_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ),
         sa.Column("version", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
     op.create_index("ix_venue_tasks_venue_id", "venue_tasks", ["venue_id"])
     op.create_index("ix_venue_tasks_duty_start_at", "venue_tasks", ["duty_start_at"])
@@ -106,7 +123,9 @@ def upgrade() -> None:
         sa.Column("start_time", sa.Time(), nullable=False),
         sa.Column("end_time", sa.Time(), nullable=False),
         sa.Column("multiplier", sa.Numeric(4, 2), nullable=False),
-        sa.Column("venue_id", sa.Uuid(), sa.ForeignKey("venues.id", ondelete="CASCADE"), nullable=True),
+        sa.Column(
+            "venue_id", sa.Uuid(), sa.ForeignKey("venues.id", ondelete="CASCADE"), nullable=True
+        ),
         sa.Column("weekdays", postgresql.JSONB(), nullable=True),
         sa.Column("effective_start_date", sa.Date(), nullable=True),
         sa.Column("effective_end_date", sa.Date(), nullable=True),

@@ -3,6 +3,7 @@
 模型使用可移植类型（Uuid / JSONBType / 通用 Enum），因此可在 SQLite 上建表；
 生产仍走 Postgres（JSONB、原生 enum）。
 """
+
 from __future__ import annotations
 
 import pytest

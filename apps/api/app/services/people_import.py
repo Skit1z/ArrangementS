@@ -6,6 +6,7 @@
 安全：敏感字段（身份证号/银行卡号）在预览阶段即加密，preview_payload 仅存密文(base64)+后四位，
 明文绝不落库；初始密码可由“学号+拼音首字母”确定性重算，不存储、不入日志。
 """
+
 from __future__ import annotations
 
 import base64
@@ -135,9 +136,7 @@ def _classify(db: Session, rows: list[RowResult]) -> None:
     valid_nos = [r.student_no for r in rows if r.status != ROW_ERROR and r.student_no]
     existing = {
         p.student_no: p
-        for p in db.scalars(
-            select(PersonProfile).where(PersonProfile.student_no.in_(valid_nos))
-        )
+        for p in db.scalars(select(PersonProfile).where(PersonProfile.student_no.in_(valid_nos)))
     }
     for r in rows:
         if r.status == ROW_ERROR:
@@ -219,9 +218,7 @@ def confirm_import(db: Session, batch_id: uuid.UUID) -> list[CreatedAccount]:
             if row.get("_bank_card_cipher_b64")
             else None
         )
-        prof = db.scalar(
-            select(PersonProfile).where(PersonProfile.student_no == row["student_no"])
-        )
+        prof = db.scalar(select(PersonProfile).where(PersonProfile.student_no == row["student_no"]))
         if prof is None:
             initial = build_initial_password(row["student_no"], row["full_name"])
             user = User(

@@ -1,4 +1,5 @@
 """个人排班约束（方案 5.3）。强制/偏好统一存储，类型 + JSON 值。"""
+
 from __future__ import annotations
 
 import uuid

@@ -1,10 +1,10 @@
 """假期与假期可值班名单路由（admin）。"""
+
 from __future__ import annotations
 
 import uuid
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_admin
@@ -25,7 +25,9 @@ router = APIRouter(prefix="/admin/vacations", tags=["vacations"])
 
 
 @router.get("", response_model=list[VacationOut])
-def list_vacations(_: User = Depends(require_admin), db: Session = Depends(get_db)) -> list[VacationPeriod]:
+def list_vacations(
+    _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> list[VacationPeriod]:
     res = vacation_service.sync_vacation_periods(db)
     db.commit()
     return res
@@ -60,8 +62,13 @@ def update_vacation(
     db: Session = Depends(get_db),
 ) -> VacationPeriod:
     patch_data = payload.model_dump(exclude_unset=True)
-    if "yellow_shift_template_ids" in patch_data and patch_data["yellow_shift_template_ids"] is not None:
-        patch_data["yellow_shift_template_ids"] = [str(i) for i in patch_data["yellow_shift_template_ids"]]
+    if (
+        "yellow_shift_template_ids" in patch_data
+        and patch_data["yellow_shift_template_ids"] is not None
+    ):
+        patch_data["yellow_shift_template_ids"] = [
+            str(i) for i in patch_data["yellow_shift_template_ids"]
+        ]
     vac = vacation_service.update_vacation(db, vacation_id, patch_data)
     db.commit()
     db.refresh(vac)

@@ -1,4 +1,5 @@
 """人员管理：查询、停用/启用、自动排班名单、个人约束、敏感字段查看。"""
+
 from __future__ import annotations
 
 import uuid
@@ -58,10 +59,10 @@ def set_status(db: Session, person_id: uuid.UUID, new_status: PersonStatus) -> P
     return prof
 
 
-def set_scheduling_pool(db: Session, actor_id: uuid.UUID, person_ids: list[uuid.UUID], enabled: bool) -> int:
-    profs = list(
-        db.scalars(select(PersonProfile).where(PersonProfile.id.in_(person_ids)))
-    )
+def set_scheduling_pool(
+    db: Session, actor_id: uuid.UUID, person_ids: list[uuid.UUID], enabled: bool
+) -> int:
+    profs = list(db.scalars(select(PersonProfile).where(PersonProfile.id.in_(person_ids))))
     for prof in profs:
         prof.is_in_scheduling_pool = enabled
     db.flush()
@@ -119,11 +120,7 @@ def add_constraint(
 
 
 def list_constraints(db: Session, person_id: uuid.UUID) -> list[PersonConstraint]:
-    return list(
-        db.scalars(
-            select(PersonConstraint).where(PersonConstraint.person_id == person_id)
-        )
-    )
+    return list(db.scalars(select(PersonConstraint).where(PersonConstraint.person_id == person_id)))
 
 
 def delete_constraint(db: Session, person_id: uuid.UUID, constraint_id: uuid.UUID) -> None:

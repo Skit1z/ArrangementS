@@ -1,4 +1,5 @@
 """学期、课程节次时间、教学楼代码映射（方案 4.1 / 4.2）。"""
+
 from __future__ import annotations
 
 import uuid

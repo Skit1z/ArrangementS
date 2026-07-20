@@ -1,4 +1,5 @@
 """区间合并与相交测试。"""
+
 from __future__ import annotations
 
 from datetime import datetime

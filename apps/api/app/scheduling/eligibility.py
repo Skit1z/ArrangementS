@@ -6,6 +6,7 @@
 P1.4 修复：所有约束都尊重 ``effective_start``/``effective_end`` —— 仅在区间内的约束
 生效，区间外的约束对当前排班透明。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -40,7 +41,9 @@ def _is_constraint_in_effect(c: PersonConstraint, on_date: date) -> bool:
     return True
 
 
-def _hard_constraints(db: Session, person_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[PersonConstraint]]:
+def _hard_constraints(
+    db: Session, person_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[PersonConstraint]]:
     """加载硬约束（不按日期过滤——调用方在判定时按 slot 日期过滤 effective_*）。
 
     保留无日期过滤是为了保持原 API：``build_solver_input`` 和 ``check_person_available_for_slot``
@@ -96,7 +99,9 @@ def _violates_constraint(c: PersonConstraint, slot: DutySlot) -> bool:
     return False
 
 
-def _weekly_limit(constraints: list[PersonConstraint], on_dates: set[date] | None = None) -> int | None:
+def _weekly_limit(
+    constraints: list[PersonConstraint], on_dates: set[date] | None = None
+) -> int | None:
     """Return the strictest applicable weekly limit.
 
     Multiple effective-dated rules may overlap.  Taking the minimum avoids making
@@ -114,7 +119,9 @@ def _weekly_limit(constraints: list[PersonConstraint], on_dates: set[date] | Non
     return min(limits) if limits else None
 
 
-def _forbidden_pairs(constraints_by_person: dict[uuid.UUID, list[PersonConstraint]]) -> list[tuple[str, str]]:
+def _forbidden_pairs(
+    constraints_by_person: dict[uuid.UUID, list[PersonConstraint]],
+) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     for pid, cs in constraints_by_person.items():
         for c in cs:
@@ -141,6 +148,7 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
 
     # 预取场地（用于 is_event_venue 判定）
     from app.models.venue import Venue
+
     venue_by_id = {str(v.id): v for v in db.scalars(select(Venue))}
 
     # 展开岗位并计算可用性
@@ -198,7 +206,12 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
                 locked[pos_id] = lk
             for person in people:
                 available[(str(person.id), pos_id)] = _is_available(
-                    db, person, slot, blocks.get(person.id, []), constraints.get(person.id, []), vacation
+                    db,
+                    person,
+                    slot,
+                    blocks.get(person.id, []),
+                    constraints.get(person.id, []),
+                    vacation,
                 )
 
     slot_dates = {
@@ -207,9 +220,7 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
         else s.slot_start_at.astimezone(BEIJING_TZ).date()
         for s in slots
     }
-    weekly_limit = {
-        str(p.id): _weekly_limit(constraints.get(p.id, []), slot_dates) for p in people
-    }
+    weekly_limit = {str(p.id): _weekly_limit(constraints.get(p.id, []), slot_dates) for p in people}
     weekly_limit = {k: v for k, v in weekly_limit.items() if v is not None}
 
     history = _month_history(db, plan)
@@ -263,7 +274,10 @@ def check_person_available_for_slot(db: Session, person: PersonProfile, slot: Du
 
 
 def has_time_overlap_with_person(
-    db: Session, person_id: uuid.UUID, slot: DutySlot, exclude_assignment_id: uuid.UUID | None = None
+    db: Session,
+    person_id: uuid.UUID,
+    slot: DutySlot,
+    exclude_assignment_id: uuid.UUID | None = None,
 ) -> bool:
     """该人是否已有与目标岗位时间重叠的有效分配。"""
     from app.models.enums import PlanAssignmentStatus
@@ -274,14 +288,20 @@ def has_time_overlap_with_person(
         .where(
             Assignment.person_id == person_id,
             Assignment.plan_status.notin_(
-                [PlanAssignmentStatus.vacant, PlanAssignmentStatus.cancelled, PlanAssignmentStatus.replaced]
+                [
+                    PlanAssignmentStatus.vacant,
+                    PlanAssignmentStatus.cancelled,
+                    PlanAssignmentStatus.replaced,
+                ]
             ),
         )
     ).all()
     for a, other_slot in rows:
         if exclude_assignment_id is not None and a.id == exclude_assignment_id:
             continue
-        if overlaps(slot.slot_start_at, slot.slot_end_at, other_slot.slot_start_at, other_slot.slot_end_at):
+        if overlaps(
+            slot.slot_start_at, slot.slot_end_at, other_slot.slot_start_at, other_slot.slot_end_at
+        ):
             return True
     return False
 
@@ -316,11 +336,13 @@ def would_exceed_weekly_limit(
         .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
         .where(
             Assignment.person_id == person_id,
-            Assignment.plan_status.notin_([
-                PlanAssignmentStatus.vacant,
-                PlanAssignmentStatus.cancelled,
-                PlanAssignmentStatus.replaced,
-            ]),
+            Assignment.plan_status.notin_(
+                [
+                    PlanAssignmentStatus.vacant,
+                    PlanAssignmentStatus.cancelled,
+                    PlanAssignmentStatus.replaced,
+                ]
+            ),
         )
     ).all()
     count = 0
@@ -339,7 +361,10 @@ def would_exceed_weekly_limit(
 
 
 def violates_no_pair_with_existing(
-    db: Session, person_id: uuid.UUID, slot: DutySlot, exclude_assignment_id: uuid.UUID | None = None
+    db: Session,
+    person_id: uuid.UUID,
+    slot: DutySlot,
+    exclude_assignment_id: uuid.UUID | None = None,
 ) -> bool:
     """接替人若与同 slot 的其它已分配人员存在「禁止同班」关系，返回 True。
 
@@ -349,12 +374,17 @@ def violates_no_pair_with_existing(
 
     # 同 slot 其它人员
     other_person_ids = [
-        pid for assignment_id, pid in db.execute(
+        pid
+        for assignment_id, pid in db.execute(
             select(Assignment.id, Assignment.person_id).where(
                 Assignment.duty_slot_id == slot.id,
                 Assignment.person_id.is_not(None),
                 Assignment.plan_status.notin_(
-                    [PlanAssignmentStatus.vacant, PlanAssignmentStatus.cancelled, PlanAssignmentStatus.replaced]
+                    [
+                        PlanAssignmentStatus.vacant,
+                        PlanAssignmentStatus.cancelled,
+                        PlanAssignmentStatus.replaced,
+                    ]
                 ),
             )
         )
@@ -399,7 +429,9 @@ def violates_no_pair_with_existing(
 
 def _month_history(db: Session, plan) -> dict[str, int]:
     """当月已存在分配的平衡工时（排除本周计划），用于公平性历史 H_p。"""
-    month_keys = {s.month_key for s in db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))}
+    month_keys = {
+        s.month_key for s in db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))
+    }
     if not month_keys:
         return {}
     rows = db.scalars(

@@ -1,4 +1,5 @@
 """请假申请（方案 6.1 / 12.1）。"""
+
 from __future__ import annotations
 
 import uuid

@@ -4,6 +4,7 @@
 ``full_name`` + ``class_name`` + ``phone``（供移动端展示联系电话），
 绝不返回身份证号、银行卡号、困难等级等敏感字段。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -43,19 +44,25 @@ def my_assignments(
     rows = db.execute(stmt).all()
     out: list[dict] = []
     for a, slot, venue, _plan in rows:
-        out.append({
-            "assignment_id": str(a.id),
-            "slot_id": str(slot.id),
-            "venue_name": venue.name,
-            "slot_start_at": slot.slot_start_at.isoformat(),
-            "slot_end_at": slot.slot_end_at.isoformat(),
-            "credited_minutes": a.credited_minutes,
-            "plan_status": a.plan_status.value,
-            "execution_status": a.execution_status.value,
-            "teammates": _teammates(db, slot.id, person_id),
-            "previous_shift": _adjacent_shift_people(db, venue.id, slot.slot_start_at, find_next=False),
-            "next_shift": _adjacent_shift_people(db, venue.id, slot.slot_end_at, find_next=True),
-        })
+        out.append(
+            {
+                "assignment_id": str(a.id),
+                "slot_id": str(slot.id),
+                "venue_name": venue.name,
+                "slot_start_at": slot.slot_start_at.isoformat(),
+                "slot_end_at": slot.slot_end_at.isoformat(),
+                "credited_minutes": a.credited_minutes,
+                "plan_status": a.plan_status.value,
+                "execution_status": a.execution_status.value,
+                "teammates": _teammates(db, slot.id, person_id),
+                "previous_shift": _adjacent_shift_people(
+                    db, venue.id, slot.slot_start_at, find_next=False
+                ),
+                "next_shift": _adjacent_shift_people(
+                    db, venue.id, slot.slot_end_at, find_next=True
+                ),
+            }
+        )
     return out
 
 
@@ -69,7 +76,9 @@ def _teammates(db: Session, slot_id: uuid.UUID, exclude_person_id: uuid.UUID) ->
             Assignment.plan_status.in_(VISIBLE_PLAN_STATUSES),
         )
     ).all()
-    return [{"full_name": p.full_name, "class_name": p.class_name, "phone": p.phone} for _a, p in rows]
+    return [
+        {"full_name": p.full_name, "class_name": p.class_name, "phone": p.phone} for _a, p in rows
+    ]
 
 
 def _adjacent_shift_people(
@@ -131,7 +140,11 @@ def next_duty(db: Session, person_id: uuid.UUID) -> dict | None:
                 "slot_start_at": slot.slot_start_at.isoformat(),
                 "slot_end_at": slot.slot_end_at.isoformat(),
                 "teammates": _teammates(db, slot.id, person_id),
-                "previous_shift": _adjacent_shift_people(db, venue.id, slot.slot_start_at, find_next=False),
-                "next_shift": _adjacent_shift_people(db, venue.id, slot.slot_end_at, find_next=True),
+                "previous_shift": _adjacent_shift_people(
+                    db, venue.id, slot.slot_start_at, find_next=False
+                ),
+                "next_shift": _adjacent_shift_people(
+                    db, venue.id, slot.slot_end_at, find_next=True
+                ),
             }
     return None

@@ -1,4 +1,5 @@
 """用户账号（admin 与普通用户共用一张表，通过 role 区分）。"""
+
 from __future__ import annotations
 
 import uuid

@@ -1,4 +1,5 @@
 """阶段七：请假、换班、不可值班申请、未到岗标记测试。"""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -39,32 +40,56 @@ def _person(db, i):
     u = User(username=f"w{i}", password_hash=hash_password("x"), role=UserRole.user, is_active=True)
     db.add(u)
     db.flush()
-    p = PersonProfile(user_id=u.id, student_no=f"w{i}", class_name="一班", full_name=f"人{i}",
-                      phone="13800000000", status=PersonStatus.active, is_in_scheduling_pool=True)
+    p = PersonProfile(
+        user_id=u.id,
+        student_no=f"w{i}",
+        class_name="一班",
+        full_name=f"人{i}",
+        phone="13800000000",
+        status=PersonStatus.active,
+        is_in_scheduling_pool=True,
+    )
     db.add(p)
     db.flush()
     return p
 
 
 def _future_assignment(db, person, hours_ahead=48):
-    venue = Venue(name="黄楼", code="HL", venue_type=VenueType.fixed_shift, default_required_people=2)
+    venue = Venue(
+        name="黄楼", code="HL", venue_type=VenueType.fixed_shift, default_required_people=2
+    )
     db.add(venue)
     db.flush()
-    plan = WeeklyPlan(week_start=date(2026, 3, 2), week_end=date(2026, 3, 8), revision=1, status=PlanStatus.published)
+    plan = WeeklyPlan(
+        week_start=date(2026, 3, 2),
+        week_end=date(2026, 3, 8),
+        revision=1,
+        status=PlanStatus.published,
+    )
     db.add(plan)
     db.flush()
     start = datetime.now(timezone.utc) + timedelta(hours=hours_ahead)
     slot = DutySlot(
-        weekly_plan_id=plan.id, venue_id=venue.id, source_type=SlotSourceType.fixed_shift,
-        slot_start_at=start, slot_end_at=start + timedelta(hours=2),
-        required_people=2, credited_minutes=120, month_key="2026-03", status=SlotStatus.filled,
+        weekly_plan_id=plan.id,
+        venue_id=venue.id,
+        source_type=SlotSourceType.fixed_shift,
+        slot_start_at=start,
+        slot_end_at=start + timedelta(hours=2),
+        required_people=2,
+        credited_minutes=120,
+        month_key="2026-03",
+        status=SlotStatus.filled,
     )
     db.add(slot)
     db.flush()
     a = Assignment(
-        duty_slot_id=slot.id, person_id=person.id, position_index=0,
-        plan_status=PlanAssignmentStatus.assigned, execution_status=ExecutionStatus.pending,
-        credited_minutes=120, balance_minutes=120,
+        duty_slot_id=slot.id,
+        person_id=person.id,
+        position_index=0,
+        plan_status=PlanAssignmentStatus.assigned,
+        execution_status=ExecutionStatus.pending,
+        credited_minutes=120,
+        balance_minutes=120,
     )
     db.add(a)
     db.flush()
@@ -77,7 +102,9 @@ def test_leave_approve_zeroes_hours_and_vacates(db_session):
     a, slot = _future_assignment(db_session, p)
     db_session.commit()
 
-    leave = leave_service.create_leave(db_session, applicant_person_id=p.id, assignment_id=a.id, reason="病假")
+    leave = leave_service.create_leave(
+        db_session, applicant_person_id=p.id, assignment_id=a.id, reason="病假"
+    )
     db_session.commit()
     assert leave.status == LeaveStatus.pending
 
@@ -96,7 +123,9 @@ def test_leave_only_own_assignment(db_session):
     a, _ = _future_assignment(db_session, p0)
     db_session.commit()
     with pytest.raises(HTTPException) as ei:
-        leave_service.create_leave(db_session, applicant_person_id=p1.id, assignment_id=a.id, reason="x")
+        leave_service.create_leave(
+            db_session, applicant_person_id=p1.id, assignment_id=a.id, reason="x"
+        )
     assert ei.value.status_code == 403
 
 
@@ -124,7 +153,9 @@ def test_emergency_flag_within_24h(db_session):
     p = _person(db_session, 0)
     a, _ = _future_assignment(db_session, p, hours_ahead=10)
     db_session.commit()
-    leave = leave_service.create_leave(db_session, applicant_person_id=p.id, assignment_id=a.id, reason="急事")
+    leave = leave_service.create_leave(
+        db_session, applicant_person_id=p.id, assignment_id=a.id, reason="急事"
+    )
     assert leave.is_emergency is True
 
 
@@ -135,7 +166,9 @@ def test_targeted_swap_full_flow(db_session):
     a, slot = _future_assignment(db_session, p0)
     db_session.commit()
 
-    swap = swap_service.create_targeted(db_session, requester_person_id=p0.id, assignment_id=a.id, target_person_id=p1.id)
+    swap = swap_service.create_targeted(
+        db_session, requester_person_id=p0.id, assignment_id=a.id, target_person_id=p1.id
+    )
     db_session.commit()
     assert swap.status == SwapStatus.awaiting_target
 
@@ -170,6 +203,7 @@ def test_open_swap_flow_and_other_candidates_expire(db_session):
     assert a.person_id == p1.id
     from app.models.enums import SwapCandidateStatus
     from app.models.swap import SwapCandidate
+
     cands = {c.candidate_person_id: c.status for c in db_session.scalars(select(SwapCandidate))}
     assert cands[p1.id] == SwapCandidateStatus.selected
     assert cands[p2.id] == SwapCandidateStatus.expired
@@ -195,13 +229,19 @@ def test_swap_approve_revalidates_time_overlap(db_session):
     a, slot = _future_assignment(db_session, p0)
     # p1 已有一个与该 slot 时间重叠的分配
     other = Assignment(
-        duty_slot_id=slot.id, person_id=p1.id, position_index=1,
-        plan_status=PlanAssignmentStatus.assigned, execution_status=ExecutionStatus.pending,
-        credited_minutes=120, balance_minutes=120,
+        duty_slot_id=slot.id,
+        person_id=p1.id,
+        position_index=1,
+        plan_status=PlanAssignmentStatus.assigned,
+        execution_status=ExecutionStatus.pending,
+        credited_minutes=120,
+        balance_minutes=120,
     )
     db_session.add(other)
     db_session.flush()
-    swap = swap_service.create_targeted(db_session, requester_person_id=p0.id, assignment_id=a.id, target_person_id=p1.id)
+    swap = swap_service.create_targeted(
+        db_session, requester_person_id=p0.id, assignment_id=a.id, target_person_id=p1.id
+    )
     swap_service.respond_target(db_session, target_person_id=p1.id, swap_id=swap.id, accept=True)
     db_session.commit()
     with pytest.raises(HTTPException) as ei:
@@ -214,11 +254,20 @@ def test_availability_request_approve_creates_block(db_session):
     p = _person(db_session, 0)
     db_session.commit()
     start = datetime.now(timezone.utc) + timedelta(days=1)
-    req = availability_service.create_request(db_session, person_id=p.id, start_at=start, end_at=start + timedelta(hours=2), reason="有事")
+    req = availability_service.create_request(
+        db_session, person_id=p.id, start_at=start, end_at=start + timedelta(hours=2), reason="有事"
+    )
     db_session.commit()
     availability_service.approve(db_session, actor_id=None, request_id=req.id)
     db_session.commit()
-    blocks = list(db_session.scalars(select(AvailabilityBlock).where(AvailabilityBlock.person_id == p.id, AvailabilityBlock.status == AvailabilityStatus.active)))
+    blocks = list(
+        db_session.scalars(
+            select(AvailabilityBlock).where(
+                AvailabilityBlock.person_id == p.id,
+                AvailabilityBlock.status == AvailabilityStatus.active,
+            )
+        )
+    )
     assert len(blocks) == 1
 
 
@@ -235,9 +284,11 @@ def test_weekly_availability_request_expands_until_date(db_session):
         recurrence_rule=f"FREQ=WEEKLY;UNTIL={until.isoformat()}",
     )
     availability_service.approve(db_session, actor_id=None, request_id=req.id)
-    blocks = list(db_session.scalars(select(AvailabilityBlock).where(
-        AvailabilityBlock.source_ref_id == req.id
-    )))
+    blocks = list(
+        db_session.scalars(
+            select(AvailabilityBlock).where(AvailabilityBlock.source_ref_id == req.id)
+        )
+    )
     assert len(blocks) == 3
 
 
@@ -246,7 +297,9 @@ def test_availability_request_past_rejected(db_session):
     db_session.commit()
     past = datetime.now(timezone.utc) - timedelta(days=2)
     with pytest.raises(HTTPException):
-        availability_service.create_request(db_session, person_id=p.id, start_at=past, end_at=past + timedelta(hours=1), reason="x")
+        availability_service.create_request(
+            db_session, person_id=p.id, start_at=past, end_at=past + timedelta(hours=1), reason="x"
+        )
 
 
 # --- 未到岗 ---
@@ -296,8 +349,10 @@ def test_admin_daily_assignments_requires_admin(client, seed_admin, db_session):
     # 用 admin 创建一个普通用户来登录
     from app.models.user import User
     from app.models.enums import UserRole
+
     u = User(username="u1", password_hash=hash_password("y"), role=UserRole.user, is_active=True)
-    db_session.add(u); db_session.commit()
+    db_session.add(u)
+    db_session.commit()
     token = login(client, "u1", "y")
     resp = client.get(
         "/api/v1/admin/assignments/daily?date=2026-03-04",

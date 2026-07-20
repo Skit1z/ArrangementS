@@ -1,4 +1,5 @@
 """特殊日期（节假日/调休/停班/自定义）。方案 2.2 / 2.9 / 12.1。"""
+
 from __future__ import annotations
 
 import uuid

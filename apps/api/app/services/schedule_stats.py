@@ -4,6 +4,7 @@
 - 实际完成工时(completed)：完成计入；请假/未到岗/取消=0。
 - 分场地按 venue 维度动态统计，不硬编码具体场地。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -120,17 +121,23 @@ def _apply_swap_counts(db: Session, month_key: str, agg: dict) -> None:
         .where(SwapRequest.status == SwapStatus.approved, DutySlot.month_key == month_key)
     ).all()
     for swap, _slot in approved:
-        out = agg.setdefault(swap.requester_person_id, dict(balance=0, completed=0, extra=0, leave=0, absence=0))
+        out = agg.setdefault(
+            swap.requester_person_id, dict(balance=0, completed=0, extra=0, leave=0, absence=0)
+        )
         out["swap_out"] = out.get("swap_out", 0) + 1
         if swap.selected_person_id is not None:
-            rep = agg.setdefault(swap.selected_person_id, dict(balance=0, completed=0, extra=0, leave=0, absence=0))
+            rep = agg.setdefault(
+                swap.selected_person_id, dict(balance=0, completed=0, extra=0, leave=0, absence=0)
+            )
             rep["replacement"] = rep.get("replacement", 0) + 1
 
 
 def _apply_adjustments(db: Session, month: date, agg: dict) -> None:
     rows = db.scalars(select(HourAdjustment).where(HourAdjustment.month == month))
     for adj in rows:
-        rec = agg.setdefault(adj.person_id, dict(balance=0, completed=0, extra=0, leave=0, absence=0))
+        rec = agg.setdefault(
+            adj.person_id, dict(balance=0, completed=0, extra=0, leave=0, absence=0)
+        )
         rec["completed"] += adj.minutes_delta
         if adj.affect_balance:
             rec["balance"] += adj.minutes_delta
@@ -138,10 +145,12 @@ def _apply_adjustments(db: Session, month: date, agg: dict) -> None:
 
 def _write_venue_summaries(db: Session, month: date, venue_agg: dict, now: datetime) -> None:
     locked_people = set(
-        db.scalars(select(MonthlyHourSummary.person_id).where(
-            MonthlyHourSummary.month == month,
-            MonthlyHourSummary.status == MonthlySummaryStatus.locked,
-        ))
+        db.scalars(
+            select(MonthlyHourSummary.person_id).where(
+                MonthlyHourSummary.month == month,
+                MonthlyHourSummary.status == MonthlySummaryStatus.locked,
+            )
+        )
     )
     current_keys = set(venue_agg)
     existing_rows = list(
@@ -178,26 +187,42 @@ def lock_month(db: Session, actor_id: uuid.UUID | None, month_key: str) -> int:
         s.locked_at = now
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="statistics.lock",
-        entity_type="monthly_summary", entity_id=month_key,
+        db,
+        actor_user_id=actor_id,
+        action="statistics.lock",
+        entity_type="monthly_summary",
+        entity_id=month_key,
     )
     return len(rows)
 
 
 def add_adjustment(
-    db: Session, *, actor_id: uuid.UUID | None, month_key: str, person_id: uuid.UUID,
-    minutes_delta: int, affect_balance: bool, reason: str,
+    db: Session,
+    *,
+    actor_id: uuid.UUID | None,
+    month_key: str,
+    person_id: uuid.UUID,
+    minutes_delta: int,
+    affect_balance: bool,
+    reason: str,
 ) -> HourAdjustment:
     month = month_to_date(month_key)
     adj = HourAdjustment(
-        person_id=person_id, month=month, minutes_delta=minutes_delta,
-        affect_balance=affect_balance, reason=reason, created_by=actor_id,
+        person_id=person_id,
+        month=month,
+        minutes_delta=minutes_delta,
+        affect_balance=affect_balance,
+        reason=reason,
+        created_by=actor_id,
     )
     db.add(adj)
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="statistics.adjust",
-        entity_type="hour_adjustment", entity_id=adj.id,
+        db,
+        actor_user_id=actor_id,
+        action="statistics.adjust",
+        entity_type="hour_adjustment",
+        entity_id=adj.id,
         after_data={"person_id": str(person_id), "minutes_delta": minutes_delta},
     )
     return adj
@@ -216,7 +241,9 @@ def list_monthly(db: Session, month_key: str) -> list[tuple[MonthlyHourSummary, 
     )
 
 
-def venue_breakdown(db: Session, month_key: str, person_id: uuid.UUID) -> list[tuple[MonthlyVenueHourSummary, Venue]]:
+def venue_breakdown(
+    db: Session, month_key: str, person_id: uuid.UUID
+) -> list[tuple[MonthlyVenueHourSummary, Venue]]:
     """返回 (场地汇总, 场地) 元组列表，附带场地名。"""
     month = month_to_date(month_key)
     return list(

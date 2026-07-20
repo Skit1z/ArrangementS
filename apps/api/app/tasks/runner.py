@@ -11,6 +11,7 @@
 入口：`python -m app.tasks.runner`
 测试：直接调本模块的 job_* 函数（不走真实 scheduler）。
 """
+
 from __future__ import annotations
 
 import logging
@@ -53,6 +54,7 @@ def job_auto_complete(db=None) -> int:
 
 def job_expire_workflows(db=None) -> dict[str, int]:
     """关闭班次已开始但仍未完成的请假、换班流程。"""
+
     def _do(session) -> dict[str, int]:
         now = datetime.now(timezone.utc)
         return {
@@ -105,11 +107,16 @@ def job_expire_semesters(db=None, today: date | None = None) -> list[str]:
                 n = timetable_service.expire_semester_courses(session, sem.id)
                 log.info(
                     "expire_semester_courses: 学期「%s」已结束（%s），自动失效 %d 份课表",
-                    sem.name, end, n,
+                    sem.name,
+                    end,
+                    n,
                 )
             else:
-                log.info("expire_semester_courses: 学期「%s」已结束（%s），无已审核课表，仅解除当前态",
-                         sem.name, end)
+                log.info(
+                    "expire_semester_courses: 学期「%s」已结束（%s），无已审核课表，仅解除当前态",
+                    sem.name,
+                    end,
+                )
             result.append(sem.name)
         return result
 
@@ -161,7 +168,8 @@ def main() -> None:
     log.info(
         "任务运行器启动：auto-complete 每 %d 分钟；expire-semesters 每日 %02d:%02d UTC",
         AUTO_COMPLETE_INTERVAL_MINUTES,
-        EXPIRE_SEMESTERS_CRON["hour"], EXPIRE_SEMESTERS_CRON["minute"],
+        EXPIRE_SEMESTERS_CRON["hour"],
+        EXPIRE_SEMESTERS_CRON["minute"],
     )
     # 启动时各跑一次，避免重启后首批延迟
     try:

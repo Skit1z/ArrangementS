@@ -4,6 +4,7 @@
 forbid_date、forbid_time、no_pair_with、weekly_limit。
 所有类型都支持可选的 effective_start/end（按日期生效）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -22,8 +23,14 @@ from app.models.user import User
 router = APIRouter(prefix="/admin/people", tags=["admin-constraints"])
 
 ALLOWED_TYPES = {
-    "suspend", "forbid_venue", "only_venue", "forbid_weekday", "forbid_date",
-    "forbid_time", "no_pair_with", "weekly_limit",
+    "suspend",
+    "forbid_venue",
+    "only_venue",
+    "forbid_weekday",
+    "forbid_date",
+    "forbid_time",
+    "no_pair_with",
+    "weekly_limit",
 }
 
 
@@ -56,7 +63,8 @@ def list_constraints(
     db: Session = Depends(get_db),
 ) -> list[ConstraintOut]:
     rows = db.scalars(
-        select(PersonConstraint).where(PersonConstraint.person_id == person_id)
+        select(PersonConstraint)
+        .where(PersonConstraint.person_id == person_id)
         .order_by(PersonConstraint.created_at.desc())
     )
     return [ConstraintOut.model_validate(r) for r in rows]
@@ -74,7 +82,11 @@ def create_constraint(
             status_code=422,
             detail=f"不支持的约束类型：{payload.constraint_type}，可选：{sorted(ALLOWED_TYPES)}",
         )
-    if payload.effective_start and payload.effective_end and payload.effective_end < payload.effective_start:
+    if (
+        payload.effective_start
+        and payload.effective_end
+        and payload.effective_end < payload.effective_start
+    ):
         raise HTTPException(status_code=422, detail="effective_end 不得早于 effective_start")
     c = PersonConstraint(
         person_id=person_id,

@@ -1,4 +1,5 @@
 """月度统计路由（方案 13.9）。admin 看全员，普通用户仅本人。"""
+
 from __future__ import annotations
 
 import uuid
@@ -43,13 +44,18 @@ def _summary_dict(s, p) -> dict:
 
 
 @router.get("/monthly/{month}")
-def monthly(month: str, _: User = Depends(require_admin), db: Session = Depends(get_db)) -> list[dict]:
+def monthly(
+    month: str, _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> list[dict]:
     return [_summary_dict(s, p) for s, p in schedule_stats.list_monthly(db, month)]
 
 
 @router.get("/monthly/{month}/people/{person_id}")
 def person_monthly(
-    month: str, person_id: uuid.UUID, current: User = Depends(get_current_user), db: Session = Depends(get_db)
+    month: str,
+    person_id: uuid.UUID,
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> dict:
     if current.role != UserRole.admin:
         own = people_service.get_person_by_user(db, current.id)
@@ -59,20 +65,24 @@ def person_monthly(
     breakdown = schedule_stats.venue_breakdown(db, month, person_id)
     # 取人员档案用于姓名（admin 视图需要）
     p = db.get(PersonProfile, person_id)
-    base = _summary_dict(s, p) if p is not None else {
-        "person_id": str(s.person_id),
-        "person_name": None,
-        "student_no": None,
-        "class_name": None,
-        "balance_minutes": s.balance_minutes,
-        "completed_minutes": s.completed_minutes,
-        "multiplier_extra_minutes": s.multiplier_extra_minutes,
-        "leave_count": s.leave_count,
-        "swap_out_count": s.swap_out_count,
-        "replacement_count": s.replacement_count,
-        "absence_count": s.absence_count,
-        "status": s.status.value,
-    }
+    base = (
+        _summary_dict(s, p)
+        if p is not None
+        else {
+            "person_id": str(s.person_id),
+            "person_name": None,
+            "student_no": None,
+            "class_name": None,
+            "balance_minutes": s.balance_minutes,
+            "completed_minutes": s.completed_minutes,
+            "multiplier_extra_minutes": s.multiplier_extra_minutes,
+            "leave_count": s.leave_count,
+            "swap_out_count": s.swap_out_count,
+            "replacement_count": s.replacement_count,
+            "absence_count": s.absence_count,
+            "status": s.status.value,
+        }
+    )
     return {
         **base,
         "venues": [
@@ -88,24 +98,38 @@ def person_monthly(
 
 
 @router.post("/monthly/{month}/recalculate", response_model=MessageOut)
-def recalculate(month: str, _: User = Depends(require_admin), db: Session = Depends(get_db)) -> MessageOut:
+def recalculate(
+    month: str, _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> MessageOut:
     n = schedule_stats.recalculate(db, month)
     db.commit()
     return MessageOut(message=f"已重算 {n} 人")
 
 
 @router.post("/monthly/{month}/lock", response_model=MessageOut)
-def lock(month: str, actor: User = Depends(require_admin), db: Session = Depends(get_db)) -> MessageOut:
+def lock(
+    month: str, actor: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> MessageOut:
     n = schedule_stats.lock_month(db, actor.id, month)
     db.commit()
     return MessageOut(message=f"已锁定 {n} 条月度汇总")
 
 
 @router.post("/monthly/{month}/adjustments", response_model=MessageOut)
-def add_adjustment(month: str, payload: AdjustmentIn, actor: User = Depends(require_admin), db: Session = Depends(get_db)) -> MessageOut:
+def add_adjustment(
+    month: str,
+    payload: AdjustmentIn,
+    actor: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> MessageOut:
     schedule_stats.add_adjustment(
-        db, actor_id=actor.id, month_key=month, person_id=payload.person_id,
-        minutes_delta=payload.minutes_delta, affect_balance=payload.affect_balance, reason=payload.reason,
+        db,
+        actor_id=actor.id,
+        month_key=month,
+        person_id=payload.person_id,
+        minutes_delta=payload.minutes_delta,
+        affect_balance=payload.affect_balance,
+        reason=payload.reason,
     )
     db.commit()
     return MessageOut(message="已记录工时调整")

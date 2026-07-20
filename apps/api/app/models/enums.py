@@ -1,4 +1,5 @@
 """全局枚举定义。"""
+
 from __future__ import annotations
 
 import enum

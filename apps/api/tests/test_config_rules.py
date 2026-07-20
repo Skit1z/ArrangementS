@@ -1,4 +1,5 @@
 """倍率规则、特殊日期、每日人数、初始化数据测试。"""
+
 from __future__ import annotations
 
 from datetime import date, time
@@ -16,22 +17,37 @@ from app.services import day_rule_service, multiplier_service, special_date_serv
 # --- 倍率规则 DB 校验 ---
 def test_multiplier_same_priority_overlap_rejected(db_session):
     multiplier_service.create_rule(
-        db_session, name="A", start_time=time(9, 0), end_time=time(11, 0),
-        multiplier=Decimal("2.0"), priority=5, is_active=True,
+        db_session,
+        name="A",
+        start_time=time(9, 0),
+        end_time=time(11, 0),
+        multiplier=Decimal("2.0"),
+        priority=5,
+        is_active=True,
     )
     db_session.commit()
     with pytest.raises(HTTPException) as ei:
         multiplier_service.create_rule(
-            db_session, name="B", start_time=time(10, 0), end_time=time(12, 0),
-            multiplier=Decimal("2.0"), priority=5, is_active=True,
+            db_session,
+            name="B",
+            start_time=time(10, 0),
+            end_time=time(12, 0),
+            multiplier=Decimal("2.0"),
+            priority=5,
+            is_active=True,
         )
     assert ei.value.status_code == 422
 
 
 def test_multiplier_end_midnight_maps_to_1440(db_session):
     rule = multiplier_service.create_rule(
-        db_session, name="晚间", start_time=time(19, 0), end_time=time(0, 0),
-        multiplier=Decimal("2.0"), priority=10, is_active=True,
+        db_session,
+        name="晚间",
+        start_time=time(19, 0),
+        end_time=time(0, 0),
+        multiplier=Decimal("2.0"),
+        priority=10,
+        is_active=True,
     )
     engine = multiplier_service.to_engine_rule(rule)
     assert engine.start_min == 19 * 60
@@ -40,10 +56,12 @@ def test_multiplier_end_midnight_maps_to_1440(db_session):
 
 # --- 节假日同步解析 ---
 def test_parse_holiday_json():
-    data = {"days": [
-        {"name": "国庆节", "date": "2026-10-01", "isOffDay": True},
-        {"name": "国庆节", "date": "2026-10-11", "isOffDay": False},
-    ]}
+    data = {
+        "days": [
+            {"name": "国庆节", "date": "2026-10-01", "isOffDay": True},
+            {"name": "国庆节", "date": "2026-10-11", "isOffDay": False},
+        ]
+    }
     items = special_date_service.parse_holiday_json(data)
     assert items[0]["day_type"] == DayType.weekend_rule.value  # 放假
     assert items[1]["day_type"] == DayType.workday.value  # 补班
@@ -65,8 +83,14 @@ def test_holiday_sync_preview_and_confirm(db_session):
 
 # --- 每日人数规则 ---
 def _shift():
-    return ShiftTemplate(name="第1班", start_time=time(8, 0), end_time=time(10, 0),
-                         credited_minutes=120, weekday_required_people=2, weekend_required_people=1)
+    return ShiftTemplate(
+        name="第1班",
+        start_time=time(8, 0),
+        end_time=time(10, 0),
+        credited_minutes=120,
+        weekday_required_people=2,
+        weekend_required_people=1,
+    )
 
 
 def test_weekday_two_people():
@@ -80,17 +104,23 @@ def test_weekend_one_person():
 
 
 def test_adjusted_workday_two_people():
-    sd = SpecialDate(date=date(2026, 3, 7), day_type=DayType.workday, source=SpecialDateSource.manual)
+    sd = SpecialDate(
+        date=date(2026, 3, 7), day_type=DayType.workday, source=SpecialDateSource.manual
+    )
     assert day_rule_service.resolve_required_people(date(2026, 3, 7), _shift(), sd) == 2
 
 
 def test_holiday_weekend_rule_one_person():
-    sd = SpecialDate(date=date(2026, 3, 3), day_type=DayType.weekend_rule, source=SpecialDateSource.manual)
+    sd = SpecialDate(
+        date=date(2026, 3, 3), day_type=DayType.weekend_rule, source=SpecialDateSource.manual
+    )
     assert day_rule_service.resolve_required_people(date(2026, 3, 3), _shift(), sd) == 1
 
 
 def test_closed_zero_people():
-    sd = SpecialDate(date=date(2026, 3, 3), day_type=DayType.closed, source=SpecialDateSource.manual)
+    sd = SpecialDate(
+        date=date(2026, 3, 3), day_type=DayType.closed, source=SpecialDateSource.manual
+    )
     assert day_rule_service.resolve_required_people(date(2026, 3, 3), _shift(), sd) == 0
 
 
@@ -109,6 +139,8 @@ def test_init_data_seeds_venues_and_multipliers(db_session, monkeypatch):
     assert {v.code for v in venues} == {"HL", "LT", "TSG"}
     yellow = next(v for v in venues if v.code == "HL")
     assert yellow.venue_type == VenueType.fixed_shift
-    templates = list(db_session.scalars(select(ShiftTemplate).where(ShiftTemplate.venue_id == yellow.id)))
+    templates = list(
+        db_session.scalars(select(ShiftTemplate).where(ShiftTemplate.venue_id == yellow.id))
+    )
     assert len(templates) == 6
     assert all(t.credited_minutes == 120 for t in templates)

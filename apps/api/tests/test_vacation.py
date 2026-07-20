@@ -1,4 +1,5 @@
 """假期与假期可值班白名单测试。"""
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -30,7 +31,11 @@ def dt(day, hh):
 def test_set_availabilities_merges(db_session):
     prof = _person(db_session)
     vac = vacation_service.create_vacation(
-        db_session, actor_id=None, name="寒假", start_date=date(2026, 2, 1), end_date=date(2026, 2, 28)
+        db_session,
+        actor_id=None,
+        name="寒假",
+        start_date=date(2026, 2, 1),
+        end_date=date(2026, 2, 28),
     )
     db_session.commit()
     result = vacation_service.set_availabilities(
@@ -49,33 +54,54 @@ def test_set_availabilities_merges(db_session):
 def test_whitelist_availability_check(db_session):
     prof = _person(db_session)
     vac = vacation_service.create_vacation(
-        db_session, actor_id=None, name="寒假", start_date=date(2026, 2, 1), end_date=date(2026, 2, 28)
+        db_session,
+        actor_id=None,
+        name="寒假",
+        start_date=date(2026, 2, 1),
+        end_date=date(2026, 2, 28),
     )
     vacation_service.set_availabilities(
-        db_session, actor_id=None, vacation_id=vac.id, person_id=prof.id,
+        db_session,
+        actor_id=None,
+        vacation_id=vac.id,
+        person_id=prof.id,
         intervals=[(dt(10, 8), dt(10, 12))],
     )
     db_session.commit()
     # 完整落在区间内 → 可用
     assert vacation_service.is_person_available(db_session, vac.id, prof.id, dt(10, 8), dt(10, 10))
     # 超出区间 → 不可用（白名单语义）
-    assert not vacation_service.is_person_available(db_session, vac.id, prof.id, dt(10, 11), dt(10, 14))
+    assert not vacation_service.is_person_available(
+        db_session, vac.id, prof.id, dt(10, 11), dt(10, 14)
+    )
     # 未登记的另一天 → 不可用
-    assert not vacation_service.is_person_available(db_session, vac.id, prof.id, dt(15, 8), dt(15, 10))
+    assert not vacation_service.is_person_available(
+        db_session, vac.id, prof.id, dt(15, 8), dt(15, 10)
+    )
 
 
 def test_set_availabilities_replaces(db_session):
     prof = _person(db_session)
     vac = vacation_service.create_vacation(
-        db_session, actor_id=None, name="寒假", start_date=date(2026, 2, 1), end_date=date(2026, 2, 28)
+        db_session,
+        actor_id=None,
+        name="寒假",
+        start_date=date(2026, 2, 1),
+        end_date=date(2026, 2, 28),
     )
     vacation_service.set_availabilities(
-        db_session, actor_id=None, vacation_id=vac.id, person_id=prof.id,
+        db_session,
+        actor_id=None,
+        vacation_id=vac.id,
+        person_id=prof.id,
         intervals=[(dt(10, 8), dt(10, 12))],
     )
     db_session.commit()
     vacation_service.set_availabilities(
-        db_session, actor_id=None, vacation_id=vac.id, person_id=prof.id,
+        db_session,
+        actor_id=None,
+        vacation_id=vac.id,
+        person_id=prof.id,
         intervals=[(dt(11, 14), dt(11, 18))],
     )
     db_session.commit()

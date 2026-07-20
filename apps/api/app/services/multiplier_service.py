@@ -1,4 +1,5 @@
 """倍率规则服务：DB 规则 <-> 工时引擎规则映射、重叠校验、CRUD（方案 2.6）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -42,7 +43,9 @@ def load_engine_rules(db: Session) -> list[EngineRule]:
     return [to_engine_rule(r) for r in rules]
 
 
-def _assert_valid(db: Session, extra: DBRule | None = None, exclude_id: uuid.UUID | None = None) -> None:
+def _assert_valid(
+    db: Session, extra: DBRule | None = None, exclude_id: uuid.UUID | None = None
+) -> None:
     rows = list(db.scalars(select(DBRule).where(DBRule.is_active.is_(True))))
     engine_rules = [to_engine_rule(r) for r in rows if r.id != exclude_id]
     if extra is not None and extra.is_active:

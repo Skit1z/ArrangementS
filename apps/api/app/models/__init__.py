@@ -1,4 +1,5 @@
 """集中导入全部 ORM 模型，确保 Base.metadata 完整。"""
+
 from app.db.base import Base
 from app.models.audit import AuditLog
 from app.models.availability import AvailabilityBlock, AvailabilityRequest

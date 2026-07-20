@@ -1,4 +1,5 @@
 """月度工时统计（方案 11 / 12.1）。分场地按维度存储，新增场地无需改表结构。"""
+
 from __future__ import annotations
 
 import uuid

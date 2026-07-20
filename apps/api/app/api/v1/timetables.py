@@ -1,4 +1,5 @@
 """课表上传、预览、修正与审核路由（方案 4.3 / 4.6 / 13.3）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -116,9 +117,7 @@ def upload(
             raise HTTPException(status_code=400, detail="当前无激活学期，请联系管理员")
         semester_id = sem.id
 
-    result = ManualEntryExtractor().extract_from_entries(
-        [e.model_dump() for e in payload.entries]
-    )
+    result = ManualEntryExtractor().extract_from_entries([e.model_dump() for e in payload.entries])
     up = timetable_service.create_upload_from_entries(
         db,
         person_id=person_id,
@@ -166,14 +165,16 @@ def get_active(
         .options(selectinload(TimetableUpload.course_rules))
     )
     results = db.execute(stmt).all()
-    
+
     out = []
     for up, person in results:
-        out.append(ActiveTimetableOut(
-            person_id=person.id,
-            person_name=person.full_name,
-            rules=[CourseRuleOut.model_validate(r) for r in up.course_rules],
-        ))
+        out.append(
+            ActiveTimetableOut(
+                person_id=person.id,
+                person_name=person.full_name,
+                rules=[CourseRuleOut.model_validate(r) for r in up.course_rules],
+            )
+        )
     return out
 
 
@@ -276,6 +277,7 @@ def export_free_timetable(
     """导出高可读性全员无课表 Excel。"""
     from datetime import date
     from fastapi import Response
+
     content = timetable_service.build_free_timetable_excel(db)
     filename = f"free_timetable_{date.today().isoformat()}.xlsx"
     return Response(

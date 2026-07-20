@@ -1,4 +1,5 @@
 """场地与班次模板管理（方案 7.1）。删除采用逻辑停用，历史引用不物理删除。"""
+
 from __future__ import annotations
 
 import uuid
@@ -50,7 +51,9 @@ def disable_venue(db: Session, venue_id: uuid.UUID) -> Venue:
     return v
 
 
-def replace_shift_templates(db: Session, venue_id: uuid.UUID, templates: list[dict]) -> list[ShiftTemplate]:
+def replace_shift_templates(
+    db: Session, venue_id: uuid.UUID, templates: list[dict]
+) -> list[ShiftTemplate]:
     v = get_venue(db, venue_id)
     if v.venue_type != VenueType.fixed_shift:
         raise HTTPException(status_code=422, detail="仅固定班次场地可配置班次模板")
@@ -60,12 +63,22 @@ def replace_shift_templates(db: Session, venue_id: uuid.UUID, templates: list[di
     db.flush()
     created: list[ShiftTemplate] = []
     for idx, t in enumerate(templates):
-        st = ShiftTemplate(venue_id=venue_id, sort_order=t.get("sort_order", idx), **{
-            k: t[k] for k in (
-                "name", "start_time", "end_time", "credited_minutes",
-                "weekday_required_people", "weekend_required_people",
-            ) if k in t
-        })
+        st = ShiftTemplate(
+            venue_id=venue_id,
+            sort_order=t.get("sort_order", idx),
+            **{
+                k: t[k]
+                for k in (
+                    "name",
+                    "start_time",
+                    "end_time",
+                    "credited_minutes",
+                    "weekday_required_people",
+                    "weekend_required_people",
+                )
+                if k in t
+            },
+        )
         st.is_active = t.get("is_active", True)
         db.add(st)
         created.append(st)

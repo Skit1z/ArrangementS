@@ -1,4 +1,5 @@
 """场地与黄楼固定班次模板（方案 7.1 / 2.2）。"""
+
 from __future__ import annotations
 
 import uuid

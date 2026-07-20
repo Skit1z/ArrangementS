@@ -3,6 +3,7 @@
 审核通过后：原分配 -> 请假，岗位空缺；原人员实际完成工时 0、排班平衡工时不计入。
 补位由手动/换班完成（补位人员获得工时）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -13,7 +14,13 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.enums import ExecutionStatus, LeaveStatus, PlanAssignmentStatus, SlotStatus, SwapStatus
+from app.models.enums import (
+    ExecutionStatus,
+    LeaveStatus,
+    PlanAssignmentStatus,
+    SlotStatus,
+    SwapStatus,
+)
 from app.models.leave import LeaveRequest
 from app.models.schedule import Assignment, DutySlot
 from app.models.swap import SwapRequest
@@ -56,11 +63,13 @@ def create_leave(
     active_swap = db.scalar(
         select(SwapRequest).where(
             SwapRequest.assignment_id == assignment_id,
-            SwapRequest.status.in_((
-                SwapStatus.awaiting_target,
-                SwapStatus.open_collecting,
-                SwapStatus.pending_admin,
-            )),
+            SwapRequest.status.in_(
+                (
+                    SwapStatus.awaiting_target,
+                    SwapStatus.open_collecting,
+                    SwapStatus.pending_admin,
+                )
+            ),
         )
     )
     if active_swap is not None:
@@ -119,7 +128,9 @@ def withdraw(db: Session, person_id: uuid.UUID, leave_id: uuid.UUID) -> LeaveReq
     return leave
 
 
-def approve(db: Session, actor_id: uuid.UUID | None, leave_id: uuid.UUID, comment: str | None = None) -> LeaveRequest:
+def approve(
+    db: Session, actor_id: uuid.UUID | None, leave_id: uuid.UUID, comment: str | None = None
+) -> LeaveRequest:
     leave = _get(db, leave_id)
     if leave.status != LeaveStatus.pending:
         raise HTTPException(status_code=422, detail="仅待审核申请可批准")
@@ -148,14 +159,19 @@ def approve(db: Session, actor_id: uuid.UUID | None, leave_id: uuid.UUID, commen
     leave.reviewed_at = datetime.now(timezone.utc)
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="leave.approve",
-        entity_type="leave_request", entity_id=leave.id,
+        db,
+        actor_user_id=actor_id,
+        action="leave.approve",
+        entity_type="leave_request",
+        entity_id=leave.id,
         after_data={"assignment_id": str(leave.assignment_id)},
     )
     return leave
 
 
-def reject(db: Session, actor_id: uuid.UUID | None, leave_id: uuid.UUID, comment: str | None = None) -> LeaveRequest:
+def reject(
+    db: Session, actor_id: uuid.UUID | None, leave_id: uuid.UUID, comment: str | None = None
+) -> LeaveRequest:
     leave = _get(db, leave_id)
     if leave.status != LeaveStatus.pending:
         raise HTTPException(status_code=422, detail="仅待审核申请可拒绝")
@@ -180,7 +196,11 @@ def revoke_approval(
     if assignment.execution_status != ExecutionStatus.leave:
         raise HTTPException(status_code=409, detail="原分配执行状态已变化，无法撤销请假批准")
     slot = db.get(DutySlot, assignment.duty_slot_id)
-    start = slot.slot_start_at.replace(tzinfo=timezone.utc) if slot.slot_start_at.tzinfo is None else slot.slot_start_at
+    start = (
+        slot.slot_start_at.replace(tzinfo=timezone.utc)
+        if slot.slot_start_at.tzinfo is None
+        else slot.slot_start_at
+    )
     if start <= datetime.now(timezone.utc):
         raise HTTPException(status_code=422, detail="班次已开始，不能撤销请假批准")
 
@@ -200,8 +220,11 @@ def revoke_approval(
     leave.reviewed_at = datetime.now(timezone.utc)
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="leave.revoke_approval",
-        entity_type="leave_request", entity_id=leave.id,
+        db,
+        actor_user_id=actor_id,
+        action="leave.revoke_approval",
+        entity_type="leave_request",
+        entity_id=leave.id,
         after_data={"assignment_id": str(leave.assignment_id)},
     )
     return leave

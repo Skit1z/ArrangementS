@@ -1,4 +1,5 @@
 """普通用户自助视图测试（方案 10.2 / 10.3 / 10.7）。"""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -26,9 +27,15 @@ def _person(db, i, name=None):
     db.add(u)
     db.flush()
     p = PersonProfile(
-        user_id=u.id, student_no=f"m{i}", class_name="一班", full_name=name or f"人{i}",
-        phone="13800000000", status=PersonStatus.active,
-        id_card_last4="1234", bank_card_last4="5678", difficulty_level="一般",
+        user_id=u.id,
+        student_no=f"m{i}",
+        class_name="一班",
+        full_name=name or f"人{i}",
+        phone="13800000000",
+        status=PersonStatus.active,
+        id_card_last4="1234",
+        bank_card_last4="5678",
+        difficulty_level="一般",
     )
     db.add(p)
     db.flush()
@@ -36,30 +43,49 @@ def _person(db, i, name=None):
 
 
 def _plan(db, status=PlanStatus.published):
-    plan = WeeklyPlan(week_start=date(2026, 3, 2), week_end=date(2026, 3, 8), revision=1, status=status)
+    plan = WeeklyPlan(
+        week_start=date(2026, 3, 2), week_end=date(2026, 3, 8), revision=1, status=status
+    )
     db.add(plan)
     db.flush()
     return plan
 
 
 def _slot_with(db, plan, people, start_offset_hours=48):
-    v = Venue(name="黄楼", code=f"HL{plan.id.hex[:4]}", venue_type=VenueType.fixed_shift, default_required_people=2)
+    v = Venue(
+        name="黄楼",
+        code=f"HL{plan.id.hex[:4]}",
+        venue_type=VenueType.fixed_shift,
+        default_required_people=2,
+    )
     db.add(v)
     db.flush()
     start = datetime.now(timezone.utc) + timedelta(hours=start_offset_hours)
     slot = DutySlot(
-        weekly_plan_id=plan.id, venue_id=v.id, source_type=SlotSourceType.fixed_shift,
-        slot_start_at=start, slot_end_at=start + timedelta(hours=2), required_people=len(people),
-        credited_minutes=120, month_key="2026-03", status=SlotStatus.filled,
+        weekly_plan_id=plan.id,
+        venue_id=v.id,
+        source_type=SlotSourceType.fixed_shift,
+        slot_start_at=start,
+        slot_end_at=start + timedelta(hours=2),
+        required_people=len(people),
+        credited_minutes=120,
+        month_key="2026-03",
+        status=SlotStatus.filled,
     )
     db.add(slot)
     db.flush()
     for i, p in enumerate(people):
-        db.add(Assignment(
-            duty_slot_id=slot.id, person_id=p.id, position_index=i,
-            plan_status=PlanAssignmentStatus.assigned, execution_status=ExecutionStatus.pending,
-            credited_minutes=120, balance_minutes=120,
-        ))
+        db.add(
+            Assignment(
+                duty_slot_id=slot.id,
+                person_id=p.id,
+                position_index=i,
+                plan_status=PlanAssignmentStatus.assigned,
+                execution_status=ExecutionStatus.pending,
+                credited_minutes=120,
+                balance_minutes=120,
+            )
+        )
     db.flush()
     return slot
 
@@ -121,44 +147,81 @@ def test_adjacent_shift_excludes_draft_plan(db_session):
     draft_other = _person(db_session, 1, "草稿同事")
 
     # 共用一个场地，便于「下一班」查询能命中
-    v = Venue(name="黄楼A", code="HLA1", venue_type=VenueType.fixed_shift, default_required_people=1)
-    db_session.add(v); db_session.flush()
+    v = Venue(
+        name="黄楼A", code="HLA1", venue_type=VenueType.fixed_shift, default_required_people=1
+    )
+    db_session.add(v)
+    db_session.flush()
 
     # 草稿计划：未来 72h 有一班，含「草稿同事」
     draft_plan = WeeklyPlan(
-        week_start=date(2026, 3, 16), week_end=date(2026, 3, 22), revision=1, status=PlanStatus.draft
+        week_start=date(2026, 3, 16),
+        week_end=date(2026, 3, 22),
+        revision=1,
+        status=PlanStatus.draft,
     )
-    db_session.add(draft_plan); db_session.flush()
+    db_session.add(draft_plan)
+    db_session.flush()
     start1 = datetime.now(timezone.utc) + timedelta(hours=72)
     slot1 = DutySlot(
-        weekly_plan_id=draft_plan.id, venue_id=v.id, source_type=SlotSourceType.fixed_shift,
-        slot_start_at=start1, slot_end_at=start1 + timedelta(hours=2), required_people=1,
-        credited_minutes=120, month_key="2026-03", status=SlotStatus.filled,
+        weekly_plan_id=draft_plan.id,
+        venue_id=v.id,
+        source_type=SlotSourceType.fixed_shift,
+        slot_start_at=start1,
+        slot_end_at=start1 + timedelta(hours=2),
+        required_people=1,
+        credited_minutes=120,
+        month_key="2026-03",
+        status=SlotStatus.filled,
     )
-    db_session.add(slot1); db_session.flush()
-    db_session.add(Assignment(
-        duty_slot_id=slot1.id, person_id=draft_other.id, position_index=0,
-        plan_status=PlanAssignmentStatus.assigned, execution_status=ExecutionStatus.pending,
-        credited_minutes=120, balance_minutes=120,
-    ))
+    db_session.add(slot1)
+    db_session.flush()
+    db_session.add(
+        Assignment(
+            duty_slot_id=slot1.id,
+            person_id=draft_other.id,
+            position_index=0,
+            plan_status=PlanAssignmentStatus.assigned,
+            execution_status=ExecutionStatus.pending,
+            credited_minutes=120,
+            balance_minutes=120,
+        )
+    )
 
     # 已发布计划：未来 48h 有一班，含「我」（同场地 v）
     pub_plan = WeeklyPlan(
-        week_start=date(2026, 3, 2), week_end=date(2026, 3, 8), revision=1, status=PlanStatus.published
+        week_start=date(2026, 3, 2),
+        week_end=date(2026, 3, 8),
+        revision=1,
+        status=PlanStatus.published,
     )
-    db_session.add(pub_plan); db_session.flush()
+    db_session.add(pub_plan)
+    db_session.flush()
     start2 = datetime.now(timezone.utc) + timedelta(hours=48)
     slot2 = DutySlot(
-        weekly_plan_id=pub_plan.id, venue_id=v.id, source_type=SlotSourceType.fixed_shift,
-        slot_start_at=start2, slot_end_at=start2 + timedelta(hours=2), required_people=1,
-        credited_minutes=120, month_key="2026-03", status=SlotStatus.filled,
+        weekly_plan_id=pub_plan.id,
+        venue_id=v.id,
+        source_type=SlotSourceType.fixed_shift,
+        slot_start_at=start2,
+        slot_end_at=start2 + timedelta(hours=2),
+        required_people=1,
+        credited_minutes=120,
+        month_key="2026-03",
+        status=SlotStatus.filled,
     )
-    db_session.add(slot2); db_session.flush()
-    db_session.add(Assignment(
-        duty_slot_id=slot2.id, person_id=me.id, position_index=0,
-        plan_status=PlanAssignmentStatus.assigned, execution_status=ExecutionStatus.pending,
-        credited_minutes=120, balance_minutes=120,
-    ))
+    db_session.add(slot2)
+    db_session.flush()
+    db_session.add(
+        Assignment(
+            duty_slot_id=slot2.id,
+            person_id=me.id,
+            position_index=0,
+            plan_status=PlanAssignmentStatus.assigned,
+            execution_status=ExecutionStatus.pending,
+            credited_minutes=120,
+            balance_minutes=120,
+        )
+    )
     db_session.commit()
 
     # 我的已发布班次（slot2），查「下一班」时：草稿计划的 slot1（同场地 v）应被忽略
@@ -176,7 +239,12 @@ def test_next_duty_returns_upcoming_only(db_session):
     db_session.commit()
     assert me_service.next_duty(db_session, me.id) is None
 
-    plan2 = WeeklyPlan(week_start=date(2026, 3, 9), week_end=date(2026, 3, 15), revision=1, status=PlanStatus.published)
+    plan2 = WeeklyPlan(
+        week_start=date(2026, 3, 9),
+        week_end=date(2026, 3, 15),
+        revision=1,
+        status=PlanStatus.published,
+    )
     db_session.add(plan2)
     db_session.flush()
     _slot_with(db_session, plan2, [me], start_offset_hours=72)  # 未来
@@ -190,7 +258,7 @@ def test_me_timetable_returns_active(client, seed_admin, db_session):
     """登录用户调用 /me/timetable 返回本人当前学期的生效课表。"""
     from app.services import semester_service, timetable_service
     from app.timetable.extractor import RawCourseEntry
-    from tests.conftest import csrf_headers, login
+    from tests.conftest import login
 
     sem = semester_service.create_semester(db_session, name="春", first_monday=date(2026, 2, 23))
     u = User(

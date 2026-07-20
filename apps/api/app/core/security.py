@@ -3,6 +3,7 @@
 - 密码：Argon2id，明文绝不落盘。
 - 令牌：JWT（HS256），承载 user_id / role / type。
 """
+
 from __future__ import annotations
 
 import uuid

@@ -4,6 +4,7 @@
 数据源：holiday-cn（按年份 JSON，isOffDay=true 为节假日，false 为补班调休工作日）。
 无外网时可手动录入或手动导入 JSON，功能不受影响。
 """
+
 from __future__ import annotations
 
 import json
@@ -18,9 +19,7 @@ from sqlalchemy.orm import Session
 from app.models.enums import DayType, SpecialDateSource
 from app.models.special_date import SpecialDate
 
-HOLIDAY_URL_TEMPLATE = (
-    "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json"
-)
+HOLIDAY_URL_TEMPLATE = "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json"
 
 
 def get_special_date(db: Session, day: date) -> SpecialDate | None:

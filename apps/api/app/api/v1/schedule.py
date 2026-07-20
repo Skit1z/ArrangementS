@@ -1,4 +1,5 @@
 """排班路由：生成、发布、查询、锁定（方案 13.6）。"""
+
 from __future__ import annotations
 
 import uuid

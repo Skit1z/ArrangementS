@@ -1,4 +1,5 @@
 """假期相关请求 / 响应。"""
+
 from __future__ import annotations
 
 import uuid

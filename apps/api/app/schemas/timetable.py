@@ -1,4 +1,5 @@
 """课表相关请求 / 响应。"""
+
 from __future__ import annotations
 
 import uuid
@@ -65,6 +66,7 @@ class TimetablePreviewOut(BaseModel):
     rules: list[CourseRuleOut]
 
     model_config = {"from_attributes": True}
+
 
 class ActiveTimetableOut(BaseModel):
     person_id: uuid.UUID

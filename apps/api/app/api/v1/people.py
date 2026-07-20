@@ -1,4 +1,5 @@
 """人员管理路由（均为 admin 权限）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -53,11 +54,22 @@ def get_person(
 def download_import_template(_: User = Depends(require_admin)) -> Response:
     import io
     from openpyxl import Workbook
+
     wb = Workbook()
     ws = wb.active
     ws.append(["学号", "班级", "姓名", "手机号", "困难等级", "身份证号", "银行卡号"])
-    ws.append(["2023000001", "计科2301", "张三", "13800138000", "A", "110105200001011234", "6222021001112222"])
-    
+    ws.append(
+        [
+            "2023000001",
+            "计科2301",
+            "张三",
+            "13800138000",
+            "A",
+            "110105200001011234",
+            "6222021001112222",
+        ]
+    )
+
     bio = io.BytesIO()
     wb.save(bio)
     return Response(
@@ -65,7 +77,6 @@ def download_import_template(_: User = Depends(require_admin)) -> Response:
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="import_template.xlsx"'},
     )
-
 
 
 @router.post("/import/preview", response_model=ImportPreviewOut)
@@ -88,7 +99,10 @@ async def import_preview(
         new_rows=batch.new_rows,
         updated_rows=batch.updated_rows,
         error_rows=batch.error_rows,
-        rows=[ImportPreviewRow(**{k: r[k] for k in ImportPreviewRow.model_fields}) for r in payload.get("rows", [])],
+        rows=[
+            ImportPreviewRow(**{k: r[k] for k in ImportPreviewRow.model_fields})
+            for r in payload.get("rows", [])
+        ],
     )
 
 

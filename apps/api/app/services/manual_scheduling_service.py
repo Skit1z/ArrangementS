@@ -11,6 +11,7 @@
 注意：本模块只覆盖「单岗位 + 单人员」的最小可复用单元，复杂的多岗位批量优化仍走
 ``schedule_service.generate`` + solver。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -75,6 +76,7 @@ def assign_person_to_new_slot(
     if person is None:
         raise HTTPException(status_code=404, detail="人员不存在")
     from app.models.enums import PersonStatus
+
     if person.status != PersonStatus.active:
         raise HTTPException(status_code=422, detail="该人员当前非启用状态，不可排班")
 
@@ -134,10 +136,17 @@ def assign_person_to_new_slot(
     schedule_service.mark_plan_changed(db, plan)
 
     record_audit(
-        db, actor_user_id=created_by, action=action,
-        entity_type="assignment", entity_id=assignment.id,
-        after_data={"slot_id": str(slot.id), "person_id": str(person.id),
-                    "credited_minutes": credited, "raw_minutes": raw},
+        db,
+        actor_user_id=created_by,
+        action=action,
+        entity_type="assignment",
+        entity_id=assignment.id,
+        after_data={
+            "slot_id": str(slot.id),
+            "person_id": str(person.id),
+            "credited_minutes": credited,
+            "raw_minutes": raw,
+        },
     )
     return slot, assignment
 
@@ -184,21 +193,30 @@ def create_vacant_slot(
     db.flush()
 
     for pidx in range(required_people):
-        db.add(Assignment(
-            duty_slot_id=slot.id, person_id=None, position_index=pidx,
-            assignment_source=AssignmentSource.auto,
-            plan_status=PlanAssignmentStatus.vacant,
-            execution_status=ExecutionStatus.pending,
-            raw_minutes=0, weighted_minutes_before_round=Decimal(0),
-            credited_minutes=0, balance_minutes=0,  # 空岗 0，不污染统计
-            created_by=created_by,
-        ))
+        db.add(
+            Assignment(
+                duty_slot_id=slot.id,
+                person_id=None,
+                position_index=pidx,
+                assignment_source=AssignmentSource.auto,
+                plan_status=PlanAssignmentStatus.vacant,
+                execution_status=ExecutionStatus.pending,
+                raw_minutes=0,
+                weighted_minutes_before_round=Decimal(0),
+                credited_minutes=0,
+                balance_minutes=0,  # 空岗 0，不污染统计
+                created_by=created_by,
+            )
+        )
 
     db.flush()
     schedule_service.mark_plan_changed(db, plan)
     record_audit(
-        db, actor_user_id=created_by, action="manual.vacant_slot",
-        entity_type="duty_slot", entity_id=slot.id,
+        db,
+        actor_user_id=created_by,
+        action="manual.vacant_slot",
+        entity_type="duty_slot",
+        entity_id=slot.id,
         after_data={"required_people": required_people},
     )
     return slot

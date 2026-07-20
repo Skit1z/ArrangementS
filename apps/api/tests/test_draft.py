@@ -1,4 +1,5 @@
 """拖拽草稿保存测试（方案 9.5）。"""
+
 from __future__ import annotations
 
 from datetime import date, datetime, time
@@ -33,8 +34,18 @@ def _yellow(db, templates=2):
     db.flush()
     specs = [("第1班", time(8, 0), time(10, 0)), ("第2班", time(10, 0), time(12, 0))]
     for i, (n, s, e) in enumerate(specs[:templates]):
-        db.add(ShiftTemplate(venue_id=v.id, name=n, start_time=s, end_time=e, credited_minutes=120,
-                             weekday_required_people=2, weekend_required_people=1, sort_order=i))
+        db.add(
+            ShiftTemplate(
+                venue_id=v.id,
+                name=n,
+                start_time=s,
+                end_time=e,
+                credited_minutes=120,
+                weekday_required_people=2,
+                weekend_required_people=1,
+                sort_order=i,
+            )
+        )
     db.flush()
     return v
 
@@ -43,8 +54,15 @@ def _person(db, i):
     u = User(username=f"d{i}", password_hash=hash_password("x"), role=UserRole.user, is_active=True)
     db.add(u)
     db.flush()
-    p = PersonProfile(user_id=u.id, student_no=f"d{i}", class_name="一班", full_name=f"人{i}",
-                      phone="13800000000", status=PersonStatus.active, is_in_scheduling_pool=True)
+    p = PersonProfile(
+        user_id=u.id,
+        student_no=f"d{i}",
+        class_name="一班",
+        full_name=f"人{i}",
+        phone="13800000000",
+        status=PersonStatus.active,
+        is_in_scheduling_pool=True,
+    )
     db.add(p)
     db.flush()
     return p
@@ -71,19 +89,32 @@ def test_unassign_then_assign(db_session):
     v = plan.version
 
     draft_service.apply_operations(
-        db_session, week_start=MONDAY, expected_version=v,
+        db_session,
+        week_start=MONDAY,
+        expected_version=v,
         operations=[{"op": "unassign", "slot_id": str(slot.id), "position_index": 0}],
         actor_id=None,
     )
     db_session.commit()
-    a = db_session.scalar(select(Assignment).where(Assignment.duty_slot_id == slot.id, Assignment.position_index == 0))
+    a = db_session.scalar(
+        select(Assignment).where(Assignment.duty_slot_id == slot.id, Assignment.position_index == 0)
+    )
     assert a.person_id is None
     assert a.plan_status == PlanAssignmentStatus.vacant
 
     plan = schedule_service.get_plan(db_session, MONDAY)
     draft_service.apply_operations(
-        db_session, week_start=MONDAY, expected_version=plan.version,
-        operations=[{"op": "assign", "slot_id": str(slot.id), "position_index": 0, "person_id": str(ps[0].id)}],
+        db_session,
+        week_start=MONDAY,
+        expected_version=plan.version,
+        operations=[
+            {
+                "op": "assign",
+                "slot_id": str(slot.id),
+                "position_index": 0,
+                "person_id": str(ps[0].id),
+            }
+        ],
         actor_id=None,
     )
     db_session.commit()
@@ -98,7 +129,9 @@ def test_optimistic_lock_conflict(db_session):
     slot = _monday_slots(db_session)[0]
     with pytest.raises(HTTPException) as ei:
         draft_service.apply_operations(
-            db_session, week_start=MONDAY, expected_version=999,
+            db_session,
+            week_start=MONDAY,
+            expected_version=999,
             operations=[{"op": "unassign", "slot_id": str(slot.id), "position_index": 0}],
             actor_id=None,
         )
@@ -118,8 +151,12 @@ def test_time_overlap_never_allowed_even_forced(db_session):
     # 让某人占据 s1 位置0
     plan = schedule_service.get_plan(db_session, MONDAY)
     draft_service.apply_operations(
-        db_session, week_start=MONDAY, expected_version=plan.version,
-        operations=[{"op": "assign", "slot_id": str(s1.id), "position_index": 0, "person_id": str(ps[0].id)}],
+        db_session,
+        week_start=MONDAY,
+        expected_version=plan.version,
+        operations=[
+            {"op": "assign", "slot_id": str(s1.id), "position_index": 0, "person_id": str(ps[0].id)}
+        ],
         actor_id=None,
     )
     db_session.commit()
@@ -128,11 +165,19 @@ def test_time_overlap_never_allowed_even_forced(db_session):
     plan = schedule_service.get_plan(db_session, MONDAY)
     with pytest.raises(HTTPException) as ei:
         draft_service.apply_operations(
-            db_session, week_start=MONDAY, expected_version=plan.version,
-            operations=[{
-                "op": "assign", "slot_id": str(s2.id), "position_index": 0,
-                "person_id": str(ps[0].id), "forced": True, "forced_reason": "就要他",
-            }],
+            db_session,
+            week_start=MONDAY,
+            expected_version=plan.version,
+            operations=[
+                {
+                    "op": "assign",
+                    "slot_id": str(s2.id),
+                    "position_index": 0,
+                    "person_id": str(ps[0].id),
+                    "forced": True,
+                    "forced_reason": "就要他",
+                }
+            ],
             actor_id=None,
         )
     assert ei.value.status_code == 422
@@ -143,14 +188,21 @@ def test_hard_constraint_requires_forced_with_reason(db_session):
     ps = _setup(db_session, templates=1, people=4)
     slot = _monday_slots(db_session)[0]
     # p0 该时段有课
-    db_session.add(AvailabilityBlock(
-        person_id=ps[0].id, source=AvailabilitySource.course,
-        start_at=slot.slot_start_at, end_at=slot.slot_end_at, status=AvailabilityStatus.active,
-    ))
+    db_session.add(
+        AvailabilityBlock(
+            person_id=ps[0].id,
+            source=AvailabilitySource.course,
+            start_at=slot.slot_start_at,
+            end_at=slot.slot_end_at,
+            status=AvailabilityStatus.active,
+        )
+    )
     # 先清空该岗位
     plan = schedule_service.get_plan(db_session, MONDAY)
     draft_service.apply_operations(
-        db_session, week_start=MONDAY, expected_version=plan.version,
+        db_session,
+        week_start=MONDAY,
+        expected_version=plan.version,
         operations=[
             {"op": "unassign", "slot_id": str(slot.id), "position_index": 0},
             {"op": "unassign", "slot_id": str(slot.id), "position_index": 1},
@@ -163,8 +215,17 @@ def test_hard_constraint_requires_forced_with_reason(db_session):
     plan = schedule_service.get_plan(db_session, MONDAY)
     with pytest.raises(HTTPException) as ei:
         draft_service.apply_operations(
-            db_session, week_start=MONDAY, expected_version=plan.version,
-            operations=[{"op": "assign", "slot_id": str(slot.id), "position_index": 0, "person_id": str(ps[0].id)}],
+            db_session,
+            week_start=MONDAY,
+            expected_version=plan.version,
+            operations=[
+                {
+                    "op": "assign",
+                    "slot_id": str(slot.id),
+                    "position_index": 0,
+                    "person_id": str(ps[0].id),
+                }
+            ],
             actor_id=None,
         )
     assert ei.value.status_code == 422
@@ -173,9 +234,19 @@ def test_hard_constraint_requires_forced_with_reason(db_session):
     plan = schedule_service.get_plan(db_session, MONDAY)
     with pytest.raises(HTTPException) as ei2:
         draft_service.apply_operations(
-            db_session, week_start=MONDAY, expected_version=plan.version,
-            operations=[{"op": "assign", "slot_id": str(slot.id), "position_index": 0,
-                         "person_id": str(ps[0].id), "forced": True, "forced_reason": ""}],
+            db_session,
+            week_start=MONDAY,
+            expected_version=plan.version,
+            operations=[
+                {
+                    "op": "assign",
+                    "slot_id": str(slot.id),
+                    "position_index": 0,
+                    "person_id": str(ps[0].id),
+                    "forced": True,
+                    "forced_reason": "",
+                }
+            ],
             actor_id=None,
         )
     assert ei2.value.status_code == 422
@@ -183,18 +254,31 @@ def test_hard_constraint_requires_forced_with_reason(db_session):
     # forced + 原因 -> 允许，并写审计
     plan = schedule_service.get_plan(db_session, MONDAY)
     draft_service.apply_operations(
-        db_session, week_start=MONDAY, expected_version=plan.version,
-        operations=[{"op": "assign", "slot_id": str(slot.id), "position_index": 0,
-                     "person_id": str(ps[0].id), "forced": True, "forced_reason": "人手不足"}],
+        db_session,
+        week_start=MONDAY,
+        expected_version=plan.version,
+        operations=[
+            {
+                "op": "assign",
+                "slot_id": str(slot.id),
+                "position_index": 0,
+                "person_id": str(ps[0].id),
+                "forced": True,
+                "forced_reason": "人手不足",
+            }
+        ],
         actor_id=None,
     )
     db_session.commit()
-    a = db_session.scalar(select(Assignment).where(Assignment.duty_slot_id == slot.id, Assignment.position_index == 0))
+    a = db_session.scalar(
+        select(Assignment).where(Assignment.duty_slot_id == slot.id, Assignment.position_index == 0)
+    )
     assert a.person_id == ps[0].id
     assert a.assignment_source == AssignmentSource.forced
     assert a.forced_reason == "人手不足"
 
     from app.models.audit import AuditLog
+
     logs = list(db_session.scalars(select(AuditLog).where(AuditLog.action == "assignment.force")))
     assert len(logs) == 1
 
@@ -204,16 +288,34 @@ def test_same_person_twice_in_one_slot_rejected(db_session):
     slot = _monday_slots(db_session)[0]
     plan = schedule_service.get_plan(db_session, MONDAY)
     draft_service.apply_operations(
-        db_session, week_start=MONDAY, expected_version=plan.version,
-        operations=[{"op": "assign", "slot_id": str(slot.id), "position_index": 0, "person_id": str(ps[0].id)}],
+        db_session,
+        week_start=MONDAY,
+        expected_version=plan.version,
+        operations=[
+            {
+                "op": "assign",
+                "slot_id": str(slot.id),
+                "position_index": 0,
+                "person_id": str(ps[0].id),
+            }
+        ],
         actor_id=None,
     )
     db_session.commit()
     plan = schedule_service.get_plan(db_session, MONDAY)
     with pytest.raises(HTTPException) as ei:
         draft_service.apply_operations(
-            db_session, week_start=MONDAY, expected_version=plan.version,
-            operations=[{"op": "assign", "slot_id": str(slot.id), "position_index": 1, "person_id": str(ps[0].id)}],
+            db_session,
+            week_start=MONDAY,
+            expected_version=plan.version,
+            operations=[
+                {
+                    "op": "assign",
+                    "slot_id": str(slot.id),
+                    "position_index": 1,
+                    "person_id": str(ps[0].id),
+                }
+            ],
             actor_id=None,
         )
     assert ei.value.status_code == 422
@@ -224,7 +326,9 @@ def test_validate_reports_vacancy(db_session):
     slot = _monday_slots(db_session)[0]
     plan = schedule_service.get_plan(db_session, MONDAY)
     draft_service.apply_operations(
-        db_session, week_start=MONDAY, expected_version=plan.version,
+        db_session,
+        week_start=MONDAY,
+        expected_version=plan.version,
         operations=[{"op": "unassign", "slot_id": str(slot.id), "position_index": 0}],
         actor_id=None,
     )
@@ -241,8 +345,11 @@ def test_candidates_flags_overlap_and_sorted(db_session):
     assert len(cands) == 4
     # 已排在本岗位的人对该岗位应标记时间重叠（其自身分配即占用该时段）
     assigned_ids = {
-        str(a.person_id) for a in db_session.scalars(
-            select(Assignment).where(Assignment.duty_slot_id == slot.id, Assignment.person_id.isnot(None))
+        str(a.person_id)
+        for a in db_session.scalars(
+            select(Assignment).where(
+                Assignment.duty_slot_id == slot.id, Assignment.person_id.isnot(None)
+            )
         )
     }
     for c in cands:
@@ -250,13 +357,19 @@ def test_candidates_flags_overlap_and_sorted(db_session):
             assert c["time_overlap"] is True
     del ps
 
+
 def test_week_people_returns_unavailable_slots(db_session):
     ps = _setup(db_session, templates=1, people=3)
     slot = _monday_slots(db_session)[0]
-    db_session.add(AvailabilityBlock(
-        person_id=ps[0].id, source=AvailabilitySource.course,
-        start_at=slot.slot_start_at, end_at=slot.slot_end_at, status=AvailabilityStatus.active,
-    ))
+    db_session.add(
+        AvailabilityBlock(
+            person_id=ps[0].id,
+            source=AvailabilitySource.course,
+            start_at=slot.slot_start_at,
+            end_at=slot.slot_end_at,
+            status=AvailabilityStatus.active,
+        )
+    )
     db_session.commit()
 
     rows = draft_service.week_people(db_session, MONDAY)

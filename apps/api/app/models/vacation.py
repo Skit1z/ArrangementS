@@ -1,4 +1,5 @@
 """寒暑假与假期可值班白名单（方案 4.8）。"""
+
 from __future__ import annotations
 
 import uuid

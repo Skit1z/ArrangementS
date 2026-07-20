@@ -2,6 +2,7 @@
 
 纯函数，便于单元测试。时间解析依据学期课程节次规则，日期依据第一周星期一。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

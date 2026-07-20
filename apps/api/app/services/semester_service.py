@@ -1,4 +1,5 @@
 """学期与课程时间 / 教学楼映射（方案 4.1 / 4.2）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -68,6 +69,7 @@ def create_semester(
     if is_current:
         _make_current(db, sem.id)
     from app.services import vacation_service
+
     vacation_service.sync_vacation_periods(db)
     return sem
 
@@ -102,17 +104,19 @@ def update_semester(db: Session, semester_id: uuid.UUID, patch: dict) -> Semeste
             setattr(sem, k, patch[k])
     db.flush()
     from app.services import vacation_service
+
     vacation_service.sync_vacation_periods(db)
     return sem
 
 
 def get_current_semester(db: Session) -> Semester | None:
     from datetime import date, timedelta
+
     today = date.today()
     all_semesters = db.scalars(select(Semester).order_by(Semester.first_monday.asc())).all()
     if not all_semesters:
         return None
-    
+
     active_sem = None
     for sem in all_semesters:
         start_date = sem.first_monday
@@ -120,22 +124,21 @@ def get_current_semester(db: Session) -> Semester | None:
         if start_date <= today < end_date:
             active_sem = sem
             break
-            
+
     if not active_sem:
-        active_sem = min(
-            all_semesters,
-            key=lambda s: abs((s.first_monday - today).days)
-        )
-        
+        active_sem = min(all_semesters, key=lambda s: abs((s.first_monday - today).days))
+
     if not active_sem.is_current:
         for sem in all_semesters:
-            sem.is_current = (sem.id == active_sem.id)
+            sem.is_current = sem.id == active_sem.id
         db.flush()
-        
+
     return active_sem
 
 
-def resolve_building_type(db: Session, semester_id: uuid.UUID, location_code: str) -> BuildingType | None:
+def resolve_building_type(
+    db: Session, semester_id: uuid.UUID, location_code: str
+) -> BuildingType | None:
     """按前缀优先级匹配教学楼类型；未识别返回 None（交人工确认）。"""
     code = (location_code or "").strip().upper()
     rules = db.scalars(

@@ -1,4 +1,5 @@
 """审计日志：敏感信息查看、强制安排、未到岗、审批、发布、锁定等均写入。"""
+
 from __future__ import annotations
 
 import uuid

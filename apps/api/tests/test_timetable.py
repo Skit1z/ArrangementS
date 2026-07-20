@@ -1,4 +1,5 @@
 """课表时间解析、区间生成与审核生效流程测试。"""
+
 from __future__ import annotations
 
 from datetime import date, datetime, time
@@ -57,7 +58,9 @@ def _make_person(db):
     u = User(username="s9", password_hash=hash_password("x"), role=UserRole.user, is_active=True)
     db.add(u)
     db.flush()
-    p = PersonProfile(user_id=u.id, student_no="s9", class_name="一班", full_name="甲", phone="13800000000")
+    p = PersonProfile(
+        user_id=u.id, student_no="s9", class_name="一班", full_name="甲", phone="13800000000"
+    )
     db.add(p)
     db.flush()
     return p
@@ -68,10 +71,23 @@ def test_upload_does_not_generate_blocks_until_approved(db_session):
     p = _make_person(db_session)
     db_session.commit()
 
-    entries = [RawCourseEntry(weekday=3, period_start=3, period_end=4, week_expr="1-8周", location_code="B608", course_name="高数")]
+    entries = [
+        RawCourseEntry(
+            weekday=3,
+            period_start=3,
+            period_end=4,
+            week_expr="1-8周",
+            location_code="B608",
+            course_name="高数",
+        )
+    ]
     upload = timetable_service.create_upload_from_entries(
-        db_session, person_id=p.id, semester_id=sem.id, uploader_user_id=None,
-        file_name="t.pdf", entries=entries,
+        db_session,
+        person_id=p.id,
+        semester_id=sem.id,
+        uploader_user_id=None,
+        file_name="t.pdf",
+        entries=entries,
     )
     db_session.commit()
 
@@ -85,7 +101,11 @@ def test_upload_does_not_generate_blocks_until_approved(db_session):
     # 审核通过后生成区间
     timetable_service.approve(db_session, upload.id, reviewer_id=None)
     db_session.commit()
-    blocks = list(db_session.scalars(select(AvailabilityBlock).where(AvailabilityBlock.status == AvailabilityStatus.active)))
+    blocks = list(
+        db_session.scalars(
+            select(AvailabilityBlock).where(AvailabilityBlock.status == AvailabilityStatus.active)
+        )
+    )
     assert len(blocks) == 8  # 8 周各一条
 
 
@@ -93,9 +113,18 @@ def test_unknown_location_flags_review(db_session):
     sem = semester_service.create_semester(db_session, name="秋", first_monday=date(2026, 9, 7))
     p = _make_person(db_session)
     db_session.commit()
-    entries = [RawCourseEntry(weekday=1, period_start=1, period_end=2, week_expr="1-4周", location_code="ZZ9")]
+    entries = [
+        RawCourseEntry(
+            weekday=1, period_start=1, period_end=2, week_expr="1-4周", location_code="ZZ9"
+        )
+    ]
     upload = timetable_service.create_upload_from_entries(
-        db_session, person_id=p.id, semester_id=sem.id, uploader_user_id=None, file_name="t.pdf", entries=entries,
+        db_session,
+        person_id=p.id,
+        semester_id=sem.id,
+        uploader_user_id=None,
+        file_name="t.pdf",
+        entries=entries,
     )
     db_session.commit()
     assert upload.course_rules[0].needs_review is True
@@ -105,17 +134,41 @@ def test_semester_end_expires_blocks(db_session):
     sem = semester_service.create_semester(db_session, name="秋", first_monday=date(2026, 9, 7))
     p = _make_person(db_session)
     db_session.commit()
-    entries = [RawCourseEntry(weekday=3, period_start=1, period_end=2, week_expr="1-4周", location_code="B101")]
+    entries = [
+        RawCourseEntry(
+            weekday=3, period_start=1, period_end=2, week_expr="1-4周", location_code="B101"
+        )
+    ]
     upload = timetable_service.create_upload_from_entries(
-        db_session, person_id=p.id, semester_id=sem.id, uploader_user_id=None, file_name="t.pdf", entries=entries,
+        db_session,
+        person_id=p.id,
+        semester_id=sem.id,
+        uploader_user_id=None,
+        file_name="t.pdf",
+        entries=entries,
     )
     timetable_service.approve(db_session, upload.id, reviewer_id=None)
     db_session.commit()
-    assert len(list(db_session.scalars(select(AvailabilityBlock).where(AvailabilityBlock.status == AvailabilityStatus.active)))) == 4
+    assert (
+        len(
+            list(
+                db_session.scalars(
+                    select(AvailabilityBlock).where(
+                        AvailabilityBlock.status == AvailabilityStatus.active
+                    )
+                )
+            )
+        )
+        == 4
+    )
 
     timetable_service.expire_semester_courses(db_session, sem.id)
     db_session.commit()
-    active = list(db_session.scalars(select(AvailabilityBlock).where(AvailabilityBlock.status == AvailabilityStatus.active)))
+    active = list(
+        db_session.scalars(
+            select(AvailabilityBlock).where(AvailabilityBlock.status == AvailabilityStatus.active)
+        )
+    )
     assert active == []
     db_session.refresh(upload)
     assert upload.review_status == ReviewStatus.superseded
@@ -125,17 +178,43 @@ def test_new_upload_supersedes_previous(db_session):
     sem = semester_service.create_semester(db_session, name="秋", first_monday=date(2026, 9, 7))
     p = _make_person(db_session)
     db_session.commit()
-    e1 = [RawCourseEntry(weekday=1, period_start=1, period_end=2, week_expr="1-2周", location_code="B101")]
-    up1 = timetable_service.create_upload_from_entries(db_session, person_id=p.id, semester_id=sem.id, uploader_user_id=None, file_name="a.pdf", entries=e1)
+    e1 = [
+        RawCourseEntry(
+            weekday=1, period_start=1, period_end=2, week_expr="1-2周", location_code="B101"
+        )
+    ]
+    up1 = timetable_service.create_upload_from_entries(
+        db_session,
+        person_id=p.id,
+        semester_id=sem.id,
+        uploader_user_id=None,
+        file_name="a.pdf",
+        entries=e1,
+    )
     timetable_service.approve(db_session, up1.id, reviewer_id=None)
     db_session.commit()
 
-    e2 = [RawCourseEntry(weekday=2, period_start=1, period_end=2, week_expr="1-3周", location_code="B101")]
-    up2 = timetable_service.create_upload_from_entries(db_session, person_id=p.id, semester_id=sem.id, uploader_user_id=None, file_name="b.pdf", entries=e2)
+    e2 = [
+        RawCourseEntry(
+            weekday=2, period_start=1, period_end=2, week_expr="1-3周", location_code="B101"
+        )
+    ]
+    up2 = timetable_service.create_upload_from_entries(
+        db_session,
+        person_id=p.id,
+        semester_id=sem.id,
+        uploader_user_id=None,
+        file_name="b.pdf",
+        entries=e2,
+    )
     timetable_service.approve(db_session, up2.id, reviewer_id=None)
     db_session.commit()
 
     db_session.refresh(up1)
     assert up1.review_status == ReviewStatus.superseded
-    active = list(db_session.scalars(select(AvailabilityBlock).where(AvailabilityBlock.status == AvailabilityStatus.active)))
+    active = list(
+        db_session.scalars(
+            select(AvailabilityBlock).where(AvailabilityBlock.status == AvailabilityStatus.active)
+        )
+    )
     assert len(active) == 3  # 仅新版本 3 周

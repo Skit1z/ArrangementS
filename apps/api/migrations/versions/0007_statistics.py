@@ -4,6 +4,7 @@ Revision ID: 0007
 Revises: 0006
 Create Date: 2026-07-17
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -25,7 +26,12 @@ def upgrade() -> None:
     op.create_table(
         "monthly_hour_summaries",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("person_id", sa.Uuid(), sa.ForeignKey("person_profiles.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "person_id",
+            sa.Uuid(),
+            sa.ForeignKey("person_profiles.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("month", sa.Date(), nullable=False),
         sa.Column("balance_minutes", sa.Integer(), nullable=False),
         sa.Column("completed_minutes", sa.Integer(), nullable=False),
@@ -46,27 +52,45 @@ def upgrade() -> None:
     op.create_table(
         "monthly_venue_hour_summaries",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("person_id", sa.Uuid(), sa.ForeignKey("person_profiles.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "person_id",
+            sa.Uuid(),
+            sa.ForeignKey("person_profiles.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("month", sa.Date(), nullable=False),
-        sa.Column("venue_id", sa.Uuid(), sa.ForeignKey("venues.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "venue_id", sa.Uuid(), sa.ForeignKey("venues.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("completed_minutes", sa.Integer(), nullable=False),
         sa.Column("balance_minutes", sa.Integer(), nullable=False),
         sa.Column("calculated_at", sa.DateTime(timezone=True), nullable=True),
         sa.UniqueConstraint("person_id", "month", "venue_id", name="uq_person_month_venue"),
     )
-    op.create_index("ix_monthly_venue_hour_summaries_person_id", "monthly_venue_hour_summaries", ["person_id"])
+    op.create_index(
+        "ix_monthly_venue_hour_summaries_person_id", "monthly_venue_hour_summaries", ["person_id"]
+    )
 
     op.create_table(
         "hour_adjustments",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("person_id", sa.Uuid(), sa.ForeignKey("person_profiles.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "person_id",
+            sa.Uuid(),
+            sa.ForeignKey("person_profiles.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("month", sa.Date(), nullable=False),
         sa.Column("minutes_delta", sa.Integer(), nullable=False),
         sa.Column("affect_balance", sa.Boolean(), nullable=False),
         sa.Column("reason", sa.String(255), nullable=False),
         sa.Column("source_assignment_id", sa.Uuid(), nullable=True),
-        sa.Column("created_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
     op.create_index("ix_hour_adjustments_person_id", "hour_adjustments", ["person_id"])
     op.create_index("ix_hour_adjustments_month", "hour_adjustments", ["month"])

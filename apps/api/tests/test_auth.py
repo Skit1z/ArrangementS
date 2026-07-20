@@ -1,4 +1,5 @@
 """认证与 admin 管理 API 测试。"""
+
 from __future__ import annotations
 
 from app.core.cookies import CSRF_COOKIE_NAME
@@ -35,9 +36,7 @@ def test_me_after_login(client, seed_admin):
 def test_write_requires_csrf(client, seed_admin):
     login(client, "admin", "admin1234")
     # 不带 CSRF 头 → 403
-    resp = client.post(
-        "/api/v1/admin/admins", json={"username": "admin2", "password": "secret123"}
-    )
+    resp = client.post("/api/v1/admin/admins", json={"username": "admin2", "password": "secret123"})
     assert resp.status_code == 403
 
 
@@ -72,9 +71,7 @@ def test_normal_user_cannot_create_admin(client, db_session):
 
 def test_cannot_disable_self(client, seed_admin):
     token = login(client, "admin", "admin1234")
-    resp = client.post(
-        f"/api/v1/admin/admins/{seed_admin.id}/disable", headers=csrf_headers(token)
-    )
+    resp = client.post(f"/api/v1/admin/admins/{seed_admin.id}/disable", headers=csrf_headers(token))
     assert resp.status_code == 400
 
 
@@ -87,12 +84,18 @@ def test_change_password_then_relogin(client, seed_admin):
     )
     assert resp.status_code == 200
     client.post("/api/v1/auth/logout", headers=csrf_headers(token))
-    assert client.post(
-        "/api/v1/auth/login", json={"username": "admin", "password": "admin1234"}
-    ).status_code == 401
-    assert client.post(
-        "/api/v1/auth/login", json={"username": "admin", "password": "newpass123"}
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "admin1234"}
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "newpass123"}
+        ).status_code
+        == 200
+    )
 
 
 def test_last_admin_cannot_be_disabled(client, seed_admin, db_session):
@@ -105,7 +108,5 @@ def test_last_admin_cannot_be_disabled(client, seed_admin, db_session):
     # 停用 admin2 后仅剩 admin 自己；再尝试停用 admin 自己走的是 “不能停用自己”
     client.post(f"/api/v1/admin/admins/{other['id']}/disable", headers=csrf_headers(token))
     # 仅剩一个启用 admin（自己），停用自己被拒
-    resp = client.post(
-        f"/api/v1/admin/admins/{seed_admin.id}/disable", headers=csrf_headers(token)
-    )
+    resp = client.post(f"/api/v1/admin/admins/{seed_admin.id}/disable", headers=csrf_headers(token))
     assert resp.status_code == 400

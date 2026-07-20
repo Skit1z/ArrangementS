@@ -1,4 +1,5 @@
 """排班全链路集成测试：岗位生成 -> 求解 -> 落库 -> 发布。"""
+
 from __future__ import annotations
 
 from datetime import date, datetime, time
@@ -30,8 +31,18 @@ def _yellow(db, templates=2):
     db.flush()
     specs = [("第1班", time(8, 0), time(10, 0)), ("第2班", time(10, 0), time(12, 0))]
     for i, (n, s, e) in enumerate(specs[:templates]):
-        db.add(ShiftTemplate(venue_id=v.id, name=n, start_time=s, end_time=e,
-                             credited_minutes=120, weekday_required_people=2, weekend_required_people=1, sort_order=i))
+        db.add(
+            ShiftTemplate(
+                venue_id=v.id,
+                name=n,
+                start_time=s,
+                end_time=e,
+                credited_minutes=120,
+                weekday_required_people=2,
+                weekend_required_people=1,
+                sort_order=i,
+            )
+        )
     db.flush()
     return v
 
@@ -40,8 +51,15 @@ def _person(db, i):
     u = User(username=f"u{i}", password_hash=hash_password("x"), role=UserRole.user, is_active=True)
     db.add(u)
     db.flush()
-    p = PersonProfile(user_id=u.id, student_no=f"u{i}", class_name="一班", full_name=f"人{i}",
-                      phone="13800000000", status=PersonStatus.active, is_in_scheduling_pool=True)
+    p = PersonProfile(
+        user_id=u.id,
+        student_no=f"u{i}",
+        class_name="一班",
+        full_name=f"人{i}",
+        phone="13800000000",
+        status=PersonStatus.active,
+        is_in_scheduling_pool=True,
+    )
     db.add(p)
     db.flush()
     return p
@@ -59,9 +77,7 @@ def test_generate_fills_weekday_slots(db_session):
 
     # 周一（工作日）第1班应有 2 个已分配、互不相同的人
     slots = list(db_session.scalars(select(DutySlot)))
-    monday_shift1 = next(
-        s for s in slots if s.slot_start_at == datetime(2026, 3, 2, 8, 0)
-    )
+    monday_shift1 = next(s for s in slots if s.slot_start_at == datetime(2026, 3, 2, 8, 0))
     assert monday_shift1.required_people == 2
     people = [a.person_id for a in monday_shift1.assignments if a.person_id]
     assert len(people) == 2 and len(set(people)) == 2
@@ -107,11 +123,15 @@ def test_course_conflict_excludes_person(db_session):
     _person(db_session, 1)
     _person(db_session, 2)
     # p0 在周一第1班时间有课
-    db_session.add(AvailabilityBlock(
-        person_id=p0.id, source=AvailabilitySource.course,
-        start_at=datetime(2026, 3, 2, 8, 0), end_at=datetime(2026, 3, 2, 10, 0),
-        status=AvailabilityStatus.active,
-    ))
+    db_session.add(
+        AvailabilityBlock(
+            person_id=p0.id,
+            source=AvailabilitySource.course,
+            start_at=datetime(2026, 3, 2, 8, 0),
+            end_at=datetime(2026, 3, 2, 10, 0),
+            status=AvailabilityStatus.active,
+        )
+    )
     db_session.commit()
     schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
     db_session.commit()
@@ -143,14 +163,16 @@ def test_reproducible_generate(db_session):
     db_session.commit()
     first = {
         (str(a.duty_slot_id), a.position_index): str(a.person_id)
-        for a in db_session.scalars(select(Assignment)) if a.person_id
+        for a in db_session.scalars(select(Assignment))
+        if a.person_id
     }
     # 重新生成（同 seed）应得到相同分配
     schedule_service.generate(db_session, MONDAY, actor_id=None, seed=7)
     db_session.commit()
     second = {
         (str(a.duty_slot_id), a.position_index): str(a.person_id)
-        for a in db_session.scalars(select(Assignment)) if a.person_id
+        for a in db_session.scalars(select(Assignment))
+        if a.person_id
     }
     assert set(first.values()) == set(second.values())
 
@@ -176,10 +198,14 @@ def test_generate_preserves_locked_slot_and_assignment(db_session):
     assert db_session.get(DutySlot, original_slot_id).is_locked is True
     preserved = db_session.get(Assignment, original_assignment_id)
     assert preserved.person_id == original_person_id
-    matching = list(db_session.scalars(select(DutySlot).where(
-        DutySlot.source_id == locked_slot.source_id,
-        DutySlot.slot_start_at == locked_slot.slot_start_at,
-    )))
+    matching = list(
+        db_session.scalars(
+            select(DutySlot).where(
+                DutySlot.source_id == locked_slot.source_id,
+                DutySlot.slot_start_at == locked_slot.slot_start_at,
+            )
+        )
+    )
     assert len(matching) == 1
 
 
@@ -207,32 +233,39 @@ def test_add_task_to_published_plan_creates_slot_and_vacant_assignments(db_sessi
     from app.models.enums import (
         PlanAssignmentStatus,
         SlotSourceType,
-        SlotStatus,
         TaskStatus,
     )
-    from app.models.venue_task import VenueTask
     from app.services import schedule_service, task_service
 
     # 场地：1 个固定班次 + 1 个事件场地
     _yellow(db_session)
-    event_v = Venue(name="蓝厅", code="LT", venue_type=VenueType.event_based, default_required_people=2)
-    db_session.add(event_v); db_session.flush()
-    _person(db_session, 0); _person(db_session, 1)
+    event_v = Venue(
+        name="蓝厅", code="LT", venue_type=VenueType.event_based, default_required_people=2
+    )
+    db_session.add(event_v)
+    db_session.flush()
+    _person(db_session, 0)
+    _person(db_session, 1)
     db_session.commit()
 
     # 生成并发布本周计划
     schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
-    plan = db_session.scalars(select(__import__("app.models.schedule", fromlist=["WeeklyPlan"]).WeeklyPlan)).first()
+    plan = db_session.scalars(
+        select(__import__("app.models.schedule", fromlist=["WeeklyPlan"]).WeeklyPlan)
+    ).first()
     initial_revision = plan.revision
     schedule_service.publish(db_session, MONDAY, actor_id=None)
     db_session.commit()
-    initial_slot_count = len(list(db_session.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))))
+    len(list(db_session.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))))
 
     # 创建一个属于本周三的任务
     wed = datetime.combine(MONDAY + timedelta(days=2), time(14, 0), tzinfo=timezone.utc)
     task = task_service.create_task(
-        db_session, venue_id=event_v.id, title="讲座",
-        booking_start_at=wed, booking_end_at=wed + timedelta(hours=2),
+        db_session,
+        venue_id=event_v.id,
+        title="讲座",
+        booking_start_at=wed,
+        booking_end_at=wed + timedelta(hours=2),
     )
     task_service.transition_task(db_session, task.id, TaskStatus.confirmed)  # 进排班池
     db_session.commit()
@@ -242,17 +275,25 @@ def test_add_task_to_published_plan_creates_slot_and_vacant_assignments(db_sessi
     db_session.commit()
 
     # 验证：新增了 1 个 venue_task slot
-    new_slots = list(db_session.scalars(select(DutySlot).where(
-        DutySlot.weekly_plan_id == plan.id,
-        DutySlot.source_type == SlotSourceType.venue_task,
-    )))
+    new_slots = list(
+        db_session.scalars(
+            select(DutySlot).where(
+                DutySlot.weekly_plan_id == plan.id,
+                DutySlot.source_type == SlotSourceType.venue_task,
+            )
+        )
+    )
     assert len(new_slots) == 1
     assert new_slots[0].source_id == task.id
 
     # 验证：创建了 required_people(=2) 个空缺 assignment
-    vacant_assignments = list(db_session.scalars(select(Assignment).where(
-        Assignment.duty_slot_id == new_slots[0].id,
-    )))
+    vacant_assignments = list(
+        db_session.scalars(
+            select(Assignment).where(
+                Assignment.duty_slot_id == new_slots[0].id,
+            )
+        )
+    )
     assert len(vacant_assignments) == 2
     assert all(a.plan_status == PlanAssignmentStatus.vacant for a in vacant_assignments)
     assert all(a.person_id is None for a in vacant_assignments)
@@ -265,23 +306,34 @@ def test_add_task_to_published_plan_creates_slot_and_vacant_assignments(db_sessi
 def test_add_task_to_draft_plan_no_revision_bump(db_session):
     """草稿计划追加任务时不提升修订号（还没发布）。"""
     from datetime import timedelta, timezone
-    from app.models.enums import SlotSourceType, TaskStatus
-    from app.models.venue_task import VenueTask
+    from app.models.enums import TaskStatus
     from app.models.schedule import WeeklyPlan
     from app.services import schedule_service, task_service
 
-    event_v = Venue(name="蓝厅", code="LT", venue_type=VenueType.event_based, default_required_people=2)
-    db_session.add(event_v); db_session.flush()
+    event_v = Venue(
+        name="蓝厅", code="LT", venue_type=VenueType.event_based, default_required_people=2
+    )
+    db_session.add(event_v)
+    db_session.flush()
     db_session.commit()
 
     # 直接造一个草稿计划
-    plan = WeeklyPlan(week_start=MONDAY, week_end=MONDAY + timedelta(days=6), revision=1, status=__import__("app.models.enums", fromlist=["PlanStatus"]).PlanStatus.draft)
-    db_session.add(plan); db_session.flush()
+    plan = WeeklyPlan(
+        week_start=MONDAY,
+        week_end=MONDAY + timedelta(days=6),
+        revision=1,
+        status=__import__("app.models.enums", fromlist=["PlanStatus"]).PlanStatus.draft,
+    )
+    db_session.add(plan)
+    db_session.flush()
 
     wed = datetime.combine(MONDAY + timedelta(days=2), time(14, 0), tzinfo=timezone.utc)
     task = task_service.create_task(
-        db_session, venue_id=event_v.id, title="讲座",
-        booking_start_at=wed, booking_end_at=wed + timedelta(hours=2),
+        db_session,
+        venue_id=event_v.id,
+        title="讲座",
+        booking_start_at=wed,
+        booking_end_at=wed + timedelta(hours=2),
     )
     task_service.transition_task(db_session, task.id, TaskStatus.confirmed)
     db_session.commit()

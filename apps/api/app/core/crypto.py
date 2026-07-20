@@ -2,6 +2,7 @@
 
 密钥来自 FIELD_ENCRYPTION_KEY（base64 编码的 32 字节）。数据库只额外保存后四位用于脱敏。
 """
+
 from __future__ import annotations
 
 import base64

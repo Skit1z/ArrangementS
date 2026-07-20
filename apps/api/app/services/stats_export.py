@@ -3,6 +3,7 @@
 两个工作表：月度汇总、工时明细。分场地列按场地维度动态生成。
 身份证号、银行卡号绝不进入导出。
 """
+
 from __future__ import annotations
 
 import io
@@ -47,17 +48,23 @@ def _summary_sheet(db: Session, wb: Workbook, month_key: str, month) -> None:
         db.scalars(select(MonthlyVenueHourSummary).where(MonthlyVenueHourSummary.month == month))
     )
     venue_ids = sorted({v.venue_id for v in venue_rows}, key=str)
-    venue_names = {
-        v.id: v.name for v in db.scalars(select(Venue).where(Venue.id.in_(venue_ids)))
-    } if venue_ids else {}
+    venue_names = (
+        {v.id: v.name for v in db.scalars(select(Venue).where(Venue.id.in_(venue_ids)))}
+        if venue_ids
+        else {}
+    )
     venue_completed = {(v.person_id, v.venue_id): v.completed_minutes for v in venue_rows}
 
-    persons = {
-        p.id: p
-        for p in db.scalars(
-            select(PersonProfile).where(PersonProfile.id.in_([s.person_id for s in summaries]))
-        )
-    } if summaries else {}
+    persons = (
+        {
+            p.id: p
+            for p in db.scalars(
+                select(PersonProfile).where(PersonProfile.id.in_([s.person_id for s in summaries]))
+            )
+        }
+        if summaries
+        else {}
+    )
 
     headers = ["学号", "班级", "姓名", "手机号", "排班平衡工时(h)", "实际完成工时(h)"]
     headers += [f"{venue_names.get(vid, vid)}工时(h)" for vid in venue_ids]
@@ -84,8 +91,17 @@ def _summary_sheet(db: Session, wb: Workbook, month_key: str, month) -> None:
 def _detail_sheet(db: Session, wb: Workbook, month_key: str) -> None:
     ws = wb.create_sheet("工时明细")
     headers = [
-        "日期", "场地", "班次/任务", "完整值班开始", "完整值班结束",
-        "原始时长(min)", "取整前加权(min)", "最终统计工时(min)", "执行状态", "分配来源", "备注",
+        "日期",
+        "场地",
+        "班次/任务",
+        "完整值班开始",
+        "完整值班结束",
+        "原始时长(min)",
+        "取整前加权(min)",
+        "最终统计工时(min)",
+        "执行状态",
+        "分配来源",
+        "备注",
     ]
     ws.append(headers)
     for cell in ws[1]:
@@ -101,16 +117,18 @@ def _detail_sheet(db: Session, wb: Workbook, month_key: str) -> None:
     ).all()
     for a, slot, venue, person in rows:
         kind = "黄楼班次" if slot.source_type == SlotSourceType.fixed_shift else "场地任务"
-        ws.append([
-            slot.slot_start_at.date().isoformat(),
-            venue.name,
-            f"{kind}",
-            slot.slot_start_at.isoformat(),
-            slot.slot_end_at.isoformat(),
-            a.raw_minutes,
-            float(a.weighted_minutes_before_round),
-            a.credited_minutes,
-            a.execution_status.value,
-            a.assignment_source.value,
-            person.full_name,
-        ])
+        ws.append(
+            [
+                slot.slot_start_at.date().isoformat(),
+                venue.name,
+                f"{kind}",
+                slot.slot_start_at.isoformat(),
+                slot.slot_end_at.isoformat(),
+                a.raw_minutes,
+                float(a.weighted_minutes_before_round),
+                a.credited_minutes,
+                a.execution_status.value,
+                a.assignment_source.value,
+                person.full_name,
+            ]
+        )

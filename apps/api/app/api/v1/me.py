@@ -1,4 +1,5 @@
 """普通用户自助路由（不可值班申请、请假、换班）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -55,12 +56,20 @@ def my_next_duty(u: User = Depends(get_current_user), db: Session = Depends(get_
 
 
 @router.get("/hours")
-def my_hours(month: str, u: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+def my_hours(
+    month: str, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> dict:
     person_id = _person_id(db, u)
     try:
         s = schedule_stats.get_summary(db, month, person_id)
     except HTTPException:
-        return {"month": month, "balance_minutes": 0, "completed_minutes": 0, "venues": [], "calculated": False}
+        return {
+            "month": month,
+            "balance_minutes": 0,
+            "completed_minutes": 0,
+            "venues": [],
+            "calculated": False,
+        }
     breakdown = schedule_stats.venue_breakdown(db, month, person_id)
     return {
         "month": month,
@@ -73,7 +82,11 @@ def my_hours(month: str, u: User = Depends(get_current_user), db: Session = Depe
         "status": s.status.value,
         "calculated": True,
         "venues": [
-            {"venue_id": str(v.venue_id), "venue_name": venue.name, "completed_minutes": v.completed_minutes}
+            {
+                "venue_id": str(v.venue_id),
+                "venue_name": venue.name,
+                "completed_minutes": v.completed_minutes,
+            }
             for v, venue in breakdown
         ],
     }
@@ -81,10 +94,18 @@ def my_hours(month: str, u: User = Depends(get_current_user), db: Session = Depe
 
 # --- 不可值班申请 ---
 @router.post("/availability-requests", response_model=AvailabilityRequestOut, status_code=201)
-def create_availability_request(payload: AvailabilityRequestIn, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_availability_request(
+    payload: AvailabilityRequestIn,
+    u: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     req = availability_service.create_request(
-        db, person_id=_person_id(db, u), start_at=payload.start_at, end_at=payload.end_at,
-        reason=payload.reason, recurrence_rule=payload.recurrence_rule,
+        db,
+        person_id=_person_id(db, u),
+        start_at=payload.start_at,
+        end_at=payload.end_at,
+        reason=payload.reason,
+        recurrence_rule=payload.recurrence_rule,
     )
     db.commit()
     return req
@@ -96,7 +117,9 @@ def my_availability_requests(u: User = Depends(get_current_user), db: Session = 
 
 
 @router.post("/availability-requests/{request_id}/withdraw", response_model=AvailabilityRequestOut)
-def withdraw_availability_request(request_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def withdraw_availability_request(
+    request_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     req = availability_service.withdraw(db, _person_id(db, u), request_id)
     db.commit()
     return req
@@ -104,9 +127,14 @@ def withdraw_availability_request(request_id: uuid.UUID, u: User = Depends(get_c
 
 # --- 请假 ---
 @router.post("/leave-requests", response_model=LeaveOut, status_code=201)
-def create_leave(payload: LeaveIn, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_leave(
+    payload: LeaveIn, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     leave = leave_service.create_leave(
-        db, applicant_person_id=_person_id(db, u), assignment_id=payload.assignment_id, reason=payload.reason,
+        db,
+        applicant_person_id=_person_id(db, u),
+        assignment_id=payload.assignment_id,
+        reason=payload.reason,
     )
     db.commit()
     return leave
@@ -118,7 +146,9 @@ def my_leaves(u: User = Depends(get_current_user), db: Session = Depends(get_db)
 
 
 @router.post("/leave-requests/{leave_id}/withdraw", response_model=LeaveOut)
-def withdraw_leave(leave_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def withdraw_leave(
+    leave_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     leave = leave_service.withdraw(db, _person_id(db, u), leave_id)
     db.commit()
     return leave
@@ -126,19 +156,29 @@ def withdraw_leave(leave_id: uuid.UUID, u: User = Depends(get_current_user), db:
 
 # --- 换班 ---
 @router.post("/swap-requests/targeted", response_model=SwapOut, status_code=201)
-def create_targeted_swap(payload: SwapTargetedIn, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_targeted_swap(
+    payload: SwapTargetedIn, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     swap = swap_service.create_targeted(
-        db, requester_person_id=_person_id(db, u), assignment_id=payload.assignment_id,
-        target_person_id=payload.target_person_id, reason=payload.reason,
+        db,
+        requester_person_id=_person_id(db, u),
+        assignment_id=payload.assignment_id,
+        target_person_id=payload.target_person_id,
+        reason=payload.reason,
     )
     db.commit()
     return swap
 
 
 @router.post("/swap-requests/open", response_model=SwapOut, status_code=201)
-def create_open_swap(payload: SwapOpenIn, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_open_swap(
+    payload: SwapOpenIn, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     swap = swap_service.create_open(
-        db, requester_person_id=_person_id(db, u), assignment_id=payload.assignment_id, reason=payload.reason,
+        db,
+        requester_person_id=_person_id(db, u),
+        assignment_id=payload.assignment_id,
+        reason=payload.reason,
     )
     db.commit()
     return swap
@@ -155,28 +195,40 @@ def my_swap_invitations(u: User = Depends(get_current_user), db: Session = Depen
 
 
 @router.post("/swap-requests/{swap_id}/accept", response_model=SwapOut)
-def accept_swap(swap_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    swap = swap_service.respond_target(db, target_person_id=_person_id(db, u), swap_id=swap_id, accept=True)
+def accept_swap(
+    swap_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    swap = swap_service.respond_target(
+        db, target_person_id=_person_id(db, u), swap_id=swap_id, accept=True
+    )
     db.commit()
     return swap
 
 
 @router.post("/swap-requests/{swap_id}/reject", response_model=SwapOut)
-def reject_swap_invitation(swap_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    swap = swap_service.respond_target(db, target_person_id=_person_id(db, u), swap_id=swap_id, accept=False)
+def reject_swap_invitation(
+    swap_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    swap = swap_service.respond_target(
+        db, target_person_id=_person_id(db, u), swap_id=swap_id, accept=False
+    )
     db.commit()
     return swap
 
 
 @router.post("/swap-requests/{swap_id}/apply", response_model=MessageOut)
-def apply_open_swap(swap_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def apply_open_swap(
+    swap_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     swap_service.apply_open(db, candidate_person_id=_person_id(db, u), swap_id=swap_id)
     db.commit()
     return MessageOut(message="报名成功")
 
 
 @router.post("/swap-requests/{swap_id}/withdraw", response_model=SwapOut)
-def withdraw_swap(swap_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def withdraw_swap(
+    swap_id: uuid.UUID, u: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     swap = swap_service.withdraw(db, requester_person_id=_person_id(db, u), swap_id=swap_id)
     db.commit()
     return swap
@@ -195,6 +247,7 @@ def list_peers(u: User = Depends(get_current_user), db: Session = Depends(get_db
     from app.models.person import PersonProfile
     from app.models.enums import PersonStatus
     from sqlalchemy import select
+
     my_id = _person_id(db, u)
     people = db.scalars(
         select(PersonProfile)

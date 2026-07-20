@@ -1,4 +1,5 @@
 """认证与 admin 账号管理业务逻辑。"""
+
 from __future__ import annotations
 
 import uuid
@@ -44,11 +45,14 @@ def change_password(db: Session, user: User, old_password: str, new_password: st
 
 
 def _active_admin_count(db: Session) -> int:
-    return db.scalar(
-        select(func.count()).select_from(User).where(
-            User.role == UserRole.admin, User.is_active.is_(True)
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.role == UserRole.admin, User.is_active.is_(True))
         )
-    ) or 0
+        or 0
+    )
 
 
 def create_admin(db: Session, actor: User, username: str, password: str) -> User:

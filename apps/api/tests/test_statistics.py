@@ -1,4 +1,5 @@
 """月度统计与导出测试（方案 11）。"""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -26,11 +27,19 @@ MONTH = "2026-03"
 
 
 def _person(db, i):
-    u = User(username=f"st{i}", password_hash=hash_password("x"), role=UserRole.user, is_active=True)
+    u = User(
+        username=f"st{i}", password_hash=hash_password("x"), role=UserRole.user, is_active=True
+    )
     db.add(u)
     db.flush()
-    p = PersonProfile(user_id=u.id, student_no=f"st{i}", class_name="一班", full_name=f"人{i}",
-                      phone="13800000000", status=PersonStatus.active)
+    p = PersonProfile(
+        user_id=u.id,
+        student_no=f"st{i}",
+        class_name="一班",
+        full_name=f"人{i}",
+        phone="13800000000",
+        status=PersonStatus.active,
+    )
     db.add(p)
     db.flush()
     return p
@@ -43,21 +52,35 @@ def _venue(db, code="HL", vtype=VenueType.fixed_shift):
     return v
 
 
-def _assignment(db, plan, venue, person, execution, credited=120, raw=120, weighted=120, balance=120):
+def _assignment(
+    db, plan, venue, person, execution, credited=120, raw=120, weighted=120, balance=120
+):
     from decimal import Decimal
+
     start = datetime(2026, 3, 3, 8, 0)
     slot = DutySlot(
-        weekly_plan_id=plan.id, venue_id=venue.id, source_type=SlotSourceType.fixed_shift,
-        slot_start_at=start, slot_end_at=start + timedelta(hours=2), required_people=1,
-        credited_minutes=credited, month_key=MONTH, status=SlotStatus.filled,
+        weekly_plan_id=plan.id,
+        venue_id=venue.id,
+        source_type=SlotSourceType.fixed_shift,
+        slot_start_at=start,
+        slot_end_at=start + timedelta(hours=2),
+        required_people=1,
+        credited_minutes=credited,
+        month_key=MONTH,
+        status=SlotStatus.filled,
     )
     db.add(slot)
     db.flush()
     a = Assignment(
-        duty_slot_id=slot.id, person_id=person.id, position_index=0,
-        plan_status=PlanAssignmentStatus.assigned, execution_status=execution,
-        raw_minutes=raw, weighted_minutes_before_round=Decimal(weighted),
-        credited_minutes=credited, balance_minutes=balance,
+        duty_slot_id=slot.id,
+        person_id=person.id,
+        position_index=0,
+        plan_status=PlanAssignmentStatus.assigned,
+        execution_status=execution,
+        raw_minutes=raw,
+        weighted_minutes_before_round=Decimal(weighted),
+        credited_minutes=credited,
+        balance_minutes=balance,
     )
     db.add(a)
     db.flush()
@@ -65,7 +88,12 @@ def _assignment(db, plan, venue, person, execution, credited=120, raw=120, weigh
 
 
 def _plan(db):
-    plan = WeeklyPlan(week_start=date(2026, 3, 2), week_end=date(2026, 3, 8), revision=1, status=PlanStatus.published)
+    plan = WeeklyPlan(
+        week_start=date(2026, 3, 2),
+        week_end=date(2026, 3, 8),
+        revision=1,
+        status=PlanStatus.published,
+    )
     db.add(plan)
     db.flush()
     return plan
@@ -106,11 +134,16 @@ def test_venue_breakdown_dynamic(db_session):
     v2 = _venue(db_session, "LT", VenueType.event_based)
     p = _person(db_session, 0)
     _assignment(db_session, plan, v1, p, ExecutionStatus.completed)
-    _assignment(db_session, plan, v2, p, ExecutionStatus.completed, credited=90, raw=60, weighted=90)
+    _assignment(
+        db_session, plan, v2, p, ExecutionStatus.completed, credited=90, raw=60, weighted=90
+    )
     db_session.commit()
     schedule_stats.recalculate(db_session, MONTH)
     db_session.commit()
-    breakdown = {b.venue_id: b.completed_minutes for b, _venue in schedule_stats.venue_breakdown(db_session, MONTH, p.id)}
+    breakdown = {
+        b.venue_id: b.completed_minutes
+        for b, _venue in schedule_stats.venue_breakdown(db_session, MONTH, p.id)
+    }
     assert breakdown[v1.id] == 120
     assert breakdown[v2.id] == 90
 
@@ -142,8 +175,13 @@ def test_adjustment_affects_completed_and_optionally_balance(db_session):
     _assignment(db_session, plan, v, p, ExecutionStatus.completed)
     db_session.commit()
     schedule_stats.add_adjustment(
-        db_session, actor_id=None, month_key=MONTH, person_id=p.id,
-        minutes_delta=30, affect_balance=True, reason="补录",
+        db_session,
+        actor_id=None,
+        month_key=MONTH,
+        person_id=p.id,
+        minutes_delta=30,
+        affect_balance=True,
+        reason="补录",
     )
     db_session.commit()
     schedule_stats.recalculate(db_session, MONTH)

@@ -1,4 +1,5 @@
 """人员 Excel 导入服务测试（方案 3.1 / 3.2）。"""
+
 from __future__ import annotations
 
 import io
@@ -37,7 +38,15 @@ def _preview_and_confirm(db, rows):
 
 
 def test_import_creates_account_and_password(db_session):
-    rows = [{"学号": "20230001", "班级": "计算机1班", "姓名": "王文博", "手机号": "13800001111", "困难等级": "一般"}]
+    rows = [
+        {
+            "学号": "20230001",
+            "班级": "计算机1班",
+            "姓名": "王文博",
+            "手机号": "13800001111",
+            "困难等级": "一般",
+        }
+    ]
     _, created = _preview_and_confirm(db_session, rows)
     assert len(created) == 1
 
@@ -50,10 +59,17 @@ def test_import_creates_account_and_password(db_session):
 
 
 def test_sensitive_fields_encrypted_not_plaintext(db_session):
-    rows = [{
-        "学号": "20230002", "班级": "计算机1班", "姓名": "李雷", "手机号": "13900002222",
-        "困难等级": "", "身份证号": "110101199003072316", "银行卡号": "6222021234567890",
-    }]
+    rows = [
+        {
+            "学号": "20230002",
+            "班级": "计算机1班",
+            "姓名": "李雷",
+            "手机号": "13900002222",
+            "困难等级": "",
+            "身份证号": "110101199003072316",
+            "银行卡号": "6222021234567890",
+        }
+    ]
     _preview_and_confirm(db_session, rows)
     prof = db_session.scalar(select(PersonProfile).where(PersonProfile.student_no == "20230002"))
     assert prof.id_card_ciphertext is not None
@@ -64,9 +80,27 @@ def test_sensitive_fields_encrypted_not_plaintext(db_session):
 
 def test_preview_classifies_errors(db_session):
     rows = [
-        {"学号": "20230003", "班级": "一班", "姓名": "张三", "手机号": "139", "困难等级": ""},  # 手机号非法
-        {"学号": "", "班级": "一班", "姓名": "李四", "手机号": "13900003333", "困难等级": ""},  # 学号为空
-        {"学号": "20230005", "班级": "一班", "姓名": "王五", "手机号": "13900005555", "困难等级": ""},  # 正常
+        {
+            "学号": "20230003",
+            "班级": "一班",
+            "姓名": "张三",
+            "手机号": "139",
+            "困难等级": "",
+        },  # 手机号非法
+        {
+            "学号": "",
+            "班级": "一班",
+            "姓名": "李四",
+            "手机号": "13900003333",
+            "困难等级": "",
+        },  # 学号为空
+        {
+            "学号": "20230005",
+            "班级": "一班",
+            "姓名": "王五",
+            "手机号": "13900005555",
+            "困难等级": "",
+        },  # 正常
     ]
     batch = people_import.create_preview(db_session, "t.xlsx", build_xlsx(rows), actor_id=None)
     db_session.commit()
@@ -76,8 +110,20 @@ def test_preview_classifies_errors(db_session):
 
 def test_same_batch_duplicate_marked_error(db_session):
     rows = [
-        {"学号": "20230006", "班级": "一班", "姓名": "赵六", "手机号": "13900006666", "困难等级": ""},
-        {"学号": "20230006", "班级": "一班", "姓名": "赵六二", "手机号": "13900006667", "困难等级": ""},
+        {
+            "学号": "20230006",
+            "班级": "一班",
+            "姓名": "赵六",
+            "手机号": "13900006666",
+            "困难等级": "",
+        },
+        {
+            "学号": "20230006",
+            "班级": "一班",
+            "姓名": "赵六二",
+            "手机号": "13900006667",
+            "困难等级": "",
+        },
     ]
     batch = people_import.create_preview(db_session, "t.xlsx", build_xlsx(rows), actor_id=None)
     db_session.commit()
@@ -85,10 +131,26 @@ def test_same_batch_duplicate_marked_error(db_session):
 
 
 def test_reimport_updates_not_duplicates(db_session):
-    rows = [{"学号": "20230007", "班级": "一班", "姓名": "钱七", "手机号": "13900007777", "困难等级": ""}]
+    rows = [
+        {
+            "学号": "20230007",
+            "班级": "一班",
+            "姓名": "钱七",
+            "手机号": "13900007777",
+            "困难等级": "",
+        }
+    ]
     _preview_and_confirm(db_session, rows)
 
-    rows2 = [{"学号": "20230007", "班级": "二班", "姓名": "钱七", "手机号": "13900007788", "困难等级": ""}]
+    rows2 = [
+        {
+            "学号": "20230007",
+            "班级": "二班",
+            "姓名": "钱七",
+            "手机号": "13900007788",
+            "困难等级": "",
+        }
+    ]
     batch2 = people_import.create_preview(db_session, "t.xlsx", build_xlsx(rows2), actor_id=None)
     db_session.commit()
     assert batch2.updated_rows == 1
@@ -120,7 +182,15 @@ def test_missing_required_column_rejected(db_session):
 
 
 def test_confirm_idempotent(db_session):
-    rows = [{"学号": "20230009", "班级": "一班", "姓名": "周九", "手机号": "13900009999", "困难等级": ""}]
+    rows = [
+        {
+            "学号": "20230009",
+            "班级": "一班",
+            "姓名": "周九",
+            "手机号": "13900009999",
+            "困难等级": "",
+        }
+    ]
     batch = people_import.create_preview(db_session, "t.xlsx", build_xlsx(rows), actor_id=None)
     db_session.commit()
     people_import.confirm_import(db_session, batch.id)

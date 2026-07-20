@@ -1,4 +1,5 @@
 """场地、班次模板、任务、特殊日期、倍率的请求 / 响应。"""
+
 from __future__ import annotations
 
 import uuid

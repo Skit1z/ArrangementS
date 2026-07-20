@@ -1,4 +1,5 @@
 """admin 账号管理请求 / 响应。"""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field

@@ -8,6 +8,7 @@
 
 本模块为纯函数，不依赖数据库，便于单元测试。
 """
+
 from __future__ import annotations
 
 import math
@@ -75,7 +76,9 @@ class MultiplierConfigError(ValueError):
     """倍率配置非法（如相同优先级重叠）。"""
 
 
-def _best_rule(when: datetime, rules: list[MultiplierRule], venue_id: str | None) -> MultiplierRule | None:
+def _best_rule(
+    when: datetime, rules: list[MultiplierRule], venue_id: str | None
+) -> MultiplierRule | None:
     best: MultiplierRule | None = None
     for rule in rules:
         if rule.matches_instant(when, venue_id):
@@ -84,7 +87,9 @@ def _best_rule(when: datetime, rules: list[MultiplierRule], venue_id: str | None
     return best
 
 
-def _breakpoints(duty_start: datetime, duty_end: datetime, rules: list[MultiplierRule]) -> list[datetime]:
+def _breakpoints(
+    duty_start: datetime, duty_end: datetime, rules: list[MultiplierRule]
+) -> list[datetime]:
     points: set[datetime] = {duty_start, duty_end}
     day = duty_start.date()
     last_day = duty_end.date()
@@ -155,7 +160,9 @@ def compute_event_task_hours(
     )
 
 
-def compute_fixed_shift_hours(credited_minutes: int, duty_start: datetime, duty_end: datetime) -> TaskHourResult:
+def compute_fixed_shift_hours(
+    credited_minutes: int, duty_start: datetime, duty_end: datetime
+) -> TaskHourResult:
     """黄楼固定班次：credited 直接采用模板固定值，不倍率、不取整。"""
     raw = int((duty_end - duty_start).total_seconds() // 60) if duty_end > duty_start else 0
     return TaskHourResult(

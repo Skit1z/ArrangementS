@@ -4,6 +4,7 @@
 - 课表未经确认不得直接影响排班（写 CourseRule 但不生成 AvailabilityBlock，直至 approve）。
 - 学期结束后旧课表与其生成的不可值班区间自动逻辑失效。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -357,8 +358,13 @@ def build_free_timetable_excel(db: Session) -> bytes:
         {"label": "9-10 节", "start": 9, "end": 10, "time": "19:00-20:50"},
     ]
     WEEKDAYS = [
-        (1, "周一"), (2, "周二"), (3, "周三"), (4, "周四"),
-        (5, "周五"), (6, "周六"), (7, "周日")
+        (1, "周一"),
+        (2, "周二"),
+        (3, "周三"),
+        (4, "周四"),
+        (5, "周五"),
+        (6, "周六"),
+        (7, "周日"),
     ]
 
     wb = Workbook()
@@ -422,14 +428,17 @@ def build_free_timetable_excel(db: Session) -> bytes:
             for person in active_people:
                 rules = person_rules.get(person.id, [])
                 has_course = any(
-                    r.weekday == wd_val and not (r.period_end < block["start"] or r.period_start > block["end"])
+                    r.weekday == wd_val
+                    and not (r.period_end < block["start"] or r.period_start > block["end"])
                     for r in rules
                 )
                 if not has_course:
                     free_names.append(person.full_name)
 
             weekday_free_counts[wd_val] += len(free_names)
-            content = f"【共 {len(free_names)} 人无课】\n" + ("、".join(free_names) if free_names else "（无）")
+            content = f"【共 {len(free_names)} 人无课】\n" + (
+                "、".join(free_names) if free_names else "（无）"
+            )
             cell_data = ws1.cell(row=row_idx, column=col_i, value=content)
             cell_data.font = Font(name="微软雅黑", size=10, color="262626")
             cell_data.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
@@ -445,7 +454,9 @@ def build_free_timetable_excel(db: Session) -> bytes:
     tot_cell.border = thin_border
 
     for col_i, (wd_val, _) in enumerate(WEEKDAYS, start=2):
-        cell_tot = ws1.cell(row=row_idx, column=col_i, value=f"共 {weekday_free_counts[wd_val]} 人次")
+        cell_tot = ws1.cell(
+            row=row_idx, column=col_i, value=f"共 {weekday_free_counts[wd_val]} 人次"
+        )
         cell_tot.font = Font(name="微软雅黑", size=10, bold=True, color="1F497D")
         cell_tot.fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
         cell_tot.alignment = Alignment(horizontal="center", vertical="center")
@@ -457,7 +468,21 @@ def build_free_timetable_excel(db: Session) -> bytes:
 
     # --- Sheet 2: 人员无课明细 (按个人) ---
     ws2 = wb.create_sheet(title="人员无课明细 (按个人)")
-    ws2.append(["学号", "班级", "姓名", "手机号", "周一无课时段", "周二无课时段", "周三无课时段", "周四无课时段", "周五无课时段", "周六无课时段", "周日无课时段"])
+    ws2.append(
+        [
+            "学号",
+            "班级",
+            "姓名",
+            "手机号",
+            "周一无课时段",
+            "周二无课时段",
+            "周三无课时段",
+            "周四无课时段",
+            "周五无课时段",
+            "周六无课时段",
+            "周日无课时段",
+        ]
+    )
     ws2.row_dimensions[1].height = 28
     header_fill2 = PatternFill(start_color="2B579A", end_color="2B579A", fill_type="solid")
     for cell in ws2[1]:
@@ -473,7 +498,8 @@ def build_free_timetable_excel(db: Session) -> bytes:
             free_blocks = []
             for block in PERIOD_BLOCKS:
                 has_course = any(
-                    r.weekday == wd_val and not (r.period_end < block["start"] or r.period_start > block["end"])
+                    r.weekday == wd_val
+                    and not (r.period_end < block["start"] or r.period_start > block["end"])
                     for r in rules
                 )
                 if not has_course:

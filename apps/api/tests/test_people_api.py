@@ -1,4 +1,5 @@
 """人员管理 API 集成测试（路由 + 权限 + 多部分上传）。"""
+
 from __future__ import annotations
 
 import io
@@ -23,7 +24,13 @@ def _xlsx() -> bytes:
 
 def test_admin_import_preview_and_confirm(client, seed_admin):
     token = login(client, "admin", "admin1234")
-    files = {"file": ("p.xlsx", _xlsx(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    files = {
+        "file": (
+            "p.xlsx",
+            _xlsx(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    }
     resp = client.post("/api/v1/people/import/preview", files=files, headers=csrf_headers(token))
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -42,7 +49,9 @@ def test_admin_import_preview_and_confirm(client, seed_admin):
 
 
 def test_normal_user_cannot_list_people(client, db_session):
-    user = User(username="u1", password_hash=hash_password("pw123456"), role=UserRole.user, is_active=True)
+    user = User(
+        username="u1", password_hash=hash_password("pw123456"), role=UserRole.user, is_active=True
+    )
     db_session.add(user)
     db_session.commit()
     login(client, "u1", "pw123456")

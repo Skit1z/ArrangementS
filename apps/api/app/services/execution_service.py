@@ -2,6 +2,7 @@
 
 未到岗：实际完成工时改为 0，但排班平衡工时保留（绝不降低后续自动排班权重）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -29,7 +30,9 @@ def _get(db: Session, assignment_id: uuid.UUID) -> Assignment:
     return a
 
 
-def mark_completed(db: Session, *, actor_id: uuid.UUID | None, assignment_id: uuid.UUID) -> Assignment:
+def mark_completed(
+    db: Session, *, actor_id: uuid.UUID | None, assignment_id: uuid.UUID
+) -> Assignment:
     a = _get(db, assignment_id)
     if (
         a.person_id is None
@@ -43,15 +46,23 @@ def mark_completed(db: Session, *, actor_id: uuid.UUID | None, assignment_id: uu
     if slot.source_type == SlotSourceType.venue_task and slot.source_id is not None:
         _maybe_complete_task(db, slot.source_id)
     record_audit(
-        db, actor_user_id=actor_id, action="assignment.mark_completed",
-        entity_type="assignment", entity_id=a.id,
+        db,
+        actor_user_id=actor_id,
+        action="assignment.mark_completed",
+        entity_type="assignment",
+        entity_id=a.id,
     )
     return a
 
 
 def mark_absent(
-    db: Session, *, actor_id: uuid.UUID | None, assignment_id: uuid.UUID,
-    reason: str | None = None, ip: str | None = None, ua: str | None = None,
+    db: Session,
+    *,
+    actor_id: uuid.UUID | None,
+    assignment_id: uuid.UUID,
+    reason: str | None = None,
+    ip: str | None = None,
+    ua: str | None = None,
 ) -> Assignment:
     a = _get(db, assignment_id)
     if (
@@ -65,8 +76,14 @@ def mark_absent(
     # balance_minutes 保持不变：未到岗不降低后续自动排班权重
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="assignment.mark_absent",
-        entity_type="assignment", entity_id=a.id, reason=reason, ip_address=ip, user_agent=ua,
+        db,
+        actor_user_id=actor_id,
+        action="assignment.mark_absent",
+        entity_type="assignment",
+        entity_id=a.id,
+        reason=reason,
+        ip_address=ip,
+        user_agent=ua,
     )
     slot = db.get(DutySlot, a.duty_slot_id)
     if slot.source_type == SlotSourceType.venue_task and slot.source_id is not None:
@@ -93,7 +110,11 @@ def auto_complete_ended(db: Session, now: datetime | None = None) -> int:
     count = 0
     affected_task_ids: set[uuid.UUID] = set()
     for a, slot in rows:
-        end = slot.slot_end_at.replace(tzinfo=timezone.utc) if slot.slot_end_at.tzinfo is None else slot.slot_end_at
+        end = (
+            slot.slot_end_at.replace(tzinfo=timezone.utc)
+            if slot.slot_end_at.tzinfo is None
+            else slot.slot_end_at
+        )
         if end <= now:
             a.execution_status = ExecutionStatus.completed
             count += 1
@@ -113,7 +134,8 @@ def _maybe_complete_task(db: Session, task_id: uuid.UUID) -> None:
     if task is None or task.status not in (TaskStatus.scheduled, TaskStatus.executing):
         return
     slot_ids = [
-        sid for (sid,) in db.execute(
+        sid
+        for (sid,) in db.execute(
             select(DutySlot.id).where(
                 DutySlot.source_type == SlotSourceType.venue_task,
                 DutySlot.source_id == task_id,
@@ -123,11 +145,13 @@ def _maybe_complete_task(db: Session, task_id: uuid.UUID) -> None:
     if not slot_ids:
         return
     pending = db.scalar(
-        select(Assignment).where(
+        select(Assignment)
+        .where(
             Assignment.duty_slot_id.in_(slot_ids),
             Assignment.plan_status == PlanAssignmentStatus.assigned,
             Assignment.execution_status.notin_((ExecutionStatus.completed, ExecutionStatus.absent)),
-        ).limit(1)
+        )
+        .limit(1)
     )
     if pending is None:
         task.status = TaskStatus.completed

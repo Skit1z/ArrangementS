@@ -1,0 +1,76 @@
+name: CI (Code Quality & Testing)
+
+on:
+  push:
+    branches: [main, master, "dev*"]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-ci:
+    name: 🐍 Backend CI (Ruff & Pytest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          cd apps/api
+          uv sync --all-extras --dev
+
+      - name: Check Python Code Formatting (Ruff Format)
+        run: |
+          cd apps/api
+          uv run ruff format --check .
+
+      - name: Check Python Code Lint & Syntax (Ruff Check)
+        run: |
+          cd apps/api
+          uv run ruff check .
+
+      - name: Run Backend Unit Tests (Pytest)
+        run: |
+          cd apps/api
+          uv run pytest
+
+  frontend-ci:
+    name: ⚡ Frontend CI (Typecheck, Test & Build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck Frontend (TypeScript)
+        run: pnpm --filter meeting-scheduler-web typecheck
+
+      - name: Run Frontend Tests (Vitest)
+        run: pnpm --filter meeting-scheduler-web test
+
+      - name: Build Frontend Application
+        run: pnpm --filter meeting-scheduler-web build

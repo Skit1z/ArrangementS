@@ -3,6 +3,7 @@
 样例 fixture: tests/fixtures/sample_timetable.pdf
 （学校教务系统导出，rotation=90，文本层完整）
 """
+
 from __future__ import annotations
 
 from pathlib import Path

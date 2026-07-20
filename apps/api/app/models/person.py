@@ -1,4 +1,5 @@
 """人员档案。敏感字段（身份证号 / 银行卡号）密文保存，仅额外存后四位。"""
+
 from __future__ import annotations
 
 import uuid

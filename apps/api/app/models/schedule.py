@@ -1,4 +1,5 @@
 """周排班计划、岗位与人员分配（方案 7.3 / 7.4 / 12.1）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -72,9 +73,15 @@ class DutySlot(Base):
     source_type: Mapped[SlotSourceType] = mapped_column(
         Enum(SlotSourceType, name="slot_source_type"), nullable=False
     )
-    source_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)  # shift_template 或 venue_task id
-    slot_start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    slot_end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        nullable=True
+    )  # shift_template 或 venue_task id
+    slot_start_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    slot_end_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
     required_people: Mapped[int] = mapped_column(Integer, nullable=False)
     credited_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     month_key: Mapped[str] = mapped_column(String(7), nullable=False, index=True)  # YYYY-MM
@@ -94,9 +101,7 @@ class DutySlot(Base):
 
 class Assignment(Base, TimestampMixin):
     __tablename__ = "assignments"
-    __table_args__ = (
-        UniqueConstraint("duty_slot_id", "position_index", name="uq_slot_position"),
-    )
+    __table_args__ = (UniqueConstraint("duty_slot_id", "position_index", name="uq_slot_position"),)
 
     id: Mapped[uuid.UUID] = uuid_pk()
     duty_slot_id: Mapped[uuid.UUID] = mapped_column(
@@ -107,7 +112,9 @@ class Assignment(Base, TimestampMixin):
     )
     position_index: Mapped[int] = mapped_column(Integer, nullable=False)
     assignment_source: Mapped[AssignmentSource] = mapped_column(
-        Enum(AssignmentSource, name="assignment_source"), nullable=False, default=AssignmentSource.auto
+        Enum(AssignmentSource, name="assignment_source"),
+        nullable=False,
+        default=AssignmentSource.auto,
     )
     plan_status: Mapped[PlanAssignmentStatus] = mapped_column(
         Enum(PlanAssignmentStatus, name="plan_assignment_status"),

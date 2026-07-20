@@ -6,6 +6,7 @@
 - 前端预校验不能替代服务端校验；本模块为最终判定方。
 - 保存采用乐观锁，防止覆盖其他 admin 的修改。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -110,7 +111,9 @@ def _do_unassign(db: Session, plan: WeeklyPlan, op: dict) -> None:
     db.flush()
 
 
-def _do_assign(db: Session, plan: WeeklyPlan, op: dict, actor_id: uuid.UUID | None, engine_rules) -> None:
+def _do_assign(
+    db: Session, plan: WeeklyPlan, op: dict, actor_id: uuid.UUID | None, engine_rules
+) -> None:
     slot = _slot_of(db, plan, uuid.UUID(op["slot_id"]))
     if slot.is_locked:
         raise HTTPException(status_code=422, detail="锁定岗位不可修改，请先解锁")
@@ -138,7 +141,9 @@ def _do_assign(db: Session, plan: WeeklyPlan, op: dict, actor_id: uuid.UUID | No
         raise HTTPException(status_code=422, detail=f"{person.full_name} 已在该班次的其他位置")
 
     # 红线：时间重叠绝对禁止，强制安排也不例外
-    if eligibility.has_time_overlap_with_person(db, person_id, slot, exclude_assignment_id=exclude_id):
+    if eligibility.has_time_overlap_with_person(
+        db, person_id, slot, exclude_assignment_id=exclude_id
+    ):
         raise HTTPException(
             status_code=422,
             detail=f"{person.full_name} 在该时间已有排班，时间重叠禁止安排（强制安排亦不可）",
@@ -182,19 +187,26 @@ def _do_assign(db: Session, plan: WeeklyPlan, op: dict, actor_id: uuid.UUID | No
 
     if forced:
         record_audit(
-            db, actor_user_id=actor_id, action="assignment.force",
-            entity_type="assignment", entity_id=existing.id, reason=forced_reason,
+            db,
+            actor_user_id=actor_id,
+            action="assignment.force",
+            entity_type="assignment",
+            entity_id=existing.id,
+            reason=forced_reason,
             after_data={"person_id": str(person_id), "slot_id": str(slot.id)},
         )
 
 
 def _refresh_slot_statuses(db: Session, plan: WeeklyPlan) -> None:
     for slot in db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id)):
-        count = db.scalar(
-            select(func.count())
-            .select_from(Assignment)
-            .where(Assignment.duty_slot_id == slot.id, Assignment.person_id.isnot(None))
-        ) or 0
+        count = (
+            db.scalar(
+                select(func.count())
+                .select_from(Assignment)
+                .where(Assignment.duty_slot_id == slot.id, Assignment.person_id.isnot(None))
+            )
+            or 0
+        )
         slot.status = SlotStatus.filled if count >= slot.required_people else SlotStatus.open
     db.flush()
 
@@ -212,12 +224,37 @@ def validate_week(db: Session, week_start: date) -> list[Conflict]:
             person = db.get(PersonProfile, a.person_id)
             if person is None:
                 continue
-            if eligibility.has_time_overlap_with_person(db, a.person_id, slot, exclude_assignment_id=a.id):
-                conflicts.append(Conflict(str(slot.id), a.position_index, str(a.person_id), "time_overlap", f"{person.full_name} 时间重叠"))
-            elif not eligibility.check_person_available_for_slot(db, person, slot) and a.assignment_source != AssignmentSource.forced:
-                conflicts.append(Conflict(str(slot.id), a.position_index, str(a.person_id), "hard_constraint", f"{person.full_name} 违反强制约束"))
+            if eligibility.has_time_overlap_with_person(
+                db, a.person_id, slot, exclude_assignment_id=a.id
+            ):
+                conflicts.append(
+                    Conflict(
+                        str(slot.id),
+                        a.position_index,
+                        str(a.person_id),
+                        "time_overlap",
+                        f"{person.full_name} 时间重叠",
+                    )
+                )
+            elif (
+                not eligibility.check_person_available_for_slot(db, person, slot)
+                and a.assignment_source != AssignmentSource.forced
+            ):
+                conflicts.append(
+                    Conflict(
+                        str(slot.id),
+                        a.position_index,
+                        str(a.person_id),
+                        "hard_constraint",
+                        f"{person.full_name} 违反强制约束",
+                    )
+                )
         if assigned < slot.required_people:
-            conflicts.append(Conflict(str(slot.id), -1, None, "vacancy", f"缺 {slot.required_people - assigned} 人"))
+            conflicts.append(
+                Conflict(
+                    str(slot.id), -1, None, "vacancy", f"缺 {slot.required_people - assigned} 人"
+                )
+            )
     return conflicts
 
 
@@ -244,18 +281,20 @@ def list_candidates(db: Session, slot_id: uuid.UUID) -> list[dict]:
             reasons.append("课程/不可值班/场地限制")
         if not p.is_in_scheduling_pool:
             reasons.append("未参与自动排班")
-        out.append({
-            "person_id": str(p.id),
-            "full_name": p.full_name,
-            "class_name": p.class_name,
-            "student_no": p.student_no,
-            "month_balance_minutes": month_balance.get(p.id, 0),
-            "week_shift_count": week_counts.get(p.id, 0),
-            "in_scheduling_pool": p.is_in_scheduling_pool,
-            "time_overlap": overlap,
-            "available": available and not overlap,
-            "reasons": reasons,
-        })
+        out.append(
+            {
+                "person_id": str(p.id),
+                "full_name": p.full_name,
+                "class_name": p.class_name,
+                "student_no": p.student_no,
+                "month_balance_minutes": month_balance.get(p.id, 0),
+                "week_shift_count": week_counts.get(p.id, 0),
+                "in_scheduling_pool": p.is_in_scheduling_pool,
+                "time_overlap": overlap,
+                "available": available and not overlap,
+                "reasons": reasons,
+            }
+        )
     out.sort(key=lambda x: (not x["available"], x["month_balance_minutes"]))
     return out
 
@@ -275,8 +314,7 @@ def week_people(db: Session, week_start: date) -> list[dict]:
     blocks = eligibility._blocks(db, person_ids)
     constraints = eligibility._hard_constraints(db, person_ids)
     vac_by_date = {
-        d: eligibility._active_vacation(db, d)
-        for d in {s.slot_start_at.date() for s in slot_rows}
+        d: eligibility._active_vacation(db, d) for d in {s.slot_start_at.date() for s in slot_rows}
     }
 
     month_keys = {s.month_key for s in slot_rows}
@@ -297,16 +335,18 @@ def week_people(db: Session, week_start: date) -> list[dict]:
                 db, p, s, pb, pc, vac_by_date.get(s.slot_start_at.date())
             )
         ]
-        out.append({
-            "person_id": str(p.id),
-            "full_name": p.full_name,
-            "class_name": p.class_name,
-            "student_no": p.student_no,
-            "month_balance_minutes": balance.get(p.id, 0),
-            "week_shift_count": week_counts.get(p.id, 0),
-            "in_scheduling_pool": p.is_in_scheduling_pool,
-            "unavailable_slot_ids": unavailable,
-        })
+        out.append(
+            {
+                "person_id": str(p.id),
+                "full_name": p.full_name,
+                "class_name": p.class_name,
+                "student_no": p.student_no,
+                "month_balance_minutes": balance.get(p.id, 0),
+                "week_shift_count": week_counts.get(p.id, 0),
+                "in_scheduling_pool": p.is_in_scheduling_pool,
+                "unavailable_slot_ids": unavailable,
+            }
+        )
     out.sort(key=lambda x: (x["month_balance_minutes"], x["full_name"]))
     return out
 

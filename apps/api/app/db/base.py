@@ -1,4 +1,5 @@
 """SQLAlchemy 2.0 声明式基类与通用列类型约定。"""
+
 from __future__ import annotations
 
 import uuid

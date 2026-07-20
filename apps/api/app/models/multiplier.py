@@ -1,4 +1,5 @@
 """倍率规则（方案 2.6）。end_time 为 00:00 表示 24:00（当日结束）。"""
+
 from __future__ import annotations
 
 import uuid

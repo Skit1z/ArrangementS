@@ -17,6 +17,7 @@ from app.schemas.overtime import OvertimeRequestCreate, OvertimeRequestOut
 
 router = APIRouter(tags=["overtime"])
 
+
 @router.post("/me/overtime", response_model=MessageOut)
 def apply_overtime(
     payload: OvertimeRequestCreate,
@@ -25,11 +26,11 @@ def apply_overtime(
 ):
     if payload.end_at <= payload.start_at:
         raise HTTPException(status_code=400, detail="结束时间必须晚于开始时间")
-    
+
     person = db.query(PersonProfile).filter(PersonProfile.user_id == u.id).first()
     if not person:
         raise HTTPException(status_code=403, detail="人员信息不存在")
-    
+
     req = OvertimeRequest(
         person_id=person.id,
         venue_id=payload.venue_id,
@@ -41,6 +42,7 @@ def apply_overtime(
     db.add(req)
     db.commit()
     return MessageOut(message="加班申请已提交，等待审核")
+
 
 @router.get("/me/overtime", response_model=list[OvertimeRequestOut])
 def list_my_overtime(
@@ -77,6 +79,7 @@ def list_my_overtime(
         res.append(out)
     return res
 
+
 @router.get("/admin/overtime", response_model=list[OvertimeRequestOut])
 def list_all_overtime(
     _: User = Depends(require_admin),
@@ -107,6 +110,7 @@ def list_all_overtime(
         )
         res.append(out)
     return res
+
 
 @router.post("/admin/overtime/{req_id}/approve", response_model=MessageOut)
 def approve_overtime(
@@ -146,6 +150,7 @@ def approve_overtime(
     db.commit()
     return MessageOut(message="已批准并自动生成排班")
 
+
 @router.post("/admin/overtime/{req_id}/reject", response_model=MessageOut)
 def reject_overtime(
     req_id: uuid.UUID,
@@ -163,6 +168,7 @@ def reject_overtime(
     req.reviewed_at = datetime.now()
     db.commit()
     return MessageOut(message="已拒绝")
+
 
 @router.post("/admin/duty-slots/manual", response_model=MessageOut)
 def create_manual_slot(

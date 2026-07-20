@@ -7,6 +7,7 @@
 - 法定节假日/周末规则 weekend_rule -> 周末人数
 - 无特殊日期：周一至周五=工作日人数，周六周日=周末人数
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -16,9 +17,7 @@ from app.models.special_date import SpecialDate
 from app.models.venue import ShiftTemplate
 
 
-def resolve_required_people(
-    day: date, shift: ShiftTemplate, special: SpecialDate | None
-) -> int:
+def resolve_required_people(day: date, shift: ShiftTemplate, special: SpecialDate | None) -> int:
     if special is not None:
         if special.day_type == DayType.closed:
             return 0

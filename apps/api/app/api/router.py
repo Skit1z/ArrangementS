@@ -1,4 +1,5 @@
 """聚合 v1 路由。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter

@@ -1,4 +1,5 @@
 """人员相关请求 / 响应。默认脱敏，敏感字段仅显示掩码。"""
+
 from __future__ import annotations
 
 import uuid

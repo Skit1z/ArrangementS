@@ -4,6 +4,7 @@ Revision ID: 0001
 Revises:
 Create Date: 2026-07-17
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -31,15 +32,25 @@ def upgrade() -> None:
         sa.Column("role", user_role, nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
     op.create_index("ix_users_username", "users", ["username"], unique=True)
 
     op.create_table(
         "person_profiles",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, unique=True),
+        sa.Column(
+            "user_id",
+            sa.Uuid(),
+            sa.ForeignKey("users.id", ondelete="RESTRICT"),
+            nullable=False,
+            unique=True,
+        ),
         sa.Column("student_no", sa.String(64), nullable=False),
         sa.Column("class_name", sa.String(128), nullable=False),
         sa.Column("full_name", sa.String(128), nullable=False),
@@ -51,8 +62,12 @@ def upgrade() -> None:
         sa.Column("bank_card_last4", sa.String(8), nullable=True),
         sa.Column("status", person_status, nullable=False),
         sa.Column("is_in_scheduling_pool", sa.Boolean(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
     op.create_index("ix_person_profiles_student_no", "person_profiles", ["student_no"], unique=True)
     op.create_index("ix_person_profiles_class_name", "person_profiles", ["class_name"])
@@ -62,7 +77,12 @@ def upgrade() -> None:
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("actor_user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "actor_user_id",
+            sa.Uuid(),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("action", sa.String(128), nullable=False),
         sa.Column("entity_type", sa.String(64), nullable=True),
         sa.Column("entity_id", sa.String(64), nullable=True),
@@ -71,8 +91,12 @@ def upgrade() -> None:
         sa.Column("reason", sa.String(512), nullable=True),
         sa.Column("ip_address", sa.String(64), nullable=True),
         sa.Column("user_agent", sa.String(512), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
     op.create_index("ix_audit_logs_actor_user_id", "audit_logs", ["actor_user_id"])
     op.create_index("ix_audit_logs_action", "audit_logs", ["action"])
@@ -90,10 +114,16 @@ def upgrade() -> None:
         sa.Column("updated_rows", sa.Integer(), nullable=False),
         sa.Column("error_rows", sa.Integer(), nullable=False),
         sa.Column("preview_payload", postgresql.JSONB(), nullable=True),
-        sa.Column("created_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "created_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ),
         sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
 
 

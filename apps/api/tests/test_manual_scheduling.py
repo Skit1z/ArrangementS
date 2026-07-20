@@ -1,7 +1,8 @@
 """manual_scheduling_service 走核心排班规则的测试（P1.1 修复）。"""
+
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -12,7 +13,6 @@ from app.core.security import hash_password
 from app.models.audit import AuditLog
 from app.models.availability import AvailabilityBlock
 from app.models.enums import (
-    AssignmentSource,
     AvailabilitySource,
     AvailabilityStatus,
     PersonStatus,
@@ -31,25 +31,45 @@ from app.services import manual_scheduling_service
 
 
 def _person(db, i=0, name="甲"):
-    u = User(username=f"ms{i}", password_hash=hash_password("x"), role=UserRole.user, is_active=True)
-    db.add(u); db.flush()
-    p = PersonProfile(
-        user_id=u.id, student_no=f"ms{i}", class_name="一班", full_name=name,
-        phone="13800000000", status=PersonStatus.active, is_in_scheduling_pool=True,
+    u = User(
+        username=f"ms{i}", password_hash=hash_password("x"), role=UserRole.user, is_active=True
     )
-    db.add(p); db.flush()
+    db.add(u)
+    db.flush()
+    p = PersonProfile(
+        user_id=u.id,
+        student_no=f"ms{i}",
+        class_name="一班",
+        full_name=name,
+        phone="13800000000",
+        status=PersonStatus.active,
+        is_in_scheduling_pool=True,
+    )
+    db.add(p)
+    db.flush()
     return p
 
 
 def _venue(db, name="蓝厅"):
-    v = Venue(name=name, code=f"V{name}", venue_type=VenueType.event_based, default_required_people=2)
-    db.add(v); db.flush()
+    v = Venue(
+        name=name, code=f"V{name}", venue_type=VenueType.event_based, default_required_people=2
+    )
+    db.add(v)
+    db.flush()
     return v
 
 
 def _multipliers(db):
-    db.add(MultiplierRule(name="晚双", start_time=time(19, 0), end_time=time(0, 0),
-                          multiplier=Decimal("2.0"), priority=10, is_active=True))
+    db.add(
+        MultiplierRule(
+            name="晚双",
+            start_time=time(19, 0),
+            end_time=time(0, 0),
+            multiplier=Decimal("2.0"),
+            priority=10,
+            is_active=True,
+        )
+    )
     db.flush()
 
 
@@ -63,8 +83,13 @@ def test_assign_person_creates_slot_with_multiplier_and_audit(db_session):
     start = datetime(2026, 3, 4, 19, 0, tzinfo=timezone(timedelta(hours=8)))  # 北京时间晚 7 点
     end = datetime(2026, 3, 4, 20, 0, tzinfo=timezone(timedelta(hours=8)))
     slot, a = manual_scheduling_service.assign_person_to_new_slot(
-        db_session, person_id=p.id, venue_id=v.id, start_at=start, end_at=end,
-        created_by=None, action="test.assign",
+        db_session,
+        person_id=p.id,
+        venue_id=v.id,
+        start_at=start,
+        end_at=end,
+        created_by=None,
+        action="test.assign",
     )
     db_session.commit()
 
@@ -89,17 +114,25 @@ def test_assign_person_blocked_by_availability_block(db_session):
     # 给 p 加一个 18-21 点的不可值班区间
     start = datetime(2026, 3, 4, 19, 0, tzinfo=timezone(timedelta(hours=8)))
     end = datetime(2026, 3, 4, 20, 0, tzinfo=timezone(timedelta(hours=8)))
-    db_session.add(AvailabilityBlock(
-        person_id=p.id, source=AvailabilitySource.course,
-        start_at=datetime(2026, 3, 4, 18, 0, tzinfo=timezone.utc),
-        end_at=datetime(2026, 3, 4, 21, 0, tzinfo=timezone.utc),
-        status=AvailabilityStatus.active, reason="课程",
-    ))
+    db_session.add(
+        AvailabilityBlock(
+            person_id=p.id,
+            source=AvailabilitySource.course,
+            start_at=datetime(2026, 3, 4, 18, 0, tzinfo=timezone.utc),
+            end_at=datetime(2026, 3, 4, 21, 0, tzinfo=timezone.utc),
+            status=AvailabilityStatus.active,
+            reason="课程",
+        )
+    )
     db_session.commit()
 
     with pytest.raises(HTTPException) as ei:
         manual_scheduling_service.assign_person_to_new_slot(
-            db_session, person_id=p.id, venue_id=v.id, start_at=start, end_at=end,
+            db_session,
+            person_id=p.id,
+            venue_id=v.id,
+            start_at=start,
+            end_at=end,
         )
     assert ei.value.status_code == 422
     assert "课程" in ei.value.detail or "不可值班" in ei.value.detail
@@ -115,14 +148,21 @@ def test_assign_person_blocked_by_time_overlap(db_session):
     end = datetime(2026, 3, 4, 20, 0, tzinfo=timezone(timedelta(hours=8)))
     # 第一次成功
     manual_scheduling_service.assign_person_to_new_slot(
-        db_session, person_id=p.id, venue_id=v.id, start_at=start, end_at=end,
+        db_session,
+        person_id=p.id,
+        venue_id=v.id,
+        start_at=start,
+        end_at=end,
     )
     db_session.commit()
     # 第二次重叠（19:30-20:30）应被拒
     with pytest.raises(HTTPException) as ei:
         manual_scheduling_service.assign_person_to_new_slot(
-            db_session, person_id=p.id, venue_id=v.id,
-            start_at=end - timedelta(minutes=30), end_at=end + timedelta(minutes=30),
+            db_session,
+            person_id=p.id,
+            venue_id=v.id,
+            start_at=end - timedelta(minutes=30),
+            end_at=end + timedelta(minutes=30),
         )
     assert ei.value.status_code == 422
     assert "重叠" in ei.value.detail
@@ -139,7 +179,11 @@ def test_assign_person_rejects_inactive_person(db_session):
     end = datetime(2026, 3, 4, 20, 0, tzinfo=timezone(timedelta(hours=8)))
     with pytest.raises(HTTPException) as ei:
         manual_scheduling_service.assign_person_to_new_slot(
-            db_session, person_id=p.id, venue_id=v.id, start_at=start, end_at=end,
+            db_session,
+            person_id=p.id,
+            venue_id=v.id,
+            start_at=start,
+            end_at=end,
         )
     assert ei.value.status_code == 422
 
@@ -152,7 +196,11 @@ def test_create_vacant_slot_zero_balance_no_pollution(db_session):
     start = datetime(2026, 3, 4, 19, 0, tzinfo=timezone(timedelta(hours=8)))
     end = datetime(2026, 3, 4, 20, 0, tzinfo=timezone(timedelta(hours=8)))
     slot = manual_scheduling_service.create_vacant_slot(
-        db_session, venue_id=v.id, start_at=start, end_at=end, required_people=3,
+        db_session,
+        venue_id=v.id,
+        start_at=start,
+        end_at=end,
+        required_people=3,
     )
     db_session.commit()
 
@@ -168,7 +216,9 @@ def test_create_vacant_slot_zero_balance_no_pollution(db_session):
 def test_overtime_approve_api_rejects_when_blocked(client, seed_admin, db_session):
     """加班申请：admin approve 时若人员有不可值班区间，应被拒绝，申请保持 pending。"""
     from app.models.enums import (
-        AvailabilitySource, AvailabilityStatus, PersonStatus, UserRole, RequestStatus,
+        AvailabilitySource,
+        AvailabilityStatus,
+        RequestStatus,
     )
     from app.models.overtime import OvertimeRequest
     from app.models.schedule import DutySlot
@@ -176,21 +226,30 @@ def test_overtime_approve_api_rejects_when_blocked(client, seed_admin, db_sessio
 
     p = _person(db_session, 1, "申请人")
     v = _venue(db_session)
-    db_session.add(AvailabilityBlock(
-        person_id=p.id, source=AvailabilitySource.course,
-        start_at=datetime(2026, 3, 4, 18, 0, tzinfo=timezone.utc),
-        end_at=datetime(2026, 3, 4, 22, 0, tzinfo=timezone.utc),
-        status=AvailabilityStatus.active, reason="课程",
-    ))
+    db_session.add(
+        AvailabilityBlock(
+            person_id=p.id,
+            source=AvailabilitySource.course,
+            start_at=datetime(2026, 3, 4, 18, 0, tzinfo=timezone.utc),
+            end_at=datetime(2026, 3, 4, 22, 0, tzinfo=timezone.utc),
+            status=AvailabilityStatus.active,
+            reason="课程",
+        )
+    )
     db_session.commit()
 
     start = datetime(2026, 3, 4, 19, 0, tzinfo=timezone(timedelta(hours=8)))
     end = datetime(2026, 3, 4, 20, 0, tzinfo=timezone(timedelta(hours=8)))
     req = OvertimeRequest(
-        person_id=p.id, venue_id=v.id, start_at=start, end_at=end,
-        reason="加班", status=RequestStatus.pending,
+        person_id=p.id,
+        venue_id=v.id,
+        start_at=start,
+        end_at=end,
+        reason="加班",
+        status=RequestStatus.pending,
     )
-    db_session.add(req); db_session.commit()
+    db_session.add(req)
+    db_session.commit()
     req_id = req.id
 
     token = login(client, "admin", "admin1234")
@@ -198,7 +257,14 @@ def test_overtime_approve_api_rejects_when_blocked(client, seed_admin, db_sessio
     assert resp.status_code == 422
     db_session.refresh(req)
     assert req.status == RequestStatus.pending
-    assert list(db_session.scalars(select(DutySlot).where(DutySlot.source_type == SlotSourceType.manual))) == []
+    assert (
+        list(
+            db_session.scalars(
+                select(DutySlot).where(DutySlot.source_type == SlotSourceType.manual)
+            )
+        )
+        == []
+    )
 
 
 def test_manual_slot_api_creates_zero_balance_vacancies(client, seed_admin, db_session):
@@ -211,12 +277,22 @@ def test_manual_slot_api_creates_zero_balance_vacancies(client, seed_admin, db_s
     end = datetime(2026, 3, 5, 20, 0, tzinfo=timezone(timedelta(hours=8)))
 
     token = login(client, "admin", "admin1234")
-    resp = client.post("/api/v1/admin/duty-slots/manual", headers=csrf_headers(token), json={
-        "venue_id": str(v.id), "start_at": start.isoformat(), "end_at": end.isoformat(),
-        "required_people": 2,
-    })
+    resp = client.post(
+        "/api/v1/admin/duty-slots/manual",
+        headers=csrf_headers(token),
+        json={
+            "venue_id": str(v.id),
+            "start_at": start.isoformat(),
+            "end_at": end.isoformat(),
+            "required_people": 2,
+        },
+    )
     assert resp.status_code == 200, resp.text
-    assigns = list(db_session.scalars(select(Assignment).join(DutySlot).where(DutySlot.source_type == SlotSourceType.manual)))
+    assigns = list(
+        db_session.scalars(
+            select(Assignment).join(DutySlot).where(DutySlot.source_type == SlotSourceType.manual)
+        )
+    )
     assert len(assigns) == 2
     assert all(a.balance_minutes == 0 for a in assigns)
     assert all(a.credited_minutes == 0 for a in assigns)

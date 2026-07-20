@@ -1,4 +1,5 @@
 """周次表达解析测试（方案 4.5）。"""
+
 from __future__ import annotations
 
 import pytest

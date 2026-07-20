@@ -3,11 +3,13 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+
 class OvertimeRequestCreate(BaseModel):
     venue_id: uuid.UUID
     start_at: datetime
     end_at: datetime
     reason: str
+
 
 class OvertimeRequestOut(BaseModel):
     id: uuid.UUID

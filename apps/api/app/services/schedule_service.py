@@ -1,4 +1,5 @@
 """周排班编排：生成岗位 -> 求解 -> 落库分配与工时 -> 发布（方案 8 / 7.3）。"""
+
 from __future__ import annotations
 
 import uuid
@@ -48,9 +49,7 @@ def mark_plan_changed(db: Session, plan: WeeklyPlan) -> None:
     db.flush()
 
 
-def generate(
-    db: Session, week_start: date, actor_id: uuid.UUID | None, seed: int = 42
-) -> dict:
+def generate(db: Session, week_start: date, actor_id: uuid.UUID | None, seed: int = 42) -> dict:
     if week_start.isoweekday() != 1:
         raise HTTPException(status_code=422, detail="周起始日必须为周一")
 
@@ -85,8 +84,11 @@ def generate(
     db.flush()
 
     record_audit(
-        db, actor_user_id=actor_id, action="schedule.generate",
-        entity_type="weekly_plan", entity_id=plan.id,
+        db,
+        actor_user_id=actor_id,
+        action="schedule.generate",
+        entity_type="weekly_plan",
+        entity_id=plan.id,
         after_data={"vacancies": len(result.vacancies), "status": result.status},
     )
     return {
@@ -102,7 +104,9 @@ def generate(
 
 def _persist_assignments(db: Session, plan: WeeklyPlan, result, actor_id: uuid.UUID | None) -> None:
     engine_rules = multiplier_service.load_engine_rules(db)
-    slot_map = {str(s.id): s for s in db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))}
+    slot_map = {
+        str(s.id): s for s in db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))
+    }
 
     filled_counts: dict[str, int] = {}
 
@@ -160,7 +164,9 @@ def _assignment_hours(slot: DutySlot, engine_rules) -> tuple[int, Decimal, int]:
     if slot.source_type == SlotSourceType.fixed_shift:
         # 黄楼固定工时，不倍率、不取整
         return slot.credited_minutes, Decimal(slot.credited_minutes), slot.credited_minutes
-    r = compute_event_task_hours(slot.slot_start_at, slot.slot_end_at, engine_rules, venue_id=str(slot.venue_id))
+    r = compute_event_task_hours(
+        slot.slot_start_at, slot.slot_end_at, engine_rules, venue_id=str(slot.venue_id)
+    )
     return r.raw_minutes, r.weighted_minutes_before_round, r.credited_minutes
 
 
@@ -181,8 +187,11 @@ def publish(db: Session, week_start: date, actor_id: uuid.UUID | None) -> Weekly
         plan.revision += 1
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="schedule.publish",
-        entity_type="weekly_plan", entity_id=plan.id,
+        db,
+        actor_user_id=actor_id,
+        action="schedule.publish",
+        entity_type="weekly_plan",
+        entity_id=plan.id,
         after_data={"revision": plan.revision},
     )
     return plan
@@ -198,14 +207,19 @@ def unpublish(db: Session, week_start: date, actor_id: uuid.UUID | None) -> Week
     plan.status = PlanStatus.draft
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="schedule.unpublish",
-        entity_type="weekly_plan", entity_id=plan.id,
+        db,
+        actor_user_id=actor_id,
+        action="schedule.unpublish",
+        entity_type="weekly_plan",
+        entity_id=plan.id,
         after_data={"revision": plan.revision},
     )
     return plan
 
 
-def add_task_to_plan(db: Session, task_id: uuid.UUID, actor_id: uuid.UUID | None = None) -> DutySlot:
+def add_task_to_plan(
+    db: Session, task_id: uuid.UUID, actor_id: uuid.UUID | None = None
+) -> DutySlot:
     """把一个已确认的 VenueTask 增量追加到其所在周的周计划（不论已发布或草稿）。
 
     场景：周计划已发布后，admin 又创建/确认了一个当天任务，调用本函数会在不破坏
@@ -228,13 +242,15 @@ def add_task_to_plan(db: Session, task_id: uuid.UUID, actor_id: uuid.UUID | None
     task = db.get(VenueTask, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if task.status not in (
-        TaskStatus.confirmed,
-    ):
+    if task.status not in (TaskStatus.confirmed,):
         raise HTTPException(status_code=422, detail=f"任务状态「{task.status.value}」不可加入排班")
 
     # 定位所在周（基于 duty_start_at 的北京时间日期）
-    duty_local = task.duty_start_at.astimezone(BEIJING_TZ) if task.duty_start_at.tzinfo else task.duty_start_at
+    duty_local = (
+        task.duty_start_at.astimezone(BEIJING_TZ)
+        if task.duty_start_at.tzinfo
+        else task.duty_start_at
+    )
     week_start = duty_local.date() - timedelta(days=duty_local.weekday())
     plan, _created = _get_or_create_plan(db, week_start)
 
@@ -265,14 +281,21 @@ def add_task_to_plan(db: Session, task_id: uuid.UUID, actor_id: uuid.UUID | None
     db.flush()
 
     for pidx in range(task.required_people):
-        db.add(Assignment(
-            duty_slot_id=slot.id, person_id=None, position_index=pidx,
-            assignment_source=AssignmentSource.auto,
-            plan_status=PlanAssignmentStatus.vacant,
-            execution_status=ExecutionStatus.pending,
-            raw_minutes=0, weighted_minutes_before_round=Decimal(0),
-            credited_minutes=0, balance_minutes=0, created_by=actor_id,
-        ))
+        db.add(
+            Assignment(
+                duty_slot_id=slot.id,
+                person_id=None,
+                position_index=pidx,
+                assignment_source=AssignmentSource.auto,
+                plan_status=PlanAssignmentStatus.vacant,
+                execution_status=ExecutionStatus.pending,
+                raw_minutes=0,
+                weighted_minutes_before_round=Decimal(0),
+                credited_minutes=0,
+                balance_minutes=0,
+                created_by=actor_id,
+            )
+        )
 
     was_published = plan.status == PlanStatus.published
     task.status = TaskStatus.scheduled
@@ -281,8 +304,11 @@ def add_task_to_plan(db: Session, task_id: uuid.UUID, actor_id: uuid.UUID | None
 
     db.flush()
     record_audit(
-        db, actor_user_id=actor_id, action="schedule.add_task",
-        entity_type="weekly_plan", entity_id=plan.id,
+        db,
+        actor_user_id=actor_id,
+        action="schedule.add_task",
+        entity_type="weekly_plan",
+        entity_id=plan.id,
         after_data={"task_id": str(task.id), "slot_id": str(slot.id), "published": was_published},
     )
     return slot
@@ -342,7 +368,9 @@ def serialize_week(db: Session, plan: WeeklyPlan) -> dict:
 
     slot_rows = list(
         db.scalars(
-            select(DutySlot).where(DutySlot.weekly_plan_id == plan.id).order_by(DutySlot.slot_start_at)
+            select(DutySlot)
+            .where(DutySlot.weekly_plan_id == plan.id)
+            .order_by(DutySlot.slot_start_at)
         )
     )
     visible_statuses = (PlanAssignmentStatus.assigned, PlanAssignmentStatus.pending)
@@ -352,10 +380,14 @@ def serialize_week(db: Session, plan: WeeklyPlan) -> dict:
         for a in s.assignments
         if a.person_id and a.plan_status in visible_statuses
     }
-    names = {
-        p.id: p.full_name
-        for p in db.scalars(select(PersonProfile).where(PersonProfile.id.in_(person_ids)))
-    } if person_ids else {}
+    names = (
+        {
+            p.id: p.full_name
+            for p in db.scalars(select(PersonProfile).where(PersonProfile.id.in_(person_ids)))
+        }
+        if person_ids
+        else {}
+    )
 
     return {
         "plan_id": plan.id,
@@ -380,7 +412,9 @@ def serialize_week(db: Session, plan: WeeklyPlan) -> dict:
                     {
                         "id": a.id,
                         "person_id": a.person_id if a.plan_status in visible_statuses else None,
-                        "person_name": names.get(a.person_id) if a.plan_status in visible_statuses else None,
+                        "person_name": names.get(a.person_id)
+                        if a.plan_status in visible_statuses
+                        else None,
                         "position_index": a.position_index,
                         "plan_status": a.plan_status.value,
                         "execution_status": a.execution_status.value,

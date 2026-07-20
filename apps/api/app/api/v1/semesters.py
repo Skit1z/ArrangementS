@@ -1,4 +1,5 @@
 """学期与课程时间 / 教学楼映射路由。"""
+
 from __future__ import annotations
 
 import uuid
@@ -24,7 +25,9 @@ router = APIRouter(prefix="/semesters", tags=["semesters"])
 
 
 @router.get("", response_model=list[SemesterOut])
-def list_semesters(_: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[Semester]:
+def list_semesters(
+    _: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> list[Semester]:
     return list(db.scalars(select(Semester).order_by(Semester.first_monday.desc())))
 
 

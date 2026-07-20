@@ -1,4 +1,5 @@
 """审计写入辅助。所有强制安排 / 敏感查看 / 审批 / 发布 / 锁定必须调用。"""
+
 from __future__ import annotations
 
 import uuid

@@ -1,4 +1,5 @@
 """登录失败限速。优先使用 Redis；不可用时回退进程内存（单机可用）。"""
+
 from __future__ import annotations
 
 import time
