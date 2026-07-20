@@ -418,6 +418,20 @@ export const adminApi = {
           initial_password: string;
         }>("/people", payload)
       ).data,
+    update: async (
+      id: string,
+      patch: Partial<{
+        student_no: string;
+        class_name: string;
+        full_name: string;
+        phone: string;
+        difficulty_level: string | null;
+        id_card: string | null;
+        bank_card: string | null;
+        is_in_scheduling_pool: boolean;
+      }>,
+    ) => (await api.patch<AdminPerson>(`/people/${id}`, patch)).data,
+    delete: async (id: string) => (await api.delete(`/people/${id}`)).data,
   },
 
   // 实时值班

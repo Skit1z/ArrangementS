@@ -205,3 +205,66 @@ def delete_constraint(db: Session, person_id: uuid.UUID, constraint_id: uuid.UUI
         raise HTTPException(status_code=404, detail="约束不存在")
     db.delete(c)
     db.flush()
+
+
+def update_person(
+    db: Session,
+    person_id: uuid.UUID,
+    patch: dict,
+) -> PersonProfile:
+    prof = db.get(PersonProfile, person_id)
+    if prof is None:
+        raise HTTPException(status_code=404, detail="人员不存在")
+
+    if "student_no" in patch and patch["student_no"] is not None:
+        new_no = patch["student_no"].strip()
+        if new_no and new_no != prof.student_no:
+            existing = db.scalar(select(PersonProfile).where(PersonProfile.student_no == new_no))
+            if existing is not None:
+                raise HTTPException(status_code=400, detail=f"学号 {new_no} 已被占用")
+            prof.student_no = new_no
+            if prof.user:
+                prof.user.username = new_no
+
+    if "full_name" in patch and patch["full_name"] is not None:
+        prof.full_name = patch["full_name"].strip()
+    if "class_name" in patch and patch["class_name"] is not None:
+        prof.class_name = patch["class_name"].strip()
+    if "phone" in patch and patch["phone"] is not None:
+        prof.phone = patch["phone"].strip()
+    if "difficulty_level" in patch:
+        prof.difficulty_level = patch["difficulty_level"]
+    if "is_in_scheduling_pool" in patch and patch["is_in_scheduling_pool"] is not None:
+        prof.is_in_scheduling_pool = patch["is_in_scheduling_pool"]
+
+    if "id_card" in patch and patch["id_card"] is not None:
+        raw_id = patch["id_card"].strip()
+        if raw_id:
+            prof.id_card_ciphertext = encrypt_field(raw_id)
+            prof.id_card_last4 = last4(raw_id)
+        else:
+            prof.id_card_ciphertext = None
+            prof.id_card_last4 = None
+
+    if "bank_card" in patch and patch["bank_card"] is not None:
+        raw_bank = patch["bank_card"].strip()
+        if raw_bank:
+            prof.bank_card_ciphertext = encrypt_field(raw_bank)
+            prof.bank_card_last4 = last4(raw_bank)
+        else:
+            prof.bank_card_ciphertext = None
+            prof.bank_card_last4 = None
+
+    db.flush()
+    return prof
+
+
+def delete_person(db: Session, person_id: uuid.UUID) -> None:
+    prof = db.get(PersonProfile, person_id)
+    if prof is None:
+        raise HTTPException(status_code=404, detail="人员不存在")
+    user = prof.user
+    db.delete(prof)
+    if user:
+        db.delete(user)
+    db.flush()

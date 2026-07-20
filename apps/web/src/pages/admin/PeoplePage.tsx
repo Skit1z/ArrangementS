@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, List, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TimePicker, Upload } from "antd";
-import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined, UserAddOutlined } from "@ant-design/icons";
+import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined, UserAddOutlined, EditOutlined } from "@ant-design/icons";
 import { useState } from "react";
 
 import { adminApi } from "@/features/admin/api";
@@ -21,6 +21,7 @@ export default function PeoplePage() {
   const qc = useQueryClient();
   const [keyword, setKeyword] = useState("");
   const [rulesPerson, setRulesPerson] = useState<Person | null>(null);
+  const [editingPerson, setEditingPerson] = useState<any | null>(null);
   const { data, isLoading } = useQuery<Person[]>({
     queryKey: ["people", keyword],
     queryFn: async () => (await api.get("/people", { params: { keyword: keyword || undefined } })).data,
@@ -40,6 +41,15 @@ export default function PeoplePage() {
     },
     onSuccess: () => {
       message.success("自动排班状态已更新");
+      qc.invalidateQueries({ queryKey: ["people"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const deletePersonM = useMutation({
+    mutationFn: (id: string) => adminApi.people.delete(id),
+    onSuccess: () => {
+      message.success("人员及关联账号已删除");
       qc.invalidateQueries({ queryKey: ["people"] });
     },
     onError: (e) => message.error(errorMessage(e)),
@@ -82,7 +92,7 @@ export default function PeoplePage() {
         dataSource={data}
         columns={[
           { title: "学号", dataIndex: "student_no" },
-          { title: "班级", dataIndex: "class_name" },
+          { title: "班级", dataIndex: "class_name", render: (v) => v || "—" },
           { title: "姓名", dataIndex: "full_name" },
           { title: "手机号", dataIndex: "phone" },
           {
@@ -104,18 +114,45 @@ export default function PeoplePage() {
           {
             title: "操作",
             key: "action",
+            width: 240,
             render: (_, r: Person) => (
-              <Button
-                icon={<SettingOutlined />}
-                size="small"
-                onClick={() => setRulesPerson(r)}
-              >
-                规则管理
-              </Button>
+              <Space wrap>
+                <Button
+                  icon={<EditOutlined />}
+                  size="small"
+                  onClick={() => setEditingPerson(r)}
+                >
+                  编辑
+                </Button>
+                <Button
+                  icon={<SettingOutlined />}
+                  size="small"
+                  onClick={() => setRulesPerson(r)}
+                >
+                  规则
+                </Button>
+                <Popconfirm
+                  title="确定删除该人员及其关联账号？"
+                  description="该删除不可撤销，确定操作？"
+                  onConfirm={() => deletePersonM.mutate(r.id)}
+                >
+                  <Button danger icon={<DeleteOutlined />} size="small">
+                    删除
+                  </Button>
+                </Popconfirm>
+              </Space>
             ),
           },
         ]}
       />
+
+      {editingPerson && (
+        <EditPersonModal
+          person={editingPerson}
+          onClose={() => setEditingPerson(null)}
+          onSuccess={() => qc.invalidateQueries({ queryKey: ["people"] })}
+        />
+      )}
 
       {importVisible && (
         <ImportModal onClose={() => setImportVisible(false)} />
@@ -671,6 +708,109 @@ function AddPersonModal({
               确认添加
             </Button>
           </Space>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+}
+
+function EditPersonModal({
+  person,
+  onClose,
+  onSuccess,
+}: {
+  person: any;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { message } = App.useApp();
+  const [form] = Form.useForm();
+
+  const updateMut = useMutation({
+    mutationFn: (vals: any) => adminApi.people.update(person.id, vals),
+    onSuccess: () => {
+      message.success("人员信息已修改");
+      onSuccess();
+      onClose();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  return (
+    <Modal
+      title={`编辑人员信息 · ${person.full_name}`}
+      open
+      onCancel={onClose}
+      onOk={() => form.submit()}
+      confirmLoading={updateMut.isPending}
+      destroyOnClose
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{
+          student_no: person.student_no,
+          class_name: person.class_name,
+          full_name: person.full_name,
+          phone: person.phone,
+          difficulty_level: person.difficulty_level,
+          is_in_scheduling_pool: person.is_in_scheduling_pool,
+        }}
+        onFinish={(vals) => updateMut.mutate(vals)}
+      >
+        <Form.Item
+          name="student_no"
+          label="学号"
+          rules={[{ required: true, message: "请输入学号" }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="full_name"
+          label="姓名"
+          rules={[{ required: true, message: "请输入姓名" }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item name="class_name" label="班级（可选）">
+          <Input placeholder="非必填" />
+        </Form.Item>
+
+        <Form.Item
+          name="phone"
+          label="手机号"
+          rules={[
+            { required: true, message: "请输入手机号" },
+            { pattern: /^1[3-9]\d{9}$/, message: "请输入有效的手机号" },
+          ]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item name="difficulty_level" label="困难等级（可选）">
+          <Select allowClear placeholder="选择困难等级">
+            <Select.Option value="A">A 级困难</Select.Option>
+            <Select.Option value="B">B 级困难</Select.Option>
+            <Select.Option value="C">C 级困难</Select.Option>
+          </Select>
+        </Form.Item>
+
+        <Form.Item name="id_card" label="修改身份证号（不填则保持不变，可选）">
+          <Input placeholder="输入新身份证号进行替换" />
+        </Form.Item>
+
+        <Form.Item name="bank_card" label="修改银行卡号（不填则保持不变，可选）">
+          <Input placeholder="输入新银行卡号进行替换" />
+        </Form.Item>
+
+        <Form.Item
+          name="is_in_scheduling_pool"
+          label="参与自动排班"
+          valuePropName="checked"
+        >
+          <Switch checkedChildren="参与" unCheckedChildren="不参与" />
         </Form.Item>
       </Form>
     </Modal>

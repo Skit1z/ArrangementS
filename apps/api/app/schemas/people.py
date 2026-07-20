@@ -60,6 +60,17 @@ class PersonCreateIn(BaseModel):
     is_in_scheduling_pool: bool = True
 
 
+class PersonUpdateIn(BaseModel):
+    student_no: str | None = None
+    class_name: str | None = None
+    full_name: str | None = None
+    phone: str | None = None
+    difficulty_level: str | None = None
+    id_card: str | None = None
+    bank_card: str | None = None
+    is_in_scheduling_pool: bool | None = None
+
+
 class PersonCreateOut(BaseModel):
     person: PersonOut
     initial_password: str

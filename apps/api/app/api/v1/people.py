@@ -23,6 +23,7 @@ from app.schemas.people import (
     PersonCreateIn,
     PersonCreateOut,
     PersonOut,
+    PersonUpdateIn,
     SchedulingPoolRequest,
     SensitiveOut,
 )
@@ -75,6 +76,32 @@ def get_person(
     person_id: uuid.UUID, _: User = Depends(require_admin), db: Session = Depends(get_db)
 ) -> PersonOut:
     return PersonOut.from_profile(people_service.get_person(db, person_id))
+
+
+@router.patch("/{person_id}", response_model=PersonOut)
+def update_person(
+    person_id: uuid.UUID,
+    payload: PersonUpdateIn,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> PersonOut:
+    """Admin 修改人员信息。"""
+    prof = people_service.update_person(db, person_id, payload.model_dump(exclude_unset=True))
+    db.commit()
+    db.refresh(prof)
+    return PersonOut.from_profile(prof)
+
+
+@router.delete("/{person_id}", response_model=MessageOut)
+def delete_person(
+    person_id: uuid.UUID,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> MessageOut:
+    """Admin 删除人员及其关联账号。"""
+    people_service.delete_person(db, person_id)
+    db.commit()
+    return MessageOut(message="人员及关联账号已删除")
 
 
 @router.get("/import/template")
