@@ -272,7 +272,11 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
     from app.models.leave import LeaveRequest
     from app.models.overtime import OvertimeRequest
     from app.models.schedule import Assignment
-    from app.models.statistics import PersonMonthSummary
+    from app.models.statistics import (
+        HourAdjustment,
+        MonthlyHourSummary,
+        MonthlyVenueHourSummary,
+    )
     from app.models.swap import ShiftExchangeRequest
     from app.models.timetable import Timetable, TimetablePeriod
     from sqlalchemy import delete, update
@@ -288,7 +292,11 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
     )
     db.execute(delete(LeaveRequest).where(LeaveRequest.person_id == person_id))
     db.execute(delete(OvertimeRequest).where(OvertimeRequest.person_id == person_id))
-    db.execute(delete(PersonMonthSummary).where(PersonMonthSummary.person_id == person_id))
+    db.execute(delete(MonthlyHourSummary).where(MonthlyHourSummary.person_id == person_id))
+    db.execute(
+        delete(MonthlyVenueHourSummary).where(MonthlyVenueHourSummary.person_id == person_id)
+    )
+    db.execute(delete(HourAdjustment).where(HourAdjustment.person_id == person_id))
     db.execute(delete(AvailabilityBlock).where(AvailabilityBlock.person_id == person_id))
     db.execute(delete(AvailabilityRequest).where(AvailabilityRequest.person_id == person_id))
 
