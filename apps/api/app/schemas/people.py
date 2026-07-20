@@ -49,6 +49,22 @@ class PersonOut(BaseModel):
         )
 
 
+class PersonCreateIn(BaseModel):
+    student_no: str = Field(..., description="学号")
+    class_name: str = Field(..., description="班级")
+    full_name: str = Field(..., description="姓名")
+    phone: str = Field(..., description="手机号")
+    difficulty_level: str | None = None
+    id_card: str | None = None
+    bank_card: str | None = None
+    is_in_scheduling_pool: bool = True
+
+
+class PersonCreateOut(BaseModel):
+    person: PersonOut
+    initial_password: str
+
+
 class ImportPreviewRow(BaseModel):
     row_no: int
     student_no: str

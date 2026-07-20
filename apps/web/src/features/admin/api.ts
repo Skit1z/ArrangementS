@@ -393,6 +393,22 @@ export const adminApi = {
 
   people: {
     list: async () => (await api.get<AdminPerson[]>("/people")).data,
+    create: async (payload: {
+      student_no: string;
+      class_name: string;
+      full_name: string;
+      phone: string;
+      difficulty_level?: string | null;
+      id_card?: string | null;
+      bank_card?: string | null;
+      is_in_scheduling_pool?: boolean;
+    }) =>
+      (
+        await api.post<{
+          person: AdminPerson;
+          initial_password: string;
+        }>("/people", payload)
+      ).data,
   },
 
   // 课表

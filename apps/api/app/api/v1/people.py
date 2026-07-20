@@ -20,6 +20,8 @@ from app.schemas.people import (
     ImportConfirmOut,
     ImportPreviewOut,
     ImportPreviewRow,
+    PersonCreateIn,
+    PersonCreateOut,
     PersonOut,
     SchedulingPoolRequest,
     SensitiveOut,
@@ -41,6 +43,31 @@ def list_people(
         db, class_name=class_name, keyword=keyword, status_filter=status
     )
     return [PersonOut.from_profile(p) for p in people]
+
+
+@router.post("", response_model=PersonCreateOut, status_code=201)
+def create_person(
+    payload: PersonCreateIn,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> PersonCreateOut:
+    """Admin 手动添加单个人员档案及自动开通登录账号。"""
+    prof, initial_pwd = people_service.create_person(
+        db,
+        student_no=payload.student_no,
+        class_name=payload.class_name,
+        full_name=payload.full_name,
+        phone=payload.phone,
+        difficulty_level=payload.difficulty_level,
+        id_card=payload.id_card,
+        bank_card=payload.bank_card,
+        is_in_scheduling_pool=payload.is_in_scheduling_pool,
+    )
+    db.commit()
+    return PersonCreateOut(
+        person=PersonOut.from_profile(prof),
+        initial_password=initial_pwd,
+    )
 
 
 @router.get("/{person_id}", response_model=PersonOut)

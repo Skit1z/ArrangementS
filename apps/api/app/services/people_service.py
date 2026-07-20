@@ -8,11 +8,85 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.crypto import decrypt_field
+from app.core.crypto import decrypt_field, encrypt_field, last4
+from app.core.pinyin import build_initial_password
+from app.core.security import hash_password
 from app.models.constraint import PersonConstraint
-from app.models.enums import PersonStatus
+from app.models.enums import PersonStatus, UserRole
 from app.models.person import PersonProfile
+from app.models.user import User
 from app.services.audit_service import record_audit
+
+
+def create_person(
+    db: Session,
+    *,
+    student_no: str,
+    class_name: str,
+    full_name: str,
+    phone: str,
+    difficulty_level: str | None = None,
+    id_card: str | None = None,
+    bank_card: str | None = None,
+    is_in_scheduling_pool: bool = True,
+) -> tuple[PersonProfile, str]:
+    student_no = student_no.strip()
+    class_name = class_name.strip()
+    full_name = full_name.strip()
+    phone = phone.strip()
+
+    if not student_no or not class_name or not full_name or not phone:
+        raise HTTPException(status_code=400, detail="学号、班级、姓名、手机号不能为空")
+
+    existing = db.scalar(select(PersonProfile).where(PersonProfile.student_no == student_no))
+    if existing is not None:
+        raise HTTPException(status_code=400, detail=f"学号 {student_no} 已存在")
+
+    existing_user = db.scalar(select(User).where(User.username == student_no))
+    if existing_user is not None:
+        raise HTTPException(status_code=400, detail=f"账号 {student_no} 已存在")
+
+    id_cipher = None
+    id_l4 = None
+    if id_card and id_card.strip():
+        raw_id = id_card.strip()
+        id_cipher = encrypt_field(raw_id)
+        id_l4 = last4(raw_id)
+
+    bank_cipher = None
+    bank_l4 = None
+    if bank_card and bank_card.strip():
+        raw_bank = bank_card.strip()
+        bank_cipher = encrypt_field(raw_bank)
+        bank_l4 = last4(raw_bank)
+
+    initial_pwd = build_initial_password(student_no, full_name)
+    user = User(
+        username=student_no,
+        password_hash=hash_password(initial_pwd),
+        role=UserRole.user,
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+
+    prof = PersonProfile(
+        user_id=user.id,
+        student_no=student_no,
+        class_name=class_name,
+        full_name=full_name,
+        phone=phone,
+        difficulty_level=difficulty_level.strip() if difficulty_level and difficulty_level.strip() else None,
+        id_card_ciphertext=id_cipher,
+        id_card_last4=id_l4,
+        bank_card_ciphertext=bank_cipher,
+        bank_card_last4=bank_l4,
+        status=PersonStatus.active,
+        is_in_scheduling_pool=is_in_scheduling_pool,
+    )
+    db.add(prof)
+    db.flush()
+    return prof, initial_pwd
 
 
 def get_person(db: Session, person_id: uuid.UUID) -> PersonProfile:

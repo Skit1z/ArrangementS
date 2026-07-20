@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, List, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TimePicker, Upload } from "antd";
-import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined } from "@ant-design/icons";
+import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useState } from "react";
 
 import { adminApi } from "@/features/admin/api";
@@ -27,6 +27,12 @@ export default function PeoplePage() {
   });
 
   const [importVisible, setImportVisible] = useState(false);
+  const [addPersonVisible, setAddPersonVisible] = useState(false);
+  const [createdAccountInfo, setCreatedAccountInfo] = useState<{
+    name: string;
+    username: string;
+    initialPassword: string;
+  } | null>(null);
 
   const toggleSchedulingPool = useMutation({
     mutationFn: async ({ personIds, enabled }: { personIds: string[]; enabled: boolean }) => {
@@ -50,6 +56,13 @@ export default function PeoplePage() {
         />
         <Space>
           <Button
+            type="primary"
+            icon={<UserAddOutlined />}
+            onClick={() => setAddPersonVisible(true)}
+          >
+            手动添加人员
+          </Button>
+          <Button
             icon={<DownloadOutlined />}
             onClick={() => {
               window.open(api.defaults.baseURL + "/people/import/template");
@@ -57,7 +70,7 @@ export default function PeoplePage() {
           >
             下载导入模板
           </Button>
-          <Button type="primary" icon={<UploadOutlined />} onClick={() => setImportVisible(true)}>
+          <Button icon={<UploadOutlined />} onClick={() => setImportVisible(true)}>
             批量导入人员
           </Button>
         </Space>
@@ -106,6 +119,50 @@ export default function PeoplePage() {
 
       {importVisible && (
         <ImportModal onClose={() => setImportVisible(false)} />
+      )}
+
+      {addPersonVisible && (
+        <AddPersonModal
+          open={addPersonVisible}
+          onClose={() => setAddPersonVisible(false)}
+          onSuccess={(info) => {
+            setCreatedAccountInfo(info);
+            qc.invalidateQueries({ queryKey: ["people"] });
+          }}
+        />
+      )}
+
+      {createdAccountInfo && (
+        <Modal
+          open={!!createdAccountInfo}
+          title="🎉 人员添加成功"
+          onOk={() => setCreatedAccountInfo(null)}
+          onCancel={() => setCreatedAccountInfo(null)}
+          cancelButtonProps={{ style: { display: "none" } }}
+          okText="我知道了"
+        >
+          <p style={{ fontSize: 14, marginBottom: 12 }}>
+            已成功为 <b>{createdAccountInfo.name}</b> 创建人员档案并开通登录账号：
+          </p>
+          <div
+            style={{
+              background: "#fafafa",
+              padding: 16,
+              borderRadius: 8,
+              border: "1px solid #f0f0f0",
+            }}
+          >
+            <p style={{ margin: "4px 0" }}>
+              <b>登录账号（学号）：</b> {createdAccountInfo.username}
+            </p>
+            <p style={{ margin: "4px 0" }}>
+              <b>初始密码：</b> <Tag color="blue">{createdAccountInfo.initialPassword}</Tag>
+            </p>
+          </div>
+          <p style={{ fontSize: 12, color: "#888", marginTop: 12 }}>
+            * 提示：用户登录系统后可随时自行修改初始密码。
+          </p>
+        </Modal>
       )}
 
       {rulesPerson && (
@@ -494,6 +551,129 @@ function RulesModal({
           </Button>
         </Form>
       </div>
+    </Modal>
+  );
+}
+
+function AddPersonModal({
+  open,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: (data: { name: string; username: string; initialPassword: string }) => void;
+}) {
+  const { message } = App.useApp();
+  const [form] = Form.useForm();
+
+  const createMut = useMutation({
+    mutationFn: async (values: any) => {
+      return await adminApi.people.create({
+        student_no: values.student_no,
+        class_name: values.class_name,
+        full_name: values.full_name,
+        phone: values.phone,
+        difficulty_level: values.difficulty_level || null,
+        id_card: values.id_card || null,
+        bank_card: values.bank_card || null,
+        is_in_scheduling_pool: values.is_in_scheduling_pool ?? true,
+      });
+    },
+    onSuccess: (res) => {
+      form.resetFields();
+      onClose();
+      onSuccess({
+        name: res.person.full_name,
+        username: res.person.student_no,
+        initialPassword: res.initial_password,
+      });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  return (
+    <Modal
+      open={open}
+      title="手动添加人员"
+      footer={null}
+      onCancel={onClose}
+      destroyOnClose
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{ is_in_scheduling_pool: true }}
+        onFinish={(vals) => createMut.mutate(vals)}
+      >
+        <Form.Item
+          name="student_no"
+          label="学号"
+          rules={[{ required: true, message: "请输入学号" }]}
+        >
+          <Input placeholder="例如：2023000001" />
+        </Form.Item>
+
+        <Form.Item
+          name="class_name"
+          label="班级"
+          rules={[{ required: true, message: "请输入班级" }]}
+        >
+          <Input placeholder="例如：计科2301" />
+        </Form.Item>
+
+        <Form.Item
+          name="full_name"
+          label="姓名"
+          rules={[{ required: true, message: "请输入姓名" }]}
+        >
+          <Input placeholder="例如：张三" />
+        </Form.Item>
+
+        <Form.Item
+          name="phone"
+          label="手机号"
+          rules={[
+            { required: true, message: "请输入手机号" },
+            { pattern: /^1[3-9]\d{9}$/, message: "请输入有效的手机号" },
+          ]}
+        >
+          <Input placeholder="例如：13800138000" />
+        </Form.Item>
+
+        <Form.Item name="difficulty_level" label="困难等级（可选）">
+          <Select allowClear placeholder="选择困难等级">
+            <Select.Option value="A">A 级困难</Select.Option>
+            <Select.Option value="B">B 级困难</Select.Option>
+            <Select.Option value="C">C 级困难</Select.Option>
+          </Select>
+        </Form.Item>
+
+        <Form.Item name="id_card" label="身份证号（可选，自动加密）">
+          <Input placeholder="例如：110105200001011234" />
+        </Form.Item>
+
+        <Form.Item name="bank_card" label="银行卡号（可选，自动加密）">
+          <Input placeholder="例如：6222021001112222" />
+        </Form.Item>
+
+        <Form.Item
+          name="is_in_scheduling_pool"
+          label="参与自动排班"
+          valuePropName="checked"
+        >
+          <Switch checkedChildren="参与" unCheckedChildren="不参与" />
+        </Form.Item>
+
+        <Form.Item style={{ marginBottom: 0, textAlign: "right" }}>
+          <Space>
+            <Button onClick={onClose}>取消</Button>
+            <Button type="primary" htmlType="submit" loading={createMut.isPending}>
+              确认添加
+            </Button>
+          </Space>
+        </Form.Item>
+      </Form>
     </Modal>
   );
 }
