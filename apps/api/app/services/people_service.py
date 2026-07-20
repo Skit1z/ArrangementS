@@ -292,7 +292,7 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
             | (SwapRequest.selected_person_id == person_id)
         )
     )
-    db.execute(delete(LeaveRequest).where(LeaveRequest.person_id == person_id))
+    db.execute(delete(LeaveRequest).where(LeaveRequest.applicant_person_id == person_id))
     db.execute(delete(OvertimeRequest).where(OvertimeRequest.person_id == person_id))
     db.execute(delete(MonthlyHourSummary).where(MonthlyHourSummary.person_id == person_id))
     db.execute(
