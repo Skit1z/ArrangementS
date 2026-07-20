@@ -13,6 +13,7 @@ import TasksPage from "@/pages/admin/TasksPage";
 import TimetablesPage from "@/pages/admin/TimetablesPage";
 import VenuesPage from "@/pages/admin/VenuesPage";
 import AdminOvertimePage from "@/pages/admin/AdminOvertimePage";
+import AdminHomePage from "@/pages/admin/AdminHomePage";
 import HomePage from "@/pages/user/HomePage";
 import HoursPage from "@/pages/user/HoursPage";
 import MySchedulePage from "@/pages/user/MySchedulePage";
@@ -28,7 +29,8 @@ export const router = createBrowserRouter([
         path: "/admin",
         element: <AdminLayout />,
         children: [
-          { index: true, element: <Navigate to="/admin/schedule" replace /> },
+          { index: true, element: <Navigate to="/admin/home" replace /> },
+          { path: "home", element: <AdminHomePage /> },
           { path: "schedule", element: <SchedulePage /> },
           { path: "people", element: <PeoplePage /> },
           { path: "review", element: <ReviewCenterPage /> },

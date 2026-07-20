@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 import { hoursOf, meApi } from "@/features/me/api";
 import { useAuth } from "@/stores/auth";
+import { CurrentDutyCard } from "@/components/CurrentDutyCard";
 
 export default function HomePage() {
   const user = useAuth((s) => s.user);
@@ -20,9 +21,12 @@ export default function HomePage() {
 
   return (
     <div>
-      <Typography.Title level={4} style={{ marginTop: 0 }}>
+      <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 16 }}>
         你好，{user?.username}
       </Typography.Title>
+
+      {/* 实时值班人员与联系方式 */}
+      <CurrentDutyCard />
 
       <Card
         size="small"

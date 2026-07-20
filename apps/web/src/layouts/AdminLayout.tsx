@@ -1,6 +1,7 @@
 import {
   AuditOutlined,
   CalendarOutlined,
+  HomeOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
@@ -13,6 +14,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/stores/auth";
 
 const items = [
+  { key: "/admin/home", icon: <HomeOutlined />, label: "首页" },
   { key: "/admin/schedule", icon: <CalendarOutlined />, label: "排班" },
   { key: "/admin/people", icon: <TeamOutlined />, label: "人员" },
   { key: "/admin/timetables", icon: <CalendarOutlined />, label: "全员课表" },

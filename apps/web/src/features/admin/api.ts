@@ -420,6 +420,11 @@ export const adminApi = {
       ).data,
   },
 
+  // 实时值班
+  schedule: {
+    currentDuty: async () => (await api.get<CurrentDutyItem[]>("/schedule/current-duty")).data,
+  },
+
   // 课表
   timetables: {
     active: async () => (await api.get<ActiveTimetableOut[]>("/timetables/active")).data,
@@ -639,4 +644,17 @@ export interface ActiveTimetableOut {
   person_id: string;
   person_name: string;
   rules: CourseRuleOut[];
+}
+
+export interface CurrentDutyItem {
+  assignment_id: string;
+  slot_id: string;
+  venue_id: string;
+  venue_name: string;
+  slot_start_at: string;
+  slot_end_at: string;
+  person_id: string;
+  full_name: string;
+  class_name: string;
+  phone: string;
 }

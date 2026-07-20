@@ -148,3 +148,51 @@ def next_duty(db: Session, person_id: uuid.UUID) -> dict | None:
                 ),
             }
     return None
+
+
+def get_current_on_duty_staff(db: Session) -> list[dict]:
+    """获取当前时刻正处于在岗值班状态的人员及其联系电话。"""
+    now = datetime.now(timezone.utc)
+
+    stmt = (
+        select(Assignment, DutySlot, Venue, PersonProfile)
+        .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
+        .join(Venue, DutySlot.venue_id == Venue.id)
+        .join(PersonProfile, Assignment.person_id == PersonProfile.id)
+        .join(WeeklyPlan, DutySlot.weekly_plan_id == WeeklyPlan.id)
+        .where(
+            WeeklyPlan.status == PlanStatus.published,
+            Assignment.plan_status.in_(VISIBLE_PLAN_STATUSES),
+        )
+        .order_by(Venue.sort_order, DutySlot.slot_start_at)
+    )
+
+    rows = db.execute(stmt).all()
+
+    current_items: list[dict] = []
+    for a, slot, venue, person in rows:
+        s_start = slot.slot_start_at
+        if s_start.tzinfo is None:
+            s_start = s_start.replace(tzinfo=timezone.utc)
+        s_end = slot.slot_end_at
+        if s_end.tzinfo is None:
+            s_end = s_end.replace(tzinfo=timezone.utc)
+
+        if s_start <= now <= s_end:
+            current_items.append(
+                {
+                    "assignment_id": str(a.id),
+                    "slot_id": str(slot.id),
+                    "venue_id": str(venue.id),
+                    "venue_name": venue.name,
+                    "slot_start_at": slot.slot_start_at.isoformat(),
+                    "slot_end_at": slot.slot_end_at.isoformat(),
+                    "person_id": str(person.id),
+                    "full_name": person.full_name,
+                    "class_name": person.class_name,
+                    "phone": person.phone,
+                }
+            )
+
+    return current_items
+

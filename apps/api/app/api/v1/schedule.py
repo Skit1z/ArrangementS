@@ -26,6 +26,16 @@ from app.services import draft_service, schedule_service
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
+@router.get("/current-duty")
+def current_duty(
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """获取当前时刻正处于在岗值班状态的人员及联系电话（普通用户与管理员均可访问）。"""
+    from app.services import me_service
+    return me_service.get_current_on_duty_staff(db)
+
+
 @router.get("/weeks/{week_start}", response_model=WeekView)
 def get_week(
     week_start: date,
