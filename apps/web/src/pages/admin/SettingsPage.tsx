@@ -758,8 +758,10 @@ function VacationsTab() {
   });
 
   const [editing, setEditing] = useState<Vacation | null>(null);
+  const [creating, setCreating] = useState(false);
   const [managing, setManaging] = useState<Vacation | null>(null);
   const [editForm] = Form.useForm();
+  const [createForm] = Form.useForm();
   const [availabilityForm] = Form.useForm();
   const peopleQ = useQuery({
     queryKey: ["admin", "people"],
@@ -772,6 +774,26 @@ function VacationsTab() {
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "vacations"] });
+
+  const createM = useMutation({
+    mutationFn: (v: any) => adminApi.vacations.create(v),
+    onSuccess: () => {
+      message.success("假期规则已创建");
+      setCreating(false);
+      createForm.resetFields();
+      invalidate();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const disableM = useMutation({
+    mutationFn: (id: string) => adminApi.vacations.disable(id),
+    onSuccess: () => {
+      message.success("假期规则已停用");
+      invalidate();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
 
   const updateM = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: VacationUpdate }) =>
@@ -801,6 +823,30 @@ function VacationsTab() {
     onError: (e) => message.error(errorMessage(e)),
   });
 
+  const openCreate = () => {
+    createForm.resetFields();
+    const currentSem = (semestersQ.data ?? []).find((s) => s.is_current) ?? semestersQ.data?.[0];
+    createForm.setFieldsValue({
+      semester_id: currentSem?.id,
+      required_people: 1,
+      date_range: [dayjs().startOf("day"), dayjs().add(14, "day").endOf("day")],
+    });
+    setCreating(true);
+  };
+
+  const submitCreate = async () => {
+    const values = await createForm.validateFields();
+    const [start, end] = values.date_range;
+    createM.mutate({
+      name: values.name,
+      start_date: start.format("YYYY-MM-DD"),
+      end_date: end.format("YYYY-MM-DD"),
+      semester_id: values.semester_id,
+      required_people: values.required_people ?? 1,
+      yellow_shift_template_ids: values.yellow_shift_template_ids ?? [],
+    });
+  };
+
   const openEdit = (v: Vacation) => {
     editForm.setFieldsValue({
       name: v.name,
@@ -826,9 +872,20 @@ function VacationsTab() {
 
   return (
     <>
+      <div style={{ marginBottom: 12 }}>
+        <Space>
+          <Button type="primary" onClick={openCreate}>
+            新增自定义假期
+          </Button>
+          <Button onClick={invalidate}>
+            刷新/自动联动
+          </Button>
+        </Space>
+      </div>
+
       <Alert
         message="寒暑假自动联动说明"
-        description="寒暑假由各学期时间自动联动生成（学期与学期之间的间隔自动识别为寒暑假），无需手动新增日期。您可在此修改各假期的排班规则（值班班次、需求人数）及可值班人员白名单。"
+        description="系统默认会根据各学期的时间自动计算联动生成寒暑假（学期与学期之间的间隔自动识别为寒暑假）。您也可以手动点击上方“新增自定义假期”添加特定的假期规则，或调整值班白名单人员。"
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
@@ -858,7 +915,7 @@ function VacationsTab() {
           },
           {
             title: "操作",
-            width: 180,
+            width: 220,
             render: (_, r) => (
               <Space>
                 <Button size="small" onClick={() => openEdit(r)}>
@@ -867,11 +924,58 @@ function VacationsTab() {
                 <Button size="small" type="primary" onClick={() => setManaging(r)}>
                   可值班名单
                 </Button>
+                {r.is_active && (
+                  <Popconfirm title="确定停用该假期规则？" onConfirm={() => disableM.mutate(r.id)}>
+                    <Button size="small" danger>
+                      停用
+                    </Button>
+                  </Popconfirm>
+                )}
               </Space>
             ),
           },
         ]}
       />
+
+      <Modal
+        title="新增自定义假期规则"
+        open={creating}
+        onOk={submitCreate}
+        onCancel={() => setCreating(false)}
+        confirmLoading={createM.isPending}
+        destroyOnClose
+      >
+        <Form form={createForm} layout="vertical">
+          <Form.Item name="name" label="假期名称" rules={[{ required: true, message: "请输入假期名称" }]}>
+            <Input placeholder="如 2026 暑假 / 国庆特别值班" />
+          </Form.Item>
+          <Form.Item name="semester_id" label="关联学期" rules={[{ required: true, message: "请选择关联学期" }]}>
+            <Select
+              placeholder="选择关联学期"
+              options={(semestersQ.data ?? []).map((s) => ({
+                label: `${s.name} (${s.first_monday})`,
+                value: s.id,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="date_range" label="起止日期" rules={[{ required: true, message: "请选择起止日期" }]}>
+            <DatePicker.RangePicker format="YYYY-MM-DD" style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="required_people" label="默认班次人数">
+            <InputNumber min={0} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="yellow_shift_template_ids" label="假期保留班次 (不选则默认保留第1个班次)">
+            <Select
+              mode="multiple"
+              placeholder="选择假期内开放的值班班次"
+              options={(shiftTemplatesQ.data ?? []).map((t) => ({
+                label: `${t.name} (${t.start_time} - ${t.end_time})`,
+                value: t.id,
+              }))}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title={`编辑假期规则 · ${editing?.name ?? ""}`}

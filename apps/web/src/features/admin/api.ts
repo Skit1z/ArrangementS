@@ -252,6 +252,15 @@ export interface Vacation {
   required_people: number;
 }
 
+export interface VacationCreate {
+  name: string;
+  start_date: string;
+  end_date: string;
+  semester_id: string;
+  yellow_shift_template_ids?: string[];
+  required_people?: number;
+}
+
 export interface VacationUpdate {
   name?: string;
   yellow_shift_template_ids?: string[];
