@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -36,7 +37,7 @@ import {
   type SpecialDateIn,
   type Vacation,
   type VacationAvailability,
-  type VacationCreate,
+  type VacationUpdate,
 } from "@/features/admin/api";
 
 export default function SettingsPage() {
@@ -563,15 +564,18 @@ function SemesterTab() {
 
   const [editing, setEditing] = useState<Semester | null>(null);
   const [creating, setCreating] = useState(false);
-  // 表单 first_monday 用 Dayjs，提交时格式化；不直接绑定 SemesterCreate（其是字符串）
   const [form] = Form.useForm<{
     name: string;
     first_monday: dayjs.Dayjs;
+    week_count: number;
     course_buffer_enabled: boolean;
     course_buffer_minutes: number;
   }>();
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "semesters"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["admin", "semesters"] });
+    qc.invalidateQueries({ queryKey: ["admin", "vacations"] });
+  };
 
   const createM = useMutation({
     mutationFn: (v: SemesterCreate) => adminApi.semesters.create(v),
@@ -606,7 +610,7 @@ function SemesterTab() {
 
   const openCreate = () => {
     form.resetFields();
-    form.setFieldsValue({ course_buffer_enabled: false, course_buffer_minutes: 10 });
+    form.setFieldsValue({ week_count: 20, course_buffer_enabled: false, course_buffer_minutes: 10 });
     setCreating(true);
   };
 
@@ -614,6 +618,7 @@ function SemesterTab() {
     form.setFieldsValue({
       name: s.name,
       first_monday: dayjs(s.first_monday),
+      week_count: s.week_count ?? 20,
       course_buffer_enabled: s.course_buffer_enabled,
       course_buffer_minutes: s.course_buffer_minutes,
     });
@@ -625,7 +630,7 @@ function SemesterTab() {
     const payload = {
       name: v.name,
       first_monday: (v.first_monday as dayjs.Dayjs).format("YYYY-MM-DD"),
-      week_count: 20,
+      week_count: v.week_count ?? 20,
       course_buffer_enabled: v.course_buffer_enabled,
       course_buffer_minutes: v.course_buffer_minutes,
     };
@@ -698,10 +703,10 @@ function SemesterTab() {
             <Input placeholder="如 2026 秋季" />
           </Form.Item>
           <Form.Item name="first_monday" label="首周周一" rules={[{ required: true }]}>
-            <DatePicker picker="date" format="YYYY-MM-DD" />
+            <DatePicker picker="date" format="YYYY-MM-DD" style={{ width: "100%" }} />
           </Form.Item>
-          <Form.Item label="教学周数">
-            <Input value="20（固定）" disabled />
+          <Form.Item name="week_count" label="教学周数 (18–22 周)" rules={[{ required: true, message: "请选择教学周数" }]}>
+            <InputNumber min={18} max={22} style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item name="course_buffer_enabled" label="启用课程缓冲" valuePropName="checked">
             <Checkbox>启用（课表时间前后加缓冲分钟）</Checkbox>
@@ -727,10 +732,21 @@ function VacationsTab() {
     queryKey: ["admin", "semesters"],
     queryFn: adminApi.semesters.list,
   });
+  const venuesQ = useQuery({
+    queryKey: ["admin", "venues"],
+    queryFn: adminApi.venues.list,
+  });
 
-  const [creating, setCreating] = useState(false);
+  const fixedVenue = (venuesQ.data ?? []).find((v) => v.venue_type === "fixed_shift");
+  const shiftTemplatesQ = useQuery({
+    queryKey: ["admin", "shift-templates", fixedVenue?.id],
+    queryFn: () => adminApi.shiftTemplates.get(fixedVenue!.id),
+    enabled: !!fixedVenue,
+  });
+
+  const [editing, setEditing] = useState<Vacation | null>(null);
   const [managing, setManaging] = useState<Vacation | null>(null);
-  const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [availabilityForm] = Form.useForm();
   const peopleQ = useQuery({
     queryKey: ["admin", "people"],
@@ -741,24 +757,15 @@ function VacationsTab() {
     queryFn: () => adminApi.vacations.availabilities(managing!.id),
     enabled: !!managing,
   });
-  
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "vacations"] });
 
-  const createM = useMutation({
-    mutationFn: (v: VacationCreate) => adminApi.vacations.create(v),
+  const updateM = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: VacationUpdate }) =>
+      adminApi.vacations.update(id, patch),
     onSuccess: () => {
-      message.success("寒暑假已创建");
-      setCreating(false);
-      form.resetFields();
-      invalidate();
-    },
-    onError: (e) => message.error(errorMessage(e)),
-  });
-
-  const disableM = useMutation({
-    mutationFn: (id: string) => adminApi.vacations.disable(id),
-    onSuccess: () => {
-      message.success("寒暑假已停用");
+      message.success("假期规则已更新");
+      setEditing(null);
       invalidate();
     },
     onError: (e) => message.error(errorMessage(e)),
@@ -781,29 +788,38 @@ function VacationsTab() {
     onError: (e) => message.error(errorMessage(e)),
   });
 
-  const openCreate = () => {
-    form.resetFields();
-    setCreating(true);
+  const openEdit = (v: Vacation) => {
+    editForm.setFieldsValue({
+      name: v.name,
+      required_people: v.required_people,
+      yellow_shift_template_ids: v.yellow_shift_template_ids ?? [],
+      is_active: v.is_active,
+    });
+    setEditing(v);
   };
 
-  const submit = async () => {
-    const v = await form.validateFields();
-    createM.mutate({
-      name: v.name,
-      start_date: v.dateRange[0].format("YYYY-MM-DD"),
-      end_date: v.dateRange[1].format("YYYY-MM-DD"),
-      semester_id: v.semester_id,
-      required_people: v.required_people,
+  const submitEdit = async () => {
+    const values = await editForm.validateFields();
+    updateM.mutate({
+      id: editing!.id,
+      patch: {
+        name: values.name,
+        required_people: values.required_people,
+        yellow_shift_template_ids: values.yellow_shift_template_ids,
+        is_active: values.is_active,
+      },
     });
   };
 
   return (
     <>
-      <div style={{ marginBottom: 12 }}>
-        <Button type="primary" onClick={openCreate}>
-          新增寒暑假
-        </Button>
-      </div>
+      <Alert
+        message="寒暑假自动联动说明"
+        description="寒暑假由各学期时间自动联动生成（学期与学期之间的间隔自动识别为寒暑假），无需手动新增日期。您可在此修改各假期的排班规则（值班班次、需求人数）及可值班人员白名单。"
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+      />
       <Table<Vacation>
         rowKey="id"
         loading={isLoading}
@@ -811,13 +827,16 @@ function VacationsTab() {
         pagination={false}
         columns={[
           { title: "名称", dataIndex: "name" },
-          { title: "开始日期", dataIndex: "start_date" },
-          { title: "结束日期", dataIndex: "end_date" },
           {
-            title: "学期",
-            dataIndex: "semester_id",
-            render: (id) => semestersQ.data?.find((s) => s.id === id)?.name ?? id,
+            title: "起止日期",
+            render: (_, r) => `${r.start_date} ~ ${r.end_date}`,
           },
+          {
+            title: "关联学期",
+            dataIndex: "semester_id",
+            render: (id) => semestersQ.data?.find((s) => s.id === id)?.name ?? "—",
+          },
+          { title: "默认班次人数", dataIndex: "required_people", width: 120 },
           {
             title: "状态",
             dataIndex: "is_active",
@@ -826,19 +845,15 @@ function VacationsTab() {
           },
           {
             title: "操作",
-            width: 120,
+            width: 180,
             render: (_, r) => (
               <Space>
-                <Button size="small" onClick={() => setManaging(r)}>
+                <Button size="small" onClick={() => openEdit(r)}>
+                  编辑
+                </Button>
+                <Button size="small" type="primary" onClick={() => setManaging(r)}>
                   可值班名单
                 </Button>
-                {r.is_active && (
-                  <Popconfirm title="确认停用？" onConfirm={() => disableM.mutate(r.id)}>
-                    <Button size="small" danger>
-                      停用
-                    </Button>
-                  </Popconfirm>
-                )}
               </Space>
             ),
           },
@@ -846,27 +861,32 @@ function VacationsTab() {
       />
 
       <Modal
-        title="新增寒暑假"
-        open={creating}
-        onOk={submit}
-        onCancel={() => setCreating(false)}
-        confirmLoading={createM.isPending}
+        title={`编辑假期规则 · ${editing?.name ?? ""}`}
+        open={!!editing}
+        onOk={submitEdit}
+        onCancel={() => setEditing(null)}
+        confirmLoading={updateM.isPending}
         destroyOnClose
       >
-        <Form form={form} layout="vertical">
-          <Form.Item name="name" label="名称" rules={[{ required: true }]}>
-            <Input placeholder="如 2026 寒假" />
+        <Form form={editForm} layout="vertical">
+          <Form.Item name="name" label="假期名称" rules={[{ required: true }]}>
+            <Input />
           </Form.Item>
-          <Form.Item name="dateRange" label="起止日期" rules={[{ required: true }]}>
-            <DatePicker.RangePicker format="YYYY-MM-DD" />
+          <Form.Item name="required_people" label="默认班次人数">
+            <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>
-          <Form.Item name="semester_id" label="关联学期" rules={[{ required: true }]}>
+          <Form.Item name="yellow_shift_template_ids" label="假期保留班次 (不选则默认保留第1个班次)">
             <Select
-              options={(semestersQ.data ?? []).map((s) => ({ value: s.id, label: s.name }))}
+              mode="multiple"
+              placeholder="选择假期内开放的值班班次"
+              options={(shiftTemplatesQ.data ?? []).map((t) => ({
+                label: `${t.name} (${t.start_time} - ${t.end_time})`,
+                value: t.id,
+              }))}
             />
           </Form.Item>
-          <Form.Item name="required_people" label="默认需求人数">
-            <InputNumber min={0} />
+          <Form.Item name="is_active" valuePropName="checked">
+            <Checkbox>启用该假期规则</Checkbox>
           </Form.Item>
         </Form>
       </Modal>

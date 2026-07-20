@@ -247,8 +247,16 @@ export interface Vacation {
   start_date: string;
   end_date: string;
   semester_id: string;
+  yellow_shift_template_ids?: string[] | null;
   is_active: boolean;
   required_people: number;
+}
+
+export interface VacationUpdate {
+  name?: string;
+  yellow_shift_template_ids?: string[];
+  required_people?: number;
+  is_active?: boolean;
 }
 
 export interface VacationAvailability {
@@ -370,6 +378,8 @@ export const adminApi = {
     list: async () => (await api.get<Vacation[]>("/admin/vacations")).data,
     create: async (payload: VacationCreate) =>
       (await api.post<Vacation>("/admin/vacations", payload)).data,
+    update: async (id: string, patch: VacationUpdate) =>
+      (await api.patch<Vacation>(`/admin/vacations/${id}`, patch)).data,
     disable: async (id: string) =>
       (await api.post(`/admin/vacations/${id}/disable`)).data,
     availabilities: async (id: string) =>

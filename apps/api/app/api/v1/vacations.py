@@ -17,6 +17,7 @@ from app.schemas.vacation import (
     SetAvailabilityRequest,
     VacationCreate,
     VacationOut,
+    VacationUpdate,
 )
 from app.services import vacation_service
 
@@ -25,7 +26,9 @@ router = APIRouter(prefix="/admin/vacations", tags=["vacations"])
 
 @router.get("", response_model=list[VacationOut])
 def list_vacations(_: User = Depends(require_admin), db: Session = Depends(get_db)) -> list[VacationPeriod]:
-    return list(db.scalars(select(VacationPeriod).order_by(VacationPeriod.start_date.desc())))
+    res = vacation_service.sync_vacation_periods(db)
+    db.commit()
+    return res
 
 
 @router.post("", response_model=VacationOut, status_code=201)
@@ -44,6 +47,22 @@ def create_vacation(
         else None,
         required_people=payload.required_people,
     )
+    db.commit()
+    db.refresh(vac)
+    return vac
+
+
+@router.patch("/{vacation_id}", response_model=VacationOut)
+def update_vacation(
+    vacation_id: uuid.UUID,
+    payload: VacationUpdate,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> VacationPeriod:
+    patch_data = payload.model_dump(exclude_unset=True)
+    if "yellow_shift_template_ids" in patch_data and patch_data["yellow_shift_template_ids"] is not None:
+        patch_data["yellow_shift_template_ids"] = [str(i) for i in patch_data["yellow_shift_template_ids"]]
+    vac = vacation_service.update_vacation(db, vacation_id, patch_data)
     db.commit()
     db.refresh(vac)
     return vac

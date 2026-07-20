@@ -37,8 +37,8 @@ def create_semester(
     course_buffer_enabled: bool = False,
     course_buffer_minutes: int = 10,
 ) -> Semester:
-    if week_count != 20:
-        raise HTTPException(status_code=422, detail="每学期固定为 20 个教学周")
+    if not (18 <= week_count <= 22):
+        raise HTTPException(status_code=422, detail="学期周数须在 18 至 22 周之间")
     sem = Semester(
         name=name,
         first_monday=first_monday,
@@ -67,6 +67,8 @@ def create_semester(
     db.flush()
     if is_current:
         _make_current(db, sem.id)
+    from app.services import vacation_service
+    vacation_service.sync_vacation_periods(db)
     return sem
 
 
@@ -86,18 +88,21 @@ def activate_semester(db: Session, semester_id: uuid.UUID) -> Semester:
 
 
 def update_semester(db: Session, semester_id: uuid.UUID, patch: dict) -> Semester:
-    """更新学期配置（固定 20 周；is_current 走 activate）。"""
+    """更新学期配置（18-22 周；is_current 走 activate）。"""
     sem = db.get(Semester, semester_id)
     if sem is None:
         raise HTTPException(status_code=404, detail="学期不存在")
     if "week_count" in patch and patch["week_count"] is not None:
         wc = patch["week_count"]
-        if wc != 20:
-            raise HTTPException(status_code=422, detail="每学期固定为 20 个教学周")
+        if not (18 <= wc <= 22):
+            raise HTTPException(status_code=422, detail="学期周数须在 18 至 22 周之间")
+        sem.week_count = wc
     for k in ("name", "first_monday", "course_buffer_enabled", "course_buffer_minutes"):
         if k in patch and patch[k] is not None:
             setattr(sem, k, patch[k])
     db.flush()
+    from app.services import vacation_service
+    vacation_service.sync_vacation_periods(db)
     return sem
 
 

@@ -14,6 +14,56 @@ from app.services.intervals import merge_intervals
 BEIJING_TZ = timezone(timedelta(hours=8))
 
 
+def sync_vacation_periods(db: Session) -> list[VacationPeriod]:
+    """根据已有学期的首周周一和周数，自动计算并同步学期之间的寒暑假区间。"""
+    from app.models.semester import Semester
+
+    semesters = list(db.scalars(select(Semester).order_by(Semester.first_monday.asc())))
+    if not semesters:
+        return list(db.scalars(select(VacationPeriod).order_by(VacationPeriod.start_date.desc())))
+
+    for i in range(len(semesters)):
+        sem_i = semesters[i]
+        sem_i_end = sem_i.first_monday + timedelta(weeks=sem_i.week_count)
+        if i + 1 < len(semesters):
+            next_sem = semesters[i + 1]
+            vac_start = sem_i_end
+            vac_end = next_sem.first_monday - timedelta(days=1)
+        else:
+            vac_start = sem_i_end
+            vac_end = sem_i_end + timedelta(weeks=8) - timedelta(days=1)
+
+        if vac_start > vac_end:
+            continue
+
+        if vac_start.month in (5, 6, 7, 8, 9):
+            default_name = f"{vac_start.year}年暑假"
+        else:
+            default_name = f"{vac_start.year}年寒假"
+
+        existing = db.scalar(
+            select(VacationPeriod).where(VacationPeriod.semester_id == sem_i.id)
+        )
+        if existing:
+            existing.start_date = vac_start
+            existing.end_date = vac_end
+            if not existing.name or "寒假" in existing.name or "暑假" in existing.name or "假期" in existing.name:
+                existing.name = default_name
+        else:
+            vac = VacationPeriod(
+                name=default_name,
+                start_date=vac_start,
+                end_date=vac_end,
+                semester_id=sem_i.id,
+                required_people=1,
+                is_active=True,
+            )
+            db.add(vac)
+
+    db.flush()
+    return list(db.scalars(select(VacationPeriod).order_by(VacationPeriod.start_date.desc())))
+
+
 def create_vacation(
     db: Session,
     *,
@@ -38,6 +88,20 @@ def create_vacation(
         created_by=actor_id,
     )
     db.add(vac)
+    db.flush()
+    return vac
+
+
+def update_vacation(
+    db: Session,
+    vacation_id: uuid.UUID,
+    patch: dict,
+) -> VacationPeriod:
+    """更新假期的排班规则（名称、保留班次、需求人数、启用状态）。"""
+    vac = get_vacation(db, vacation_id)
+    for k in ("name", "yellow_shift_template_ids", "required_people", "is_active"):
+        if k in patch and patch[k] is not None:
+            setattr(vac, k, patch[k])
     db.flush()
     return vac
 

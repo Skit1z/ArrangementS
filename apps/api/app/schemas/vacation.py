@@ -16,12 +16,20 @@ class VacationCreate(BaseModel):
     required_people: int = 1
 
 
+class VacationUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    yellow_shift_template_ids: list[uuid.UUID] | None = None
+    required_people: int | None = Field(default=None, ge=0)
+    is_active: bool | None = None
+
+
 class VacationOut(BaseModel):
     id: uuid.UUID
     name: str
     start_date: date
     end_date: date
     semester_id: uuid.UUID | None
+    yellow_shift_template_ids: list[uuid.UUID] | None = None
     required_people: int
     is_active: bool
 

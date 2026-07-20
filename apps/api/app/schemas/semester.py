@@ -12,7 +12,7 @@ from app.models.enums import BuildingType
 class SemesterCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     first_monday: date
-    week_count: int = 20
+    week_count: int = Field(default=20, ge=18, le=22)
     is_current: bool = False
     course_buffer_enabled: bool = False
     course_buffer_minutes: int = 10
@@ -21,7 +21,7 @@ class SemesterCreate(BaseModel):
 class SemesterUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
     first_monday: date | None = None
-    week_count: int | None = Field(default=None, ge=20, le=20)
+    week_count: int | None = Field(default=None, ge=18, le=22)
     course_buffer_enabled: bool | None = None
     course_buffer_minutes: int | None = None
 

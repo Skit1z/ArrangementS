@@ -25,23 +25,27 @@ def test_create_semester_seeds_defaults(db_session):
     assert (second.start_time.hour, second.start_time.minute) == (10, 20)
 
 
-def test_week_count_is_fixed_at_20(db_session):
-    sem = semester_service.create_semester(db_session, name="标准", first_monday=date(2026, 9, 1))
-    assert sem.week_count == 20
+def test_week_count_in_range_18_to_22(db_session):
+    sem = semester_service.create_semester(db_session, name="标准", first_monday=date(2026, 9, 1), week_count=18)
+    assert sem.week_count == 18
+    sem2 = semester_service.create_semester(db_session, name="长", first_monday=date(2027, 3, 1), week_count=22)
+    assert sem2.week_count == 22
     with pytest.raises(HTTPException):
-        semester_service.create_semester(db_session, name="短", first_monday=date(2027, 9, 1), week_count=1)
+        semester_service.create_semester(db_session, name="太短", first_monday=date(2027, 9, 1), week_count=10)
     with pytest.raises(HTTPException):
-        semester_service.create_semester(db_session, name="长", first_monday=date(2028, 9, 1), week_count=30)
+        semester_service.create_semester(db_session, name="太长", first_monday=date(2028, 9, 1), week_count=30)
 
 
-def test_update_semester_rejects_non_20_week_count(db_session):
+def test_update_semester_week_count_range(db_session):
     sem = semester_service.create_semester(db_session, name="原", first_monday=date(2026, 9, 1))
     db_session.commit()
+    semester_service.update_semester(db_session, sem.id, {"week_count": 18})
+    assert sem.week_count == 18
     with pytest.raises(HTTPException):
-        semester_service.update_semester(db_session, sem.id, {"week_count": 18})
-    semester_service.update_semester(db_session, sem.id, {"name": "改", "week_count": 20})
+        semester_service.update_semester(db_session, sem.id, {"week_count": 25})
+    semester_service.update_semester(db_session, sem.id, {"name": "改", "week_count": 21})
     assert sem.name == "改"
-    assert sem.week_count == 20
+    assert sem.week_count == 21
 
 
 def test_activate_semester_is_exclusive(db_session):
