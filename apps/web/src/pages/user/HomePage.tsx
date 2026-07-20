@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { hoursOf, meApi } from "@/features/me/api";
 import { useAuth } from "@/stores/auth";
 import { CurrentDutyCard } from "@/components/CurrentDutyCard";
+import { BeijingTimeBanner } from "@/components/BeijingTimeBanner";
 
 export default function HomePage() {
   const user = useAuth((s) => s.user);
@@ -21,6 +22,8 @@ export default function HomePage() {
 
   return (
     <div>
+      <BeijingTimeBanner />
+
       <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 16 }}>
         你好，{user?.username}
       </Typography.Title>

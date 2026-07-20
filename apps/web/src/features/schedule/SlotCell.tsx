@@ -104,12 +104,27 @@ export default function SlotCell(props: Props) {
   const { active } = useDndContext();
   const isDragging = !!active;
 
-  const occupiedIndices = Object.keys(props.board)
+  // 整理当前 Slot 内的所有在岗人员（按索引顺序取非空人员）
+  const slotOccupants = Object.keys(props.board)
     .filter((k) => k.startsWith(slot.id + ":") && props.board[k] !== null)
-    .map((k) => parseInt(k.split(":")[1], 10));
-  const maxIndex = occupiedIndices.length > 0 ? Math.max(...occupiedIndices) : -1;
-  const renderCount = Math.max(slot.required_people, maxIndex + (isDragging ? 2 : 1));
-  const filled = occupiedIndices.length;
+    .sort((a, b) => parseInt(a.split(":")[1], 10) - parseInt(b.split(":")[1], 10))
+    .map((k) => props.board[k]!);
+
+  // 构造无缝紧凑排列的 effectiveBoard，确保空缺始终居于已分配人员下方
+  const effectiveBoard: Board = { ...props.board };
+  Object.keys(props.board)
+    .filter((k) => k.startsWith(slot.id + ":"))
+    .forEach((k) => {
+      delete effectiveBoard[k];
+    });
+  slotOccupants.forEach((occupant, idx) => {
+    effectiveBoard[posKey(slot.id, idx)] = occupant;
+  });
+
+  const filled = slotOccupants.length;
+  const renderCount = Math.max(slot.required_people, filled + (isDragging ? 2 : 1));
+
+  const effectiveProps = { ...props, board: effectiveBoard };
 
   return (
     <div style={{ border: "1px solid #f0f0f0", borderRadius: 6, padding: 6, background: "#fff" }}>
@@ -122,7 +137,7 @@ export default function SlotCell(props: Props) {
         </span>
       </div>
       {Array.from({ length: renderCount }).map((_, i) => (
-        <Position key={i} {...props} index={i} />
+        <Position key={i} {...effectiveProps} index={i} />
       ))}
     </div>
   );

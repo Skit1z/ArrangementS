@@ -69,7 +69,8 @@ export default function PersonDrawer({
         className="drag-handle"
         onMouseDown={startDrag}
         style={{
-          padding: "10px 14px",
+          height: 44,
+          padding: "0 14px",
           background: "linear-gradient(135deg, #1F497D 0%, #1677ff 100%)",
           color: "#fff",
           borderBottom: collapsed ? "none" : "1px solid #102A45",
@@ -79,11 +80,14 @@ export default function PersonDrawer({
           justifyContent: "space-between",
           alignItems: "center",
           boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          boxSizing: "border-box",
         }}
       >
-        <Space size={8} align="center">
-          <span style={{ fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: 0.5 }}>
-            👥 人员库
+        <div style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", overflow: "hidden" }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: 0.5, whiteSpace: "nowrap" }}>
+            人员库
           </span>
           <span
             style={{
@@ -91,16 +95,17 @@ export default function PersonDrawer({
               color: "#fff",
               fontSize: 12,
               fontWeight: 600,
-              padding: "2px 8px",
+              padding: "1px 8px",
               borderRadius: 10,
+              whiteSpace: "nowrap",
             }}
           >
             {people.length} 人
           </span>
-          <span style={{ fontSize: 11, opacity: 0.7, color: "#e6f4ff", marginLeft: 4 }}>
-            ⠿ 按住拖动
+          <span style={{ fontSize: 11, opacity: 0.75, color: "#e6f4ff", marginLeft: 2, whiteSpace: "nowrap" }}>
+            ⠿ 拖动
           </span>
-        </Space>
+        </div>
 
         <Button
           size="small"
@@ -117,6 +122,8 @@ export default function PersonDrawer({
                   borderColor: "#fff",
                   borderRadius: 14,
                   boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
                 }
               : {
                   background: "rgba(255, 255, 255, 0.2)",
@@ -124,6 +131,8 @@ export default function PersonDrawer({
                   borderColor: "rgba(255, 255, 255, 0.4)",
                   fontWeight: 600,
                   borderRadius: 14,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
                 }
           }
           icon={collapsed ? <DownOutlined /> : <UpOutlined />}

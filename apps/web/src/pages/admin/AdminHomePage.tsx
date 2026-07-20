@@ -4,11 +4,11 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   RightOutlined,
-  SafetyCertificateOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Col, Row, Statistic, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
+import { BeijingTimeBanner } from "@/components/BeijingTimeBanner";
 import { CurrentDutyCard } from "@/components/CurrentDutyCard";
 import { adminApi } from "@/features/admin/api";
 import { useAuth } from "@/stores/auth";
@@ -32,6 +32,9 @@ export default function AdminHomePage() {
 
   return (
     <div>
+      {/* 显眼的实时北京时间横幅 */}
+      <BeijingTimeBanner />
+
       <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <Typography.Title level={3} style={{ margin: 0, fontWeight: 600 }}>
@@ -80,7 +83,7 @@ export default function AdminHomePage() {
         </Col>
       </Row>
 
-      {/* 快捷导航与常规工具 */}
+      {/* 快捷导航：仅保留 查看本周值班表 和 查看本周无课表 */}
       <Card
         size="small"
         title={<span style={{ fontWeight: 600 }}>快捷管理操作</span>}
@@ -88,7 +91,7 @@ export default function AdminHomePage() {
         style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
       >
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12}>
             <Button
               block
               size="large"
@@ -99,46 +102,14 @@ export default function AdminHomePage() {
               style={{ height: 60, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}
             >
               <div style={{ textAlign: "left" }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>周排班大盘</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>智能排班与班次调整</div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>查看本周值班表</div>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>进入周排班大盘查看及调整值班安排</div>
               </div>
               <RightOutlined />
             </Button>
           </Col>
 
-          <Col xs={24} sm={12} md={6}>
-            <Button
-              block
-              size="large"
-              icon={<SafetyCertificateOutlined />}
-              onClick={() => navigate("/admin/review")}
-              style={{ height: 60, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}
-            >
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>审核中心</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>处理请假与换班申请</div>
-              </div>
-              <RightOutlined />
-            </Button>
-          </Col>
-
-          <Col xs={24} sm={12} md={6}>
-            <Button
-              block
-              size="large"
-              icon={<TeamOutlined />}
-              onClick={() => navigate("/admin/people")}
-              style={{ height: 60, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}
-            >
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>人员管理</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>录入人员与导入白名单</div>
-              </div>
-              <RightOutlined />
-            </Button>
-          </Col>
-
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12}>
             <Button
               block
               size="large"
@@ -147,8 +118,8 @@ export default function AdminHomePage() {
               style={{ height: 60, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}
             >
               <div style={{ textAlign: "left" }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>全员无课表</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>按周筛选与导出 Excel</div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>查看本周无课表</div>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>查看全员课程安排及空闲时间段</div>
               </div>
               <RightOutlined />
             </Button>

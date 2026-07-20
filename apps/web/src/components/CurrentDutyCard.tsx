@@ -28,6 +28,9 @@ export function CurrentDutyCard() {
     queryKey: ["schedule", "current-duty"],
     queryFn: adminApi.schedule.currentDuty,
     refetchInterval: 15000,
+    staleTime: 60000,
+    gcTime: 300000,
+    placeholderData: (previousData) => previousData,
   });
 
   return (

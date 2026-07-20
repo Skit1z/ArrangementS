@@ -36,6 +36,28 @@ import { adminApi, TASK_STATUS_COLOR, TASK_STATUS_LABEL, type Venue } from "@/fe
 
 const MAX_HISTORY = 50;
 
+export function compactBoard(board: Board): Board {
+  const next: Board = {};
+  const groups: Record<string, { person_id: string; person_name: string }[]> = {};
+
+  Object.keys(board).forEach((key) => {
+    const occupant = board[key];
+    if (occupant) {
+      const slotId = key.split(":")[0];
+      if (!groups[slotId]) groups[slotId] = [];
+      groups[slotId].push(occupant);
+    }
+  });
+
+  Object.keys(groups).forEach((slotId) => {
+    groups[slotId].forEach((occupant, idx) => {
+      next[`${slotId}:${idx}`] = occupant;
+    });
+  });
+
+  return next;
+}
+
 /**
  * 人员标签很小、位置槽较窄，纯矩形相交常常判不到目标。
  * 优先用指针位置命中，落空再退回矩形相交 / 最近中心。
@@ -187,10 +209,11 @@ export default function ScheduleBoard({
   }, [week.week_start]);
 
   function pushHistory(next: Board) {
+    const compacted = compactBoard(next);
     history.current.push(board);
     if (history.current.length > MAX_HISTORY) history.current.shift();
     future.current = [];
-    setBoard(next);
+    setBoard(compacted);
     forceRerender((v) => v + 1);
   }
 
@@ -508,7 +531,7 @@ export default function ScheduleBoard({
             left: drawerPos.x,
             top: drawerPos.y,
             width: drawerWidth,
-            height: drawerCollapsed ? 46 : 520,
+            height: drawerCollapsed ? 44 : 520,
             zIndex: 1000,
             transition: isResizing || isDraggingPos ? "none" : "left 0.2s, top 0.2s, width 0.2s, height 0.2s",
             overflow: "visible",
