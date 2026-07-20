@@ -66,12 +66,13 @@ export default function PersonDrawer({
     >
       {/* 标题栏：作为抓手按住拖动 + 向上折叠按钮 */}
       <div
+        className="drag-handle"
         onMouseDown={startDrag}
         style={{
           padding: "8px 12px",
           background: "#fafafa",
           borderBottom: collapsed ? "none" : "1px solid #f0f0f0",
-          cursor: "move",
+          cursor: "grab",
           userSelect: "none",
           display: "flex",
           justifyContent: "space-between",

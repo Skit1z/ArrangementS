@@ -97,15 +97,12 @@ export default function ScheduleBoard({
   };
 
   const startDrag = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest(".drag-handle")) {
-      e.preventDefault();
-      setIsDraggingPos(true);
-      setDragOffset({
-        x: e.clientX - drawerPos.x,
-        y: e.clientY - drawerPos.y
-      });
-    }
+    e.preventDefault();
+    setIsDraggingPos(true);
+    setDragOffset({
+      x: e.clientX - drawerPos.x,
+      y: e.clientY - drawerPos.y,
+    });
   };
 
   useEffect(() => {
