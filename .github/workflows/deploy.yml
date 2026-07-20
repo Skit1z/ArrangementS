@@ -46,7 +46,9 @@ jobs:
           ssh -i ~/.ssh/id_deploy ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd /opt/ArrangementS
             git pull
-            find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+            cd /opt/ArrangementS/apps/api
+            /root/.local/bin/uv sync 2>/dev/null || /root/.local/bin/uv pip install -e . 2>/dev/null || true
+            find /opt/ArrangementS -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
             systemctl restart arrangements-api
             systemctl restart arrangements-worker
           EOF

@@ -58,10 +58,7 @@ export default function SettingsPage() {
         ]}
       />
       <div style={{ marginTop: 40, textAlign: 'center', color: '#8c8c8c', fontSize: '13px' }}>
-        <Space size="large">
-          <span>当前版本：v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0'}</span>
-          <span>构建时间：{typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '未记录'}</span>
-        </Space>
+        <span>构建时间：{typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '未记录'}</span>
       </div>
     </Card>
   );
