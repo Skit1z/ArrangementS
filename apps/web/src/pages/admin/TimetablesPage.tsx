@@ -351,27 +351,39 @@ function exportFreeClientFallback(
     <head>
       <meta charset="utf-8" />
       <style>
-        table { border-collapse: collapse; font-family: "微软雅黑", sans-serif; width: 100%; }
-        th, td { border: 1px solid #D9D9D9; padding: 8px 12px; text-align: left; vertical-align: top; }
-        .title { background-color: #D9E1F2; font-size: 16px; font-weight: bold; color: #1F497D; text-align: center; height: 40px; }
-        .sub { font-size: 10px; color: #595959; text-align: center; height: 24px; font-style: italic; }
-        .header { background-color: #1F497D; color: #FFFFFF; font-weight: bold; text-align: center; }
-        .period { background-color: #F2F2F2; font-weight: bold; text-align: center; vertical-align: middle; }
+        table { border-collapse: collapse; font-family: "微软雅黑", sans-serif; table-layout: fixed; width: 100%; }
+        th, td { border: 1px solid #D9D9D9; padding: 8px 12px; text-align: left; vertical-align: top; word-break: break-all; }
+        .title { background-color: #D9E1F2; font-size: 16px; font-weight: bold; color: #1F497D; text-align: center; height: 40px; vertical-align: middle; }
+        .sub { background-color: #F9FBFD; font-size: 10px; color: #595959; text-align: center; height: 24px; font-style: italic; vertical-align: middle; }
+        .header-cell { background-color: #1F497D; color: #FFFFFF; font-weight: bold; text-align: center; vertical-align: middle; height: 32px; font-size: 12px; }
+        .period-cell { background-color: #F2F2F2; font-weight: bold; text-align: center; vertical-align: middle; width: 140px; font-size: 11px; }
+        .data-cell { font-size: 11px; color: #262626; vertical-align: top; }
+        .spacer { height: 12px; border: none !important; background-color: transparent !important; }
       </style>
     </head>
     <body>
-      <table>
+      <table border="1">
+        <colgroup>
+          <col width="140" />
+          <col width="180" />
+          <col width="180" />
+          <col width="180" />
+          <col width="180" />
+          <col width="180" />
+          <col width="180" />
+          <col width="180" />
+        </colgroup>
         <tr><td colspan="8" class="title">全员无课表（可排班人员汇总表） - ${weekSubtitle}</td></tr>
         <tr><td colspan="8" class="sub">导出日期：${today}  |  人员总数：${selectablePeople.length}人  |  范围：${weekSubtitle}  |  说明：列表中为对应时间段无课、可参与班次排班的人员名单</td></tr>
-        <tr><th></th></tr>
-        <tr class="header">
-          <th style="width: 140px;">节次 / 时间</th>
-          ${weekdays.map((w) => `<th style="width: 200px;">${w.label}</th>`).join("")}
+        <tr><td colspan="8" class="spacer"></td></tr>
+        <tr>
+          <th class="header-cell" style="width: 140px;">节次 / 时间</th>
+          ${weekdays.map((w) => `<th class="header-cell" style="width: 180px;">${w.label}</th>`).join("")}
         </tr>
   `;
 
   for (const block of periodBlocks) {
-    html += `<tr><td class="period">${block.label}</td>`;
+    html += `<tr><td class="period-cell">${block.label}</td>`;
     for (const wd of weekdays) {
       const freePeople = selectablePeople.filter((person) => {
         const rules = allPeople.find((p) => p.person_id === person.id)?.rules ?? [];
@@ -387,7 +399,7 @@ function exportFreeClientFallback(
       });
 
       const names = freePeople.map((p) => p.full_name).join("、");
-      html += `<td>${names || "（无）"}</td>`;
+      html += `<td class="data-cell">${names || "（无）"}</td>`;
     }
     html += `</tr>`;
   }

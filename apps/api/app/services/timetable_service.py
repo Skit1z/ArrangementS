@@ -382,7 +382,6 @@ def build_free_timetable_excel(db: Session, week: int | None = None) -> bytes:
     title_cell.value = f"全员无课表（可排班人员汇总表） - {sem_name} ({week_subtitle})"
     title_cell.font = Font(name="微软雅黑", size=15, bold=True, color="1F497D")
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
-    title_cell.fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
     ws1.row_dimensions[1].height = 36
 
     ws1.merge_cells("A2:H2")
@@ -392,19 +391,32 @@ def build_free_timetable_excel(db: Session, week: int | None = None) -> bytes:
     sub_cell.alignment = Alignment(horizontal="center", vertical="center")
     ws1.row_dimensions[2].height = 20
 
-    headers = ["节次 / 时间", "周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-    ws1.append([])
-    ws1.append(headers)
-    ws1.row_dimensions[4].height = 28
-
-    header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
-    header_font = Font(name="微软雅黑", size=11, bold=True, color="FFFFFF")
+    title_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    sub_fill = PatternFill(start_color="F9FBFD", end_color="F9FBFD", fill_type="solid")
     thin_border = Border(
         left=Side(style="thin", color="D9D9D9"),
         right=Side(style="thin", color="D9D9D9"),
         top=Side(style="thin", color="D9D9D9"),
         bottom=Side(style="thin", color="D9D9D9"),
     )
+
+    for col_idx in range(1, 9):
+        c1 = ws1.cell(row=1, column=col_idx)
+        c1.fill = title_fill
+        c1.border = thin_border
+
+        c2 = ws1.cell(row=2, column=col_idx)
+        c2.fill = sub_fill
+        c2.border = thin_border
+
+    headers = ["节次 / 时间", "周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    ws1.append([])
+    ws1.append(headers)
+    ws1.row_dimensions[3].height = 12
+    ws1.row_dimensions[4].height = 28
+
+    header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
+    header_font = Font(name="微软雅黑", size=11, bold=True, color="FFFFFF")
 
     for col_idx in range(1, 9):
         cell = ws1.cell(row=4, column=col_idx)
