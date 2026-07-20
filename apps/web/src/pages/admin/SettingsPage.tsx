@@ -610,7 +610,20 @@ function SemesterTab() {
 
   const openCreate = () => {
     form.resetFields();
-    form.setFieldsValue({ week_count: 20, course_buffer_enabled: false, course_buffer_minutes: 10 });
+    const today = dayjs();
+    const dayOfWeek = today.day() === 0 ? 7 : today.day();
+    const currentMonday = today.subtract(dayOfWeek - 1, "day");
+    const month = today.month() + 1;
+    const season = month >= 7 || month < 2 ? "秋季" : "春季";
+    const defaultName = `${today.year()} ${season}`;
+
+    form.setFieldsValue({
+      name: defaultName,
+      first_monday: currentMonday,
+      week_count: 20,
+      course_buffer_enabled: false,
+      course_buffer_minutes: 10,
+    });
     setCreating(true);
   };
 
