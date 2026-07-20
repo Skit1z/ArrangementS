@@ -1,5 +1,5 @@
-import { App, Button, Form, Input, InputNumber, Modal, Segmented, Select, Space, Table } from "antd";
-import { DeleteOutlined, PlusOutlined, TableOutlined, AppstoreOutlined } from "@ant-design/icons";
+import { App, Button, Form, Input, InputNumber, Modal, Select } from "antd";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useState } from "react";
 
 import type { ParsedEntry } from "@/features/me/api";
@@ -36,11 +36,10 @@ interface Props {
   maxHeight?: number;
 }
 
-export function TimetableEntryEditor({ value, onChange, maxHeight = 380 }: Props) {
+export function TimetableEntryEditor({ value, onChange }: Props) {
   const { modal } = App.useApp();
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
-  // 编辑弹窗状态
+  // 编辑/新增弹窗状态
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingModalOpen, setEditingModalOpen] = useState(false);
   const [editForm] = Form.useForm<ParsedEntry>();
@@ -109,267 +108,156 @@ export function TimetableEntryEditor({ value, onChange, maxHeight = 380 }: Props
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <Segmented
-          value={viewMode}
-          onChange={(v) => setViewMode(v as "grid" | "table")}
-          options={[
-            { label: "📅 课程表 APP 视图", value: "grid", icon: <AppstoreOutlined /> },
-            { label: "📝 列表明细视图", value: "table", icon: <TableOutlined /> },
-          ]}
-        />
+        <span style={{ fontWeight: 600, fontSize: 14, color: "#333" }}>📅 课程表可视化预览</span>
         <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => openAddModal()}>
           添加课程
         </Button>
       </div>
 
-      {viewMode === "grid" ? (
-        <div style={{ overflowX: "auto", border: "1px solid #f0f0f0", borderRadius: 8, background: "#fafafa" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 720, tableLayout: "fixed" }}>
-            <thead>
-              <tr style={{ background: "#f5f5f5", borderBottom: "1px solid #e8e8e8" }}>
-                <th style={{ padding: "8px 4px", width: 75, textAlign: "center", fontSize: 12, color: "#666" }}>
-                  节次 / 时间
+      <div style={{ overflowX: "auto", border: "1px solid #f0f0f0", borderRadius: 8, background: "#fafafa" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 720, tableLayout: "fixed" }}>
+          <thead>
+            <tr style={{ background: "#f5f5f5", borderBottom: "1px solid #e8e8e8" }}>
+              <th style={{ padding: "8px 4px", width: 75, textAlign: "center", fontSize: 12, color: "#666" }}>
+                节次 / 时间
+              </th>
+              {WEEKDAYS.map((wd) => (
+                <th
+                  key={wd.value}
+                  style={{
+                    padding: "8px 4px",
+                    textAlign: "center",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#333",
+                    borderLeft: "1px solid #e8e8e8",
+                  }}
+                >
+                  {wd.label}
                 </th>
-                {WEEKDAYS.map((wd) => (
-                  <th
-                    key={wd.value}
-                    style={{
-                      padding: "8px 4px",
-                      textAlign: "center",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "#333",
-                      borderLeft: "1px solid #e8e8e8",
-                    }}
-                  >
-                    {wd.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayBlocks.map((block) => (
-                <tr key={block.label} style={{ borderBottom: "1px solid #f0f0f0" }}>
-                  <td
-                    style={{
-                      padding: "6px 2px",
-                      textAlign: "center",
-                      background: "#fafafa",
-                      fontSize: 12,
-                      borderRight: "1px solid #e8e8e8",
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, color: "#444" }}>{block.label}</div>
-                    <div style={{ fontSize: 10, color: "#999" }}>{block.time}</div>
-                  </td>
-                  {WEEKDAYS.map((wd) => {
-                    // 查找属于该 Day + Block 重叠的课程条目（带在 value 数组中的真实 index）
-                    const entriesInCell = value
-                      .map((entry, originalIdx) => ({ entry, originalIdx }))
-                      .filter(
-                        ({ entry }) =>
-                          entry.weekday === wd.value &&
-                          !(entry.period_end < block.start || entry.period_start > block.end)
-                      );
-
-                    return (
-                      <td
-                        key={wd.value}
-                        style={{
-                          padding: 4,
-                          verticalAlign: "top",
-                          height: 68,
-                          background: "#fff",
-                          borderLeft: "1px solid #f0f0f0",
-                          position: "relative",
-                        }}
-                      >
-                        {entriesInCell.length === 0 ? (
-                          <div
-                            onClick={() => openAddModal(wd.value, block.start, block.end)}
-                            style={{
-                              height: "100%",
-                              minHeight: 58,
-                              borderRadius: 6,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              color: "transparent",
-                              transition: "all 0.2s",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "#f0f7ff";
-                              e.currentTarget.style.color = "#1677ff";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "transparent";
-                              e.currentTarget.style.color = "transparent";
-                            }}
-                          >
-                            <PlusOutlined style={{ fontSize: 14 }} />
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            {entriesInCell.map(({ entry, originalIdx }) => {
-                              const style = CARD_PALETTE[originalIdx % CARD_PALETTE.length];
-                              return (
-                                <div
-                                  key={originalIdx}
-                                  style={{
-                                    background: style.bg,
-                                    border: `1px solid ${style.border}`,
-                                    borderLeft: `3px solid ${style.color}`,
-                                    borderRadius: 6,
-                                    padding: "4px 6px",
-                                    fontSize: 11,
-                                    cursor: "pointer",
-                                    position: "relative",
-                                    boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-                                  }}
-                                  onClick={() => openEditModal(originalIdx)}
-                                >
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <span style={{ fontWeight: 600, color: style.color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "80%" }}>
-                                      {entry.course_name || "课程占用"}
-                                    </span>
-                                    <DeleteOutlined
-                                      style={{ color: "#ff4d4f", fontSize: 12 }}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        modal.confirm({
-                                          title: "确认删除该课程时段？",
-                                          okText: "删除",
-                                          cancelText: "取消",
-                                          okButtonProps: { danger: true },
-                                          onOk: () => deleteEntry(originalIdx),
-                                        });
-                                      }}
-                                    />
-                                  </div>
-                                  <div style={{ color: "#555", marginTop: 2, fontSize: 10 }}>
-                                    🗓️ {entry.week_expr}
-                                  </div>
-                                  {entry.location_code && (
-                                    <div style={{ color: "#777", fontSize: 10 }}>
-                                      📍 {entry.location_code}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
               ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <>
-          <Table
-            size="small"
-            pagination={false}
-            scroll={{ x: 650, y: maxHeight }}
-            rowKey="key"
-            dataSource={value.map((entry, key) => ({ ...entry, key }))}
-            columns={[
-              {
-                title: "星期",
-                width: 100,
-                render: (_, row) => (
-                  <Select
-                    value={row.weekday}
-                    options={WEEKDAYS}
-                    style={{ width: 82 }}
-                    onChange={(weekday) => update(row.key, { weekday })}
-                  />
-                ),
-              },
-              {
-                title: "节次",
-                width: 170,
-                render: (_, row) => (
-                  <Space.Compact>
-                    <InputNumber
-                      min={1}
-                      max={20}
-                      value={row.period_start}
-                      onChange={(period_start) => update(row.key, { period_start: period_start ?? 1 })}
-                    />
-                    <Input disabled value="至" style={{ width: 38, textAlign: "center" }} />
-                    <InputNumber
-                      min={1}
-                      max={20}
-                      value={row.period_end}
-                      onChange={(period_end) => update(row.key, { period_end: period_end ?? 1 })}
-                    />
-                  </Space.Compact>
-                ),
-              },
-              {
-                title: "周次",
-                width: 145,
-                render: (_, row) => (
-                  <Input
-                    value={row.week_expr}
-                    placeholder="如 1-16周"
-                    onChange={(event) => update(row.key, { week_expr: event.target.value })}
-                  />
-                ),
-              },
-              {
-                title: "场地/地点",
-                width: 120,
-                render: (_, row) => (
-                  <Input
-                    value={row.location_code ?? ""}
-                    placeholder="可留空"
-                    onChange={(event) => update(row.key, { location_code: event.target.value || null })}
-                  />
-                ),
-              },
-              {
-                title: "课程名称",
-                width: 140,
-                render: (_, row) => (
-                  <Input
-                    value={row.course_name ?? ""}
-                    placeholder="可选"
-                    onChange={(event) => update(row.key, { course_name: event.target.value || null })}
-                  />
-                ),
-              },
-              {
-                title: "操作",
-                width: 65,
-                fixed: "right" as const,
-                render: (_, row) => (
-                  <Button
-                    danger
-                    type="text"
-                    icon={<DeleteOutlined />}
-                    aria-label="删除课程时段"
-                    onClick={() => deleteEntry(row.key)}
-                  />
-                ),
-              },
-            ]}
-          />
-          <Button
-            block
-            type="dashed"
-            icon={<PlusOutlined />}
-            style={{ marginTop: 8 }}
-            onClick={() => openAddModal()}
-          >
-            添加课程时段
-          </Button>
-        </>
-      )}
+            </tr>
+          </thead>
+          <tbody>
+            {displayBlocks.map((block) => (
+              <tr key={block.label} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                <td
+                  style={{
+                    padding: "6px 2px",
+                    textAlign: "center",
+                    background: "#fafafa",
+                    fontSize: 12,
+                    borderRight: "1px solid #e8e8e8",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: "#444" }}>{block.label}</div>
+                  <div style={{ fontSize: 10, color: "#999" }}>{block.time}</div>
+                </td>
+                {WEEKDAYS.map((wd) => {
+                  const entriesInCell = value
+                    .map((entry, originalIdx) => ({ entry, originalIdx }))
+                    .filter(
+                      ({ entry }) =>
+                        entry.weekday === wd.value &&
+                        !(entry.period_end < block.start || entry.period_start > block.end)
+                    );
+
+                  return (
+                    <td
+                      key={wd.value}
+                      style={{
+                        padding: 4,
+                        verticalAlign: "top",
+                        height: 68,
+                        background: "#fff",
+                        borderLeft: "1px solid #f0f0f0",
+                        position: "relative",
+                      }}
+                    >
+                      {entriesInCell.length === 0 ? (
+                        <div
+                          onClick={() => openAddModal(wd.value, block.start, block.end)}
+                          style={{
+                            height: "100%",
+                            minHeight: 58,
+                            borderRadius: 6,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            color: "transparent",
+                            transition: "all 0.2s",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#f0f7ff";
+                            e.currentTarget.style.color = "#1677ff";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                            e.currentTarget.style.color = "transparent";
+                          }}
+                        >
+                          <PlusOutlined style={{ fontSize: 14 }} />
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          {entriesInCell.map(({ entry, originalIdx }) => {
+                            const style = CARD_PALETTE[originalIdx % CARD_PALETTE.length];
+                            return (
+                              <div
+                                key={originalIdx}
+                                style={{
+                                  background: style.bg,
+                                  border: `1px solid ${style.border}`,
+                                  borderLeft: `3px solid ${style.color}`,
+                                  borderRadius: 6,
+                                  padding: "4px 6px",
+                                  fontSize: 11,
+                                  cursor: "pointer",
+                                  position: "relative",
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+                                }}
+                                onClick={() => openEditModal(originalIdx)}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <span style={{ fontWeight: 600, color: style.color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "80%" }}>
+                                    {entry.course_name || "课程占用"}
+                                  </span>
+                                  <DeleteOutlined
+                                    style={{ color: "#ff4d4f", fontSize: 12 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      modal.confirm({
+                                        title: "确认删除该课程时段？",
+                                        okText: "删除",
+                                        cancelText: "取消",
+                                        okButtonProps: { danger: true },
+                                        onOk: () => deleteEntry(originalIdx),
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                <div style={{ color: "#555", marginTop: 2, fontSize: 10 }}>
+                                  🗓️ {entry.week_expr}
+                                </div>
+                                {entry.location_code && (
+                                  <div style={{ color: "#777", fontSize: 10 }}>
+                                    📍 {entry.location_code}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {/* 课程详情编辑/新增 Modal */}
       <Modal
