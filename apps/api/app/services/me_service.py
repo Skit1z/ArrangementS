@@ -195,4 +195,3 @@ def get_current_on_duty_staff(db: Session) -> list[dict]:
             )
 
     return current_items
-

@@ -189,7 +189,9 @@ def export_free_timetable(
     from fastapi import Response
 
     content = timetable_service.build_free_timetable_excel(db, week=week)
-    filename = f"free_timetable_{'week_' + str(week) if week else 'all'}_{date.today().isoformat()}.xlsx"
+    filename = (
+        f"free_timetable_{'week_' + str(week) if week else 'all'}_{date.today().isoformat()}.xlsx"
+    )
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

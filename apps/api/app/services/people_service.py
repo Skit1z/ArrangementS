@@ -76,7 +76,9 @@ def create_person(
         class_name=class_name,
         full_name=full_name,
         phone=phone,
-        difficulty_level=difficulty_level.strip() if difficulty_level and difficulty_level.strip() else None,
+        difficulty_level=difficulty_level.strip()
+        if difficulty_level and difficulty_level.strip()
+        else None,
         id_card_ciphertext=id_cipher,
         id_card_last4=id_l4,
         bank_card_ciphertext=bank_cipher,

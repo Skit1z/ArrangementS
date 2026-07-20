@@ -456,8 +456,7 @@ def build_free_timetable_excel(db: Session, week: int | None = None) -> bytes:
             for person in active_people:
                 rules = person_rules.get(person.id, [])
                 has_course = any(
-                    _rule_matches(r, block["start"], block["end"], wd_val)
-                    for r in rules
+                    _rule_matches(r, block["start"], block["end"], wd_val) for r in rules
                 )
                 if not has_course:
                     free_names.append(person.full_name)

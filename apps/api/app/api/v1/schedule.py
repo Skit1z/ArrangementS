@@ -33,6 +33,7 @@ def current_duty(
 ) -> list[dict]:
     """获取当前时刻正处于在岗值班状态的人员及联系电话（普通用户与管理员均可访问）。"""
     from app.services import me_service
+
     return me_service.get_current_on_duty_staff(db)
 
 
