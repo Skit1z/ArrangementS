@@ -278,10 +278,10 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
         MonthlyVenueHourSummary,
     )
     from app.models.swap import SwapCandidate, SwapRequest
-    from app.models.timetable import Timetable, TimetablePeriod
-    from sqlalchemy import delete, update
+    from app.models.timetable import CourseRule, TimetableUpload
+    from sqlalchemy import delete, select, update
 
-    # 1. 级联清理人员档案关联数据（约束、排班分配、换班/替班、请假申请、加班申请、月度统计、不可值班）
+    # 1. 级联清理人员档案关联数据（约束、排班分配、换班/替班、请假申请、加班申请、月度统计、不可值班、课表）
     db.execute(delete(PersonConstraint).where(PersonConstraint.person_id == person_id))
     db.execute(delete(Assignment).where(Assignment.person_id == person_id))
     db.execute(delete(SwapCandidate).where(SwapCandidate.candidate_person_id == person_id))
@@ -302,14 +302,20 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
     db.execute(delete(AvailabilityBlock).where(AvailabilityBlock.person_id == person_id))
     db.execute(delete(AvailabilityRequest).where(AvailabilityRequest.person_id == person_id))
 
-    if user:
-        # 2. 级联清理用户关联数据（无课表明细、无课表）
-        timetables = list(db.scalars(select(Timetable).where(Timetable.user_id == user.id)).all())
-        for tt in timetables:
-            db.execute(delete(TimetablePeriod).where(TimetablePeriod.timetable_id == tt.id))
-            db.delete(tt)
+    uploads = list(
+        db.scalars(select(TimetableUpload).where(TimetableUpload.person_id == person_id)).all()
+    )
+    for up in uploads:
+        db.execute(delete(CourseRule).where(CourseRule.timetable_upload_id == up.id))
+        db.delete(up)
 
-        # 3. 将审计日志和导入批次中的创建者置空（解绑外键）
+    if user:
+        # 2. 关联用户外键置空（解绑外键）
+        db.execute(
+            update(TimetableUpload)
+            .where(TimetableUpload.uploader_user_id == user.id)
+            .values(uploader_user_id=None)
+        )
         db.execute(update(AuditLog).where(AuditLog.actor_id == user.id).values(actor_id=None))
         db.execute(
             update(ImportBatch).where(ImportBatch.created_by == user.id).values(created_by=None)
