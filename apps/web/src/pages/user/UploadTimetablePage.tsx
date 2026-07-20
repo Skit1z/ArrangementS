@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Card, Tag, Typography, Upload } from "antd";
+import { App, Button, Card, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { errorMessage } from "@/api/client";
+import { PdfFilePicker } from "@/components/PdfFilePicker";
 import { TimetableEntryEditor } from "@/components/TimetableEntryEditor";
 import { meApi, type ParsedEntry } from "@/features/me/api";
 
@@ -96,26 +97,13 @@ export default function UploadTimetablePage() {
       )}
 
       <Card size="small" style={{ marginBottom: 12 }}>
-        <Upload.Dragger
-          accept=".pdf"
-          maxCount={1}
-          beforeUpload={(file) => {
+        <PdfFilePicker
+          isPending={parseMut.isPending}
+          onSelectFile={(file) => {
             setFileName(file.name);
             parseMut.mutate(file);
-            return false; // 阻止 antd 自动上传，由我们手动调 API
           }}
-          showUploadList={false}
-          disabled={parseMut.isPending}
-        >
-          <p style={{ fontSize: 40, color: "#1677ff", margin: "8px 0" }}>📄</p>
-          <p>点击或拖拽学校教务系统导出的 PDF 课表至此</p>
-          <p style={{ color: "#888", fontSize: 12 }}>仅支持 PDF，10MB 以内</p>
-        </Upload.Dragger>
-        {parseMut.isPending && (
-          <Tag color="blue" style={{ marginTop: 8 }}>
-            解析中…
-          </Tag>
-        )}
+        />
       </Card>
 
       {parsed && (
