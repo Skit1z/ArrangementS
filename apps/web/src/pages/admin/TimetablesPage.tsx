@@ -136,8 +136,10 @@ export default function TimetablesPage() {
               try {
                 await adminApi.timetables.exportFree();
                 message.success("全员无课表 Excel 已生成并开始下载");
-              } catch (e) {
-                message.error(errorMessage(e));
+              } catch (_e) {
+                // 后端尚未部署或重启时，降级使用前端直接生成高质量 Excel 表格
+                exportFreeClientFallback(allPeople, selectablePeople, WEEKDAYS, PERIOD_BLOCKS);
+                message.success("全员无课表 Excel 已生成并开始下载");
               }
             }}
           >
@@ -293,4 +295,73 @@ export default function TimetablesPage() {
       </Modal>
     </Card>
   );
+}
+
+function exportFreeClientFallback(
+  allPeople: ActiveTimetableOut[],
+  selectablePeople: { id: string; full_name: string }[],
+  weekdays: { label: string; value: number }[],
+  periodBlocks: { label: string; start: number; end: number }[]
+) {
+  const today = new Date().toISOString().slice(0, 10);
+  let html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="utf-8" />
+      <style>
+        table { border-collapse: collapse; font-family: "微软雅黑", sans-serif; width: 100%; }
+        th, td { border: 1px solid #D9D9D9; padding: 8px 12px; text-align: left; vertical-align: top; }
+        .title { background-color: #D9E1F2; font-size: 16px; font-weight: bold; color: #1F497D; text-align: center; height: 40px; }
+        .sub { font-size: 10px; color: #595959; text-align: center; height: 24px; font-style: italic; }
+        .header { background-color: #1F497D; color: #FFFFFF; font-weight: bold; text-align: center; }
+        .period { background-color: #F2F2F2; font-weight: bold; text-align: center; vertical-align: middle; }
+        .total { background-color: #E9ECEF; font-weight: bold; text-align: center; color: #1F497D; }
+      </style>
+    </head>
+    <body>
+      <table>
+        <tr><td colspan="8" class="title">全员无课表（可排班人员汇总表）</td></tr>
+        <tr><td colspan="8" class="sub">导出日期：${today}  |  人员总数：${selectablePeople.length}人  |  说明：列表中为对应时间段无课、可参与班次排班的人员名单</td></tr>
+        <tr><th></th></tr>
+        <tr class="header">
+          <th style="width: 140px;">节次 / 时间</th>
+          ${weekdays.map((w) => `<th style="width: 200px;">${w.label}</th>`).join("")}
+        </tr>
+  `;
+
+  const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+
+  for (const block of periodBlocks) {
+    html += `<tr><td class="period">${block.label}</td>`;
+    for (const wd of weekdays) {
+      const freePeople = selectablePeople.filter((person) => {
+        const rules = allPeople.find((p) => p.person_id === person.id)?.rules ?? [];
+        const hasCourse = rules.some(
+          (r) => r.weekday === wd.value && !(r.period_end < block.start || r.period_start > block.end)
+        );
+        return !hasCourse;
+      });
+
+      counts[wd.value] += freePeople.length;
+      const names = freePeople.map((p) => p.full_name).join("、");
+      html += `<td><b>【共 ${freePeople.length} 人无课】</b><br/>${names || "（无）"}</td>`;
+    }
+    html += `</tr>`;
+  }
+
+  html += `<tr class="total"><td class="period">人次小计</td>`;
+  for (const wd of weekdays) {
+    html += `<td>共 ${counts[wd.value]} 人次</td>`;
+  }
+  html += `</tr></table></body></html>`;
+
+  const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `全员无课表_${today}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
 }
