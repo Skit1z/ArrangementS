@@ -266,3 +266,20 @@ def reject(
     timetable_service.reject(db, upload_id)
     db.commit()
     return MessageOut(message="课表已驳回")
+
+
+@router.get("/export-free")
+def export_free_timetable(
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """导出高可读性全员无课表 Excel。"""
+    from datetime import date
+    from fastapi import Response
+    content = timetable_service.build_free_timetable_excel(db)
+    filename = f"free_timetable_{date.today().isoformat()}.xlsx"
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

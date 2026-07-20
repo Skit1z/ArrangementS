@@ -313,3 +313,181 @@ def _get_upload(db: Session, upload_id: uuid.UUID) -> TimetableUpload:
     if upload is None:
         raise HTTPException(status_code=404, detail="课表上传不存在")
     return upload
+
+
+def build_free_timetable_excel(db: Session) -> bytes:
+    import io
+    from datetime import date
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.models.enums import PersonStatus, ReviewStatus
+    from app.models.person import PersonProfile
+    from app.models.timetable import TimetableUpload
+    from app.services import semester_service
+
+    current_sem = semester_service.get_current_semester(db)
+    active_people = list(
+        db.scalars(
+            select(PersonProfile)
+            .where(PersonProfile.status == PersonStatus.active)
+            .order_by(PersonProfile.full_name.asc())
+        )
+    )
+
+    person_rules: dict[uuid.UUID, list] = {}
+    if current_sem:
+        stmt = (
+            select(TimetableUpload)
+            .where(
+                TimetableUpload.semester_id == current_sem.id,
+                TimetableUpload.review_status == ReviewStatus.approved,
+            )
+            .options(selectinload(TimetableUpload.course_rules))
+        )
+        for up in db.scalars(stmt):
+            person_rules[up.person_id] = up.course_rules
+
+    PERIOD_BLOCKS = [
+        {"label": "1-2 节", "start": 1, "end": 2, "time": "08:00-09:50"},
+        {"label": "3-4 节", "start": 3, "end": 4, "time": "10:05-12:10"},
+        {"label": "5-6 节", "start": 5, "end": 6, "time": "14:00-15:50"},
+        {"label": "7-8 节", "start": 7, "end": 8, "time": "16:05-17:55"},
+        {"label": "9-10 节", "start": 9, "end": 10, "time": "19:00-20:50"},
+    ]
+    WEEKDAYS = [
+        (1, "周一"), (2, "周二"), (3, "周三"), (4, "周四"),
+        (5, "周五"), (6, "周六"), (7, "周日")
+    ]
+
+    wb = Workbook()
+
+    # --- Sheet 1: 全员无课表 (按节次) ---
+    ws1 = wb.active
+    ws1.title = "全员无课表 (按节次)"
+
+    sem_name = current_sem.name if current_sem else "当前学期"
+    ws1.merge_cells("A1:H1")
+    title_cell = ws1["A1"]
+    title_cell.value = f"全员无课表（可排班人员汇总表） - {sem_name}"
+    title_cell.font = Font(name="微软雅黑", size=15, bold=True, color="1F497D")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    title_cell.fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    ws1.row_dimensions[1].height = 36
+
+    ws1.merge_cells("A2:H2")
+    sub_cell = ws1["A2"]
+    sub_cell.value = f"导出日期：{date.today().isoformat()}  |  人员总数：{len(active_people)}人  |  说明：列表中为对应时间段无课、可参与班次排班的人员名单"
+    sub_cell.font = Font(name="微软雅黑", size=9, italic=True, color="595959")
+    sub_cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws1.row_dimensions[2].height = 20
+
+    headers = ["节次 / 时间", "周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    ws1.append([])
+    ws1.append(headers)
+    ws1.row_dimensions[4].height = 28
+
+    header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
+    header_font = Font(name="微软雅黑", size=11, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style="thin", color="D9D9D9"),
+        right=Side(style="thin", color="D9D9D9"),
+        top=Side(style="thin", color="D9D9D9"),
+        bottom=Side(style="thin", color="D9D9D9"),
+    )
+
+    for col_idx in range(1, 9):
+        cell = ws1.cell(row=4, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
+
+    row_idx = 5
+    weekday_free_counts = {wd[0]: 0 for wd in WEEKDAYS}
+
+    for block in PERIOD_BLOCKS:
+        row_data = [f"{block['label']}\n({block['time']})"]
+        ws1.row_dimensions[row_idx].height = 75
+
+        cell_a = ws1.cell(row=row_idx, column=1, value=row_data[0])
+        cell_a.font = Font(name="微软雅黑", size=10, bold=True, color="333333")
+        cell_a.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+        cell_a.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell_a.border = thin_border
+
+        for col_i, (wd_val, wd_name) in enumerate(WEEKDAYS, start=2):
+            free_names = []
+            for person in active_people:
+                rules = person_rules.get(person.id, [])
+                has_course = any(
+                    r.weekday == wd_val and not (r.period_end < block["start"] or r.period_start > block["end"])
+                    for r in rules
+                )
+                if not has_course:
+                    free_names.append(person.full_name)
+
+            weekday_free_counts[wd_val] += len(free_names)
+            content = f"【共 {len(free_names)} 人无课】\n" + ("、".join(free_names) if free_names else "（无）")
+            cell_data = ws1.cell(row=row_idx, column=col_i, value=content)
+            cell_data.font = Font(name="微软雅黑", size=10, color="262626")
+            cell_data.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+            cell_data.border = thin_border
+
+        row_idx += 1
+
+    ws1.row_dimensions[row_idx].height = 28
+    tot_cell = ws1.cell(row=row_idx, column=1, value="人次小计")
+    tot_cell.font = Font(name="微软雅黑", size=10, bold=True, color="1F497D")
+    tot_cell.fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
+    tot_cell.alignment = Alignment(horizontal="center", vertical="center")
+    tot_cell.border = thin_border
+
+    for col_i, (wd_val, _) in enumerate(WEEKDAYS, start=2):
+        cell_tot = ws1.cell(row=row_idx, column=col_i, value=f"共 {weekday_free_counts[wd_val]} 人次")
+        cell_tot.font = Font(name="微软雅黑", size=10, bold=True, color="1F497D")
+        cell_tot.fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
+        cell_tot.alignment = Alignment(horizontal="center", vertical="center")
+        cell_tot.border = thin_border
+
+    ws1.column_dimensions["A"].width = 16
+    for col_letter in ["B", "C", "D", "E", "F", "G", "H"]:
+        ws1.column_dimensions[col_letter].width = 26
+
+    # --- Sheet 2: 人员无课明细 (按个人) ---
+    ws2 = wb.create_sheet(title="人员无课明细 (按个人)")
+    ws2.append(["学号", "班级", "姓名", "手机号", "周一无课时段", "周二无课时段", "周三无课时段", "周四无课时段", "周五无课时段", "周六无课时段", "周日无课时段"])
+    ws2.row_dimensions[1].height = 28
+    header_fill2 = PatternFill(start_color="2B579A", end_color="2B579A", fill_type="solid")
+    for cell in ws2[1]:
+        cell.fill = header_fill2
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
+
+    for person in active_people:
+        rules = person_rules.get(person.id, [])
+        p_row = [person.student_no, person.class_name, person.full_name, person.phone or ""]
+        for wd_val, _ in WEEKDAYS:
+            free_blocks = []
+            for block in PERIOD_BLOCKS:
+                has_course = any(
+                    r.weekday == wd_val and not (r.period_end < block["start"] or r.period_start > block["end"])
+                    for r in rules
+                )
+                if not has_course:
+                    free_blocks.append(block["label"])
+            p_row.append(", ".join(free_blocks) if free_blocks else "全天有课")
+        ws2.append(p_row)
+
+    ws2.column_dimensions["A"].width = 14
+    ws2.column_dimensions["B"].width = 14
+    ws2.column_dimensions["C"].width = 12
+    ws2.column_dimensions["D"].width = 14
+    for c in ["E", "F", "G", "H", "I", "J", "K"]:
+        ws2.column_dimensions[c].width = 22
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

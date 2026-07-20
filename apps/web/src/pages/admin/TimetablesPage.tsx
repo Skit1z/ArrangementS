@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { UploadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { App, Button, Card, Modal, Select, Space, Spin, Tag } from "antd";
 import { useState } from "react";
 import { errorMessage } from "@/api/client";
@@ -127,6 +127,21 @@ export default function TimetablesPage() {
           />
           <Button icon={<UploadOutlined />} onClick={() => setProxyOpen(true)}>
             为某人代传课表
+          </Button>
+          <Button
+            type="primary"
+            ghost
+            icon={<DownloadOutlined />}
+            onClick={async () => {
+              try {
+                await adminApi.timetables.exportFree();
+                message.success("全员无课表 Excel 已生成并开始下载");
+              } catch (e) {
+                message.error(errorMessage(e));
+              }
+            }}
+          >
+            导出无课表 Excel
           </Button>
           <span style={{ color: "#888", fontSize: 13, marginLeft: 8 }}>
             {viewMode === "busy"

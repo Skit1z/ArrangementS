@@ -438,6 +438,17 @@ export const adminApi = {
       ).data,
     approve: async (uploadId: string) =>
       (await api.post<{ message: string }>(`/timetables/${uploadId}/approve`)).data,
+    exportFree: async () => {
+      const res = await api.get("/timetables/export-free", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `全员无课表_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    },
   },
 
   // 加班审批
