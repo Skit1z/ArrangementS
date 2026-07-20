@@ -316,7 +316,9 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
             .where(TimetableUpload.uploader_user_id == user.id)
             .values(uploader_user_id=None)
         )
-        db.execute(update(AuditLog).where(AuditLog.actor_id == user.id).values(actor_id=None))
+        db.execute(
+            update(AuditLog).where(AuditLog.actor_user_id == user.id).values(actor_user_id=None)
+        )
         db.execute(
             update(ImportBatch).where(ImportBatch.created_by == user.id).values(created_by=None)
         )
