@@ -266,7 +266,7 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
     user = prof.user
 
     from app.models.audit import AuditLog
-    from app.models.availability import TimetableAvailability
+    from app.models.availability import AvailabilityBlock, AvailabilityRequest
     from app.models.constraint import PersonConstraint
     from app.models.import_batch import ImportBatch
     from app.models.leave import LeaveRequest
@@ -277,7 +277,7 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
     from app.models.timetable import Timetable, TimetablePeriod
     from sqlalchemy import delete, update
 
-    # 1. 级联清理人员档案关联数据（约束、排班分配、换班申请、请假申请、加班记录、月度统计）
+    # 1. 级联清理人员档案关联数据（约束、排班分配、换班申请、请假申请、加班记录、月度统计、不可值班）
     db.execute(delete(PersonConstraint).where(PersonConstraint.person_id == person_id))
     db.execute(delete(Assignment).where(Assignment.person_id == person_id))
     db.execute(
@@ -289,14 +289,15 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
     db.execute(delete(LeaveRequest).where(LeaveRequest.person_id == person_id))
     db.execute(delete(OvertimeRecord).where(OvertimeRecord.person_id == person_id))
     db.execute(delete(PersonMonthSummary).where(PersonMonthSummary.person_id == person_id))
+    db.execute(delete(AvailabilityBlock).where(AvailabilityBlock.person_id == person_id))
+    db.execute(delete(AvailabilityRequest).where(AvailabilityRequest.person_id == person_id))
 
     if user:
-        # 2. 级联清理用户关联数据（无课表明细、无课表、可用性规则）
+        # 2. 级联清理用户关联数据（无课表明细、无课表）
         timetables = list(db.scalars(select(Timetable).where(Timetable.user_id == user.id)).all())
         for tt in timetables:
             db.execute(delete(TimetablePeriod).where(TimetablePeriod.timetable_id == tt.id))
             db.delete(tt)
-        db.execute(delete(TimetableAvailability).where(TimetableAvailability.user_id == user.id))
 
         # 3. 将审计日志和导入批次中的创建者置空（解绑外键）
         db.execute(update(AuditLog).where(AuditLog.actor_id == user.id).values(actor_id=None))
