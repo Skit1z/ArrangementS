@@ -1,5 +1,4 @@
 import { ClockCircleOutlined } from "@ant-design/icons";
-import { Tag } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
@@ -43,20 +42,6 @@ export function BeijingTimeBanner() {
           {timeStr}
         </div>
       </div>
-      <Tag
-        color="green"
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          padding: "6px 14px",
-          borderRadius: 20,
-          border: "none",
-          background: "rgba(82, 196, 26, 0.25)",
-          color: "#73d13d",
-        }}
-      >
-        ● 实时同步
-      </Tag>
     </div>
   );
 }

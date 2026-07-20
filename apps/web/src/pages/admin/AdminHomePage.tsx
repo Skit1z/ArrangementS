@@ -6,15 +6,13 @@ import {
   RightOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Col, Row, Statistic, Typography } from "antd";
+import { Button, Card, Col, Row, Statistic } from "antd";
 import { useNavigate } from "react-router-dom";
 import { BeijingTimeBanner } from "@/components/BeijingTimeBanner";
 import { CurrentDutyCard } from "@/components/CurrentDutyCard";
 import { adminApi } from "@/features/admin/api";
-import { useAuth } from "@/stores/auth";
 
 export default function AdminHomePage() {
-  const user = useAuth((s) => s.user);
   const navigate = useNavigate();
 
   const peopleQuery = useQuery({
@@ -34,17 +32,6 @@ export default function AdminHomePage() {
     <div>
       {/* 显眼的实时北京时间横幅 */}
       <BeijingTimeBanner />
-
-      <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <Typography.Title level={3} style={{ margin: 0, fontWeight: 600 }}>
-            管理员控制台
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            欢迎回来，{user?.username}！实时关注今天与本周的值班动态。
-          </Typography.Text>
-        </div>
-      </div>
 
       {/* 实时值班人员与联系方式 Card */}
       <CurrentDutyCard />

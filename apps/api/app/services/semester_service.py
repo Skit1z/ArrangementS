@@ -109,13 +109,45 @@ def update_semester(db: Session, semester_id: uuid.UUID, patch: dict) -> Semeste
     return sem
 
 
+def ensure_default_semester(db: Session) -> Semester:
+    """如果数据库无任何学期（如重新部署/重置后），自动初始化当前学期。"""
+    from datetime import date, timedelta
+
+    existing = db.scalar(select(Semester).limit(1))
+    if existing:
+        return existing
+
+    today = date.today()
+    first_monday = today - timedelta(days=today.weekday())
+
+    if today.month >= 9:
+        name = f"{today.year}-{today.year + 1}学年第一学期"
+    elif today.month >= 2:
+        name = f"{today.year - 1}-{today.year}学年第二学期"
+    else:
+        name = f"{today.year - 1}-{today.year}学年第一学期"
+
+    sem = create_semester(
+        db,
+        name=name,
+        first_monday=first_monday,
+        week_count=20,
+        is_current=True,
+    )
+    db.commit()
+    return sem
+
+
 def get_current_semester(db: Session) -> Semester | None:
     from datetime import date, timedelta
 
     today = date.today()
     all_semesters = list(db.scalars(select(Semester).order_by(Semester.first_monday.asc())).all())
     if not all_semesters:
-        return None
+        ensure_default_semester(db)
+        all_semesters = list(
+            db.scalars(select(Semester).order_by(Semester.first_monday.asc())).all()
+        )
 
     active_sem = None
     # 1. 精确落在某学期开学至结束期间

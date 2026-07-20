@@ -30,8 +30,8 @@ from app.models.import_batch import ImportBatch
 from app.models.person import PersonProfile
 from app.models.user import User
 
-REQUIRED_COLUMNS = ["学号", "姓名", "手机号", "困难等级"]
-OPTIONAL_COLUMNS = ["班级", "身份证号", "银行卡号"]
+REQUIRED_COLUMNS = ["学号", "姓名"]
+OPTIONAL_COLUMNS = ["班级", "手机号", "困难等级", "身份证号", "银行卡号"]
 
 _PHONE_RE = re.compile(r"^1[3-9]\d{9}$")
 _ID_CARD_RE = re.compile(r"^\d{17}[\dXx]$")
@@ -108,7 +108,7 @@ def _validate_row(row_no: int, rec: dict[str, str], seen: set[str]) -> RowResult
         r.errors.append("同批次学号重复")
     if not r.full_name:
         r.errors.append("姓名为空")
-    if not _PHONE_RE.match(r.phone):
+    if r.phone and not _PHONE_RE.match(r.phone):
         r.errors.append("手机号格式非法")
     if id_card and not _ID_CARD_RE.match(id_card):
         r.errors.append("身份证号格式非法")
