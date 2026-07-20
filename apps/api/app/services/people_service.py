@@ -277,17 +277,19 @@ def delete_person(db: Session, person_id: uuid.UUID) -> None:
         MonthlyHourSummary,
         MonthlyVenueHourSummary,
     )
-    from app.models.swap import ShiftExchangeRequest
+    from app.models.swap import SwapCandidate, SwapRequest
     from app.models.timetable import Timetable, TimetablePeriod
     from sqlalchemy import delete, update
 
-    # 1. 级联清理人员档案关联数据（约束、排班分配、换班申请、请假申请、加班申请、月度统计、不可值班）
+    # 1. 级联清理人员档案关联数据（约束、排班分配、换班/替班、请假申请、加班申请、月度统计、不可值班）
     db.execute(delete(PersonConstraint).where(PersonConstraint.person_id == person_id))
     db.execute(delete(Assignment).where(Assignment.person_id == person_id))
+    db.execute(delete(SwapCandidate).where(SwapCandidate.candidate_person_id == person_id))
     db.execute(
-        delete(ShiftExchangeRequest).where(
-            (ShiftExchangeRequest.applicant_person_id == person_id)
-            | (ShiftExchangeRequest.target_person_id == person_id)
+        delete(SwapRequest).where(
+            (SwapRequest.requester_person_id == person_id)
+            | (SwapRequest.target_person_id == person_id)
+            | (SwapRequest.selected_person_id == person_id)
         )
     )
     db.execute(delete(LeaveRequest).where(LeaveRequest.person_id == person_id))
