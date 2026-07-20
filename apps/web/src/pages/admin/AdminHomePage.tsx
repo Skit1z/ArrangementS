@@ -5,7 +5,6 @@ import {
   ClockCircleOutlined,
   RightOutlined,
   SafetyCertificateOutlined,
-  ShopOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Col, Row, Statistic, Typography } from "antd";
@@ -23,18 +22,12 @@ export default function AdminHomePage() {
     queryFn: adminApi.people.list,
   });
 
-  const venuesQuery = useQuery({
-    queryKey: ["admin", "venues"],
-    queryFn: adminApi.venues.list,
-  });
-
   const semestersQuery = useQuery({
     queryKey: ["admin", "semesters"],
     queryFn: adminApi.semesters.list,
   });
 
   const activePeopleCount = (peopleQuery.data ?? []).filter((p) => p.status === "active").length;
-  const activeVenuesCount = (venuesQuery.data ?? []).filter((v) => v.is_active).length;
   const currentSemester = (semestersQuery.data ?? []).find((s) => s.is_current);
 
   return (
@@ -55,10 +48,10 @@ export default function AdminHomePage() {
 
       {/* 统计指标卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={8} md={8}>
           <Card size="small" bordered={false} style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
             <Statistic
-              title="在册活跃人员"
+              title="在岗人员"
               value={activePeopleCount}
               suffix="人"
               prefix={<TeamOutlined style={{ color: "#1890ff" }} />}
@@ -66,18 +59,7 @@ export default function AdminHomePage() {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" bordered={false} style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-            <Statistic
-              title="活跃值班场地"
-              value={activeVenuesCount}
-              suffix="个"
-              prefix={<ShopOutlined style={{ color: "#52c41a" }} />}
-            />
-          </Card>
-        </Col>
-
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={8} md={8}>
           <Card size="small" bordered={false} style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
             <Statistic
               title="当前学期"
@@ -87,7 +69,7 @@ export default function AdminHomePage() {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={8} md={8}>
           <Card size="small" bordered={false} style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
             <Statistic
               title="首周起始日期"

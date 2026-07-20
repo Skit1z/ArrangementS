@@ -1,14 +1,33 @@
 import { useQuery } from "@tanstack/react-query";
 import { Badge, Card, Empty, Skeleton, Space, Tag } from "antd";
-import { PhoneOutlined, UserOutlined } from "@ant-design/icons";
+import { ClockCircleOutlined, PhoneOutlined, UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useEffect, useState } from "react";
 import { adminApi, type CurrentDutyItem } from "@/features/admin/api";
+
+export function LiveClock() {
+  const [timeStr, setTimeStr] = useState(() => dayjs().format("YYYY-MM-DD HH:mm:ss ddd"));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeStr(dayjs().format("YYYY-MM-DD HH:mm:ss ddd"));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <Space size={4} style={{ color: "#1677ff", fontWeight: 600, fontSize: 13 }}>
+      <ClockCircleOutlined />
+      <span>北京时间：{timeStr}</span>
+    </Space>
+  );
+}
 
 export function CurrentDutyCard() {
   const { data, isLoading } = useQuery<CurrentDutyItem[]>({
     queryKey: ["schedule", "current-duty"],
     queryFn: adminApi.schedule.currentDuty,
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
   return (
@@ -20,6 +39,7 @@ export function CurrentDutyCard() {
           <span style={{ fontWeight: 600, fontSize: 15 }}>当前在岗 / 实时值班人员</span>
         </Space>
       }
+      extra={<LiveClock />}
       style={{ marginBottom: 16, borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
     >
       {isLoading ? (

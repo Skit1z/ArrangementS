@@ -113,11 +113,12 @@ def get_current_semester(db: Session) -> Semester | None:
     from datetime import date, timedelta
 
     today = date.today()
-    all_semesters = db.scalars(select(Semester).order_by(Semester.first_monday.asc())).all()
+    all_semesters = list(db.scalars(select(Semester).order_by(Semester.first_monday.asc())).all())
     if not all_semesters:
         return None
 
     active_sem = None
+    # 1. 精确落在某学期开学至结束期间
     for sem in all_semesters:
         start_date = sem.first_monday
         end_date = start_date + timedelta(weeks=sem.week_count)
@@ -125,8 +126,13 @@ def get_current_semester(db: Session) -> Semester | None:
             active_sem = sem
             break
 
+    # 2. 如果落在寒暑假期间（两学期之间），默认设为该寒暑假之前的那个学期
     if not active_sem:
-        active_sem = min(all_semesters, key=lambda s: abs((s.first_monday - today).days))
+        past_semesters = [s for s in all_semesters if s.first_monday <= today]
+        if past_semesters:
+            active_sem = past_semesters[-1]
+        else:
+            active_sem = all_semesters[0]
 
     if not active_sem.is_current:
         for sem in all_semesters:

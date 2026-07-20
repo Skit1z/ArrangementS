@@ -668,10 +668,24 @@ function SemesterTab() {
           { title: "首周周一", dataIndex: "first_monday", width: 120 },
           { title: "周数", dataIndex: "week_count", width: 80 },
           {
-            title: "当前",
-            dataIndex: "is_current",
-            width: 80,
-            render: (v: boolean) => (v ? <Tag color="green">当前</Tag> : <Tag>—</Tag>),
+            title: "当前状态",
+            width: 180,
+            render: (_, r) => {
+              if (!r.is_current) return <Tag>—</Tag>;
+              const target = dayjs();
+              const start = dayjs(r.first_monday);
+              const end = start.add(r.week_count, "week");
+              if (target.isSame(start, "day") || (target.isAfter(start) && target.isBefore(end))) {
+                const w = Math.floor(target.diff(start, "day") / 7) + 1;
+                return <Tag color="green">当前学期 (第 {w} 周)</Tag>;
+              } else if (target.isSame(end, "day") || target.isAfter(end)) {
+                const vacWeek = Math.floor(target.diff(end, "day") / 7) + 1;
+                const isWinter = [1, 2, 3, 11, 12].includes(end.month() + 1);
+                const vacName = isWinter ? "寒假" : "暑假";
+                return <Tag color="green">当前 ({vacName}第 {vacWeek} 周)</Tag>;
+              }
+              return <Tag color="green">当前</Tag>;
+            },
           },
           {
             title: "课程缓冲",

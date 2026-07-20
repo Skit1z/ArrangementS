@@ -508,7 +508,7 @@ export default function ScheduleBoard({
             left: drawerPos.x,
             top: drawerPos.y,
             width: drawerWidth,
-            height: drawerCollapsed ? 42 : 520,
+            height: drawerCollapsed ? 46 : 520,
             zIndex: 1000,
             transition: isResizing || isDraggingPos ? "none" : "left 0.2s, top 0.2s, width 0.2s, height 0.2s",
             overflow: "visible",

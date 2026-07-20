@@ -64,34 +64,72 @@ export default function PersonDrawer({
         height: "100%",
       }}
     >
-      {/* 标题栏：作为抓手按住拖动 + 向上折叠按钮 */}
+      {/* 标题栏：作为抓手按住拖动 + 高亮显眼的折叠/展开按钮 */}
       <div
         className="drag-handle"
         onMouseDown={startDrag}
         style={{
-          padding: "8px 12px",
-          background: "#fafafa",
-          borderBottom: collapsed ? "none" : "1px solid #f0f0f0",
+          padding: "10px 14px",
+          background: "linear-gradient(135deg, #1F497D 0%, #1677ff 100%)",
+          color: "#fff",
+          borderBottom: collapsed ? "none" : "1px solid #102A45",
           cursor: "grab",
           userSelect: "none",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
         }}
       >
-        <span style={{ fontWeight: 600, fontSize: 13, color: "#333" }}>
-          👥 人员库 ({people.length}人)
-        </span>
+        <Space size={8} align="center">
+          <span style={{ fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: 0.5 }}>
+            👥 人员库
+          </span>
+          <span
+            style={{
+              background: "rgba(255, 255, 255, 0.25)",
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 10,
+            }}
+          >
+            {people.length} 人
+          </span>
+          <span style={{ fontSize: 11, opacity: 0.7, color: "#e6f4ff", marginLeft: 4 }}>
+            ⠿ 按住拖动
+          </span>
+        </Space>
+
         <Button
-          type="text"
           size="small"
-          icon={collapsed ? <DownOutlined /> : <UpOutlined />}
           onClick={(e) => {
             e.stopPropagation();
             onToggleCollapse();
           }}
-          aria-label={collapsed ? "展开人员库" : "折叠人员库"}
-        />
+          style={
+            collapsed
+              ? {
+                  background: "#fff",
+                  color: "#1677ff",
+                  fontWeight: 700,
+                  borderColor: "#fff",
+                  borderRadius: 14,
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                }
+              : {
+                  background: "rgba(255, 255, 255, 0.2)",
+                  color: "#fff",
+                  borderColor: "rgba(255, 255, 255, 0.4)",
+                  fontWeight: 600,
+                  borderRadius: 14,
+                }
+          }
+          icon={collapsed ? <DownOutlined /> : <UpOutlined />}
+        >
+          {collapsed ? "展开人员库" : "向上折叠"}
+        </Button>
       </div>
 
       {!collapsed && (

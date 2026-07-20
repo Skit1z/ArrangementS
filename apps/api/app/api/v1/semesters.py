@@ -28,6 +28,8 @@ router = APIRouter(prefix="/semesters", tags=["semesters"])
 def list_semesters(
     _: User = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> list[Semester]:
+    semester_service.get_current_semester(db)
+    db.commit()
     return list(db.scalars(select(Semester).order_by(Semester.first_monday.desc())))
 
 
