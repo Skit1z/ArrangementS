@@ -127,12 +127,13 @@ export default function DutyRosterPage() {
   const handleExportExcel = () => {
     if (!roster || !activeVenue) return;
     try {
-      const header = ["星期/时段", ...TIME_SLOTS.map((s) => `${s.label} ${s.range}`)];
-      const rows = WEEKDAY.map((w) => {
-        const cells = TIME_SLOTS.map((s) =>
+      // 转置：行=时段，列=星期
+      const header = ["时段", ...WEEKDAY.map((w) => `周${w}`)];
+      const rows = TIME_SLOTS.map((s) => {
+        const cells = WEEKDAY.map((w) =>
           (roster[w]?.[s.key] ?? []).map((e) => (e.phone ? `${e.name} ${e.phone}` : e.name)).join("\n"),
         );
-        return [w, ...cells];
+        return [`${s.label} ${s.range}`, ...cells];
       });
 
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -246,23 +247,23 @@ export default function DutyRosterPage() {
                 <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 900, fontSize: 13 }}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>星期</th>
-                      {TIME_SLOTS.map((s) => (
-                        <th key={s.key} style={thStyle}>
-                          <div style={{ fontWeight: 600 }}>{s.label}</div>
-                          <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>{s.range}</div>
-                        </th>
+                      <th style={thStyle}>时段</th>
+                      {WEEKDAY.map((w, wi) => (
+                        <th key={w} style={{ ...thStyle, background: wi >= 5 ? "#fa8c16" : "#1F497D" }}>{w}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {WEEKDAY.map((w, wi) => (
-                      <tr key={w}>
-                        <td style={rowHeaderStyle(wi)}>{w}</td>
-                        {TIME_SLOTS.map((s) => {
+                    {TIME_SLOTS.map((s) => (
+                      <tr key={s.key}>
+                        <td style={{ ...rowHeaderStyle(0), fontSize: 12 }}>
+                          <div style={{ fontWeight: 600 }}>{s.label}</div>
+                          <div style={{ fontSize: 10, color: "#888" }}>{s.range}</div>
+                        </td>
+                        {WEEKDAY.map((w) => {
                           const entries = roster[w]?.[s.key] ?? [];
                           return (
-                            <td key={s.key} style={cellStyle}>
+                            <td key={w} style={cellStyle}>
                               {entries.length > 0 ? (
                                 entries.map((e, i) => (
                                   <span key={i} style={tagStyle}>
