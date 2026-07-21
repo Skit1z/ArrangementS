@@ -49,9 +49,27 @@ export default function TimetablesPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
+  const semestersQ = useQuery({
+    queryKey: ["admin", "semesters"],
+    queryFn: adminApi.semesters.list,
+  });
+  const currentSemester = (semestersQ.data ?? []).find((s) => s.is_current);
+
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string | null>(null);
+  // 默认选中当前学期（异步数据到达后回填）
+  useEffect(() => {
+    if (!selectedSemesterId && currentSemester) {
+      setSelectedSemesterId(currentSemester.id);
+    }
+  }, [currentSemester, selectedSemesterId]);
+
   const { data, isLoading } = useQuery<ActiveTimetableOut[]>({
-    queryKey: ["admin", "timetables", "active"],
-    queryFn: adminApi.timetables.active,
+    queryKey: ["admin", "timetables", "active", selectedSemesterId],
+    queryFn: () =>
+      adminApi.timetables.active(
+        selectedSemesterId ? { semester_id: selectedSemesterId } : undefined,
+      ),
+    enabled: !!selectedSemesterId,
   });
   const peopleQuery = useQuery({
     queryKey: ["admin", "people", "timetable-picker"],
@@ -89,7 +107,24 @@ export default function TimetablesPage() {
         return;
       }
       setProxyParsed(d.entries);
-      message.success(`解析出 ${d.entries.length} 条`);
+      // 通过 PDF 解析出的学号自动匹配人员
+      if (d.student_no) {
+        const matched = (peopleQuery.data ?? []).find(
+          (p) => p.student_no === d.student_no,
+        );
+        if (matched) {
+          setProxyPersonId(matched.id);
+          message.success(
+            `解析出 ${d.entries.length} 条；已自动匹配学号 ${d.student_no} → ${matched.full_name}`,
+          );
+        } else {
+          message.warning(
+            `解析出 ${d.entries.length} 条；未在系统中找到学号 ${d.student_no}，请手动选择人员`,
+          );
+        }
+      } else {
+        message.success(`解析出 ${d.entries.length} 条（未识别到学号，请手动选择人员）`);
+      }
     },
     onError: (e) => message.error(errorMessage(e)),
   });
@@ -141,7 +176,18 @@ export default function TimetablesPage() {
     >
       <div style={{ marginBottom: 16 }}>
         <Space wrap>
-          <span>视图：</span>
+          <span>学期：</span>
+          <Select
+            value={selectedSemesterId}
+            onChange={(v) => setSelectedSemesterId(v)}
+            style={{ width: 180 }}
+            placeholder="选择学期"
+            options={(semestersQ.data ?? []).map((s) => ({
+              label: `${s.name}${s.is_current ? " (当前)" : ""}`,
+              value: s.id,
+            }))}
+          />
+          <span style={{ marginLeft: 8 }}>视图：</span>
           <Select
             value={viewMode}
             onChange={(v) => setViewMode(v as "busy" | "free")}
@@ -157,7 +203,7 @@ export default function TimetablesPage() {
             onChange={(v) => setSelectedWeek(v as number | "all")}
             style={{ width: 140 }}
             options={[
-              { label: "全学期 (所有周)", value: "all" },
+              { label: "整学期", value: "all" },
               ...Array.from({ length: 20 }, (_, i) => ({
                 label: `第 ${i + 1} 周`,
                 value: i + 1,
@@ -178,7 +224,7 @@ export default function TimetablesPage() {
             }
           />
           <Button icon={<UploadOutlined />} onClick={() => setProxyOpen(true)}>
-            为某人代传课表
+            代传课表
           </Button>
           <Button
             type="primary"
@@ -197,11 +243,6 @@ export default function TimetablesPage() {
           >
             导出无课表 Excel
           </Button>
-          <span style={{ color: "#888", fontSize: 13, marginLeft: 8 }}>
-            {viewMode === "busy"
-              ? "* 显示由于上课而不可排班的人员。"
-              : "* 显示当前时段无课可排班的人员。"}
-          </span>
         </Space>
       </div>
 

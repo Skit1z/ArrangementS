@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert,
   App,
   Button,
   Card,
@@ -19,10 +18,11 @@ import {
   Tag,
   TimePicker,
 } from "antd";
+import { DeleteOutlined, EditOutlined, ExclamationCircleFilled, PlusOutlined, SettingOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useState } from "react";
 
-import { errorMessage } from "@/api/client";
+import { api, errorMessage } from "@/api/client";
 import {
   adminApi,
   DAY_TYPE_LABEL,
@@ -40,21 +40,48 @@ import {
   type VacationUpdate,
 } from "@/features/admin/api";
 
+interface AdminUser {
+  id: string;
+  username: string;
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+}
+
+interface SystemSettingItem {
+  key: string;
+  value: string;
+  description: string | null;
+}
+
+interface AuditLogItem {
+  id: string;
+  actor_username: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  reason: string | null;
+  created_at: string;
+}
+
 export default function SettingsPage() {
   return (
-    <Card 
-      title={<span style={{ fontSize: '20px', fontWeight: 600 }}>系统配置与参数设置</span>} 
+    <Card
+      title={<span style={{ fontSize: '20px', fontWeight: 600 }}>设置</span>}
       bordered={false}
       style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 12 }}
     >
       <Tabs
-        defaultActiveKey="multipliers"
+        defaultActiveKey="accounts"
         size="large"
         items={[
+          { key: "accounts", label: "账号管理", children: <AccountsTab /> },
           { key: "multipliers", label: "倍率规则", children: <MultipliersTab /> },
           { key: "special", label: "特殊日期", children: <SpecialDatesTab /> },
           { key: "semester", label: "学期设置", children: <SemesterTab /> },
           { key: "vacations", label: "寒暑假", children: <VacationsTab /> },
+          { key: "system", label: "系统参数", children: <SystemSettingsTab /> },
+          { key: "logs", label: "审计日志", children: <AuditLogsTab /> },
         ]}
       />
       <div style={{ marginTop: 40, textAlign: 'center', color: '#8c8c8c', fontSize: '13px' }}>
@@ -221,18 +248,18 @@ function MultipliersTab() {
             title: "操作",
             width: 160,
             render: (_, r) => (
-              <Space>
-                <Button size="small" onClick={() => openEdit(r)}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} style={{ padding: "0 6px", fontSize: 13 }}>
                   编辑
                 </Button>
                 {r.is_active && (
                   <Popconfirm title="停用该规则？" onConfirm={() => disableM.mutate(r.id)}>
-                    <Button size="small" danger>
+                    <Button type="link" danger size="small" icon={<DeleteOutlined />} style={{ padding: "0 6px", fontSize: 13 }}>
                       停用
                     </Button>
                   </Popconfirm>
                 )}
-              </Space>
+              </div>
             ),
           },
         ]}
@@ -694,18 +721,18 @@ function SemesterTab() {
             title: "操作",
             width: 200,
             render: (_, r) => (
-              <Space>
-                <Button size="small" onClick={() => openEdit(r)}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} style={{ padding: "0 6px", fontSize: 13 }}>
                   编辑
                 </Button>
                 {!r.is_current && (
                   <Popconfirm title="设为当前学期？" onConfirm={() => activateM.mutate(r.id)}>
-                    <Button size="small" type="primary">
+                    <Button type="link" size="small" style={{ padding: "0 6px", fontSize: 13, color: "#1677ff" }}>
                       设为当前
                     </Button>
                   </Popconfirm>
                 )}
-              </Space>
+              </div>
             ),
           },
         ]}
@@ -894,13 +921,6 @@ function VacationsTab() {
         </Space>
       </div>
 
-      <Alert
-        message="寒暑假自动联动说明"
-        description="系统默认会根据各学期的时间自动计算联动生成寒暑假（学期与学期之间的间隔自动识别为寒暑假）。您也可以手动点击上方“新增自定义假期”添加特定的假期规则，或调整值班白名单人员。"
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-      />
       <Table<Vacation>
         rowKey="id"
         loading={isLoading}
@@ -926,23 +946,23 @@ function VacationsTab() {
           },
           {
             title: "操作",
-            width: 220,
+            width: 240,
             render: (_, r) => (
-              <Space>
-                <Button size="small" onClick={() => openEdit(r)}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} style={{ padding: "0 6px", fontSize: 13 }}>
                   编辑
                 </Button>
-                <Button size="small" type="primary" onClick={() => setManaging(r)}>
+                <Button type="link" size="small" icon={<SettingOutlined />} onClick={() => setManaging(r)} style={{ padding: "0 6px", fontSize: 13 }}>
                   可值班名单
                 </Button>
                 {r.is_active && (
                   <Popconfirm title="确定停用该假期规则？" onConfirm={() => disableM.mutate(r.id)}>
-                    <Button size="small" danger>
+                    <Button type="link" danger size="small" icon={<DeleteOutlined />} style={{ padding: "0 6px", fontSize: 13 }}>
                       停用
                     </Button>
                   </Popconfirm>
                 )}
-              </Space>
+              </div>
             ),
           },
         ]}
@@ -1083,6 +1103,331 @@ function VacationsTab() {
           ]}
         />
       </Drawer>
+    </>
+  );
+}
+
+// ============ 账号管理 Tab ============
+function AccountsTab() {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<AdminUser[]>({
+    queryKey: ["admin", "admins"],
+    queryFn: async () => (await api.get<AdminUser[]>("/admin/admins")).data,
+  });
+  const [createOpen, setCreateOpen] = useState(false);
+  const [resetting, setResetting] = useState<AdminUser | null>(null);
+  const [createForm] = Form.useForm<{ username: string; password: string }>();
+  const [resetForm] = Form.useForm<{ password: string }>();
+
+  const createM = useMutation({
+    mutationFn: async (v: { username: string; password: string }) =>
+      (await api.post("/admin/admins", v)).data,
+    onSuccess: () => {
+      message.success("管理员账号已创建");
+      setCreateOpen(false);
+      createForm.resetFields();
+      qc.invalidateQueries({ queryKey: ["admin", "admins"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const disableM = useMutation({
+    mutationFn: async (id: string) => (await api.post(`/admin/admins/${id}/disable`)).data,
+    onSuccess: () => {
+      message.success("账号已停用");
+      qc.invalidateQueries({ queryKey: ["admin", "admins"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const resetM = useMutation({
+    mutationFn: async (v: { id: string; password: string }) =>
+      (await api.post(`/admin/admins/${v.id}/reset-password`, { password: v.password })).data,
+    onSuccess: () => {
+      message.success("密码已重置");
+      setResetting(null);
+      resetForm.resetFields();
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  return (
+    <>
+      <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between" }}>
+        <span style={{ color: "#8c8c8c", fontSize: 13 }}>
+          管理员账号拥有后台全部权限；停用后该账号将无法登录。
+        </span>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+          新增管理员
+        </Button>
+      </div>
+
+      <Table<AdminUser>
+        rowKey="id"
+        loading={isLoading}
+        dataSource={data}
+        pagination={{
+          showSizeChanger: true,
+          showQuickJumper: true,
+          pageSizeOptions: ["10", "20", "50"],
+          showTotal: (total) => `共 ${total} 个账号`,
+          defaultPageSize: 20,
+        }}
+        columns={[
+          { title: "用户名", dataIndex: "username", width: 200 },
+          {
+            title: "状态",
+            dataIndex: "is_active",
+            width: 100,
+            render: (v: boolean) =>
+              v ? <Tag color="green">启用</Tag> : <Tag>已停用</Tag>,
+          },
+          {
+            title: "最近登录",
+            dataIndex: "last_login_at",
+            width: 180,
+            render: (v: string | null) => (v ? dayjs(v).format("YYYY-MM-DD HH:mm") : "—"),
+          },
+          {
+            title: "创建时间",
+            dataIndex: "created_at",
+            width: 180,
+            render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm"),
+          },
+          {
+            title: "操作",
+            width: 200,
+            render: (_, r) => (
+              <div style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => setResetting(r)}
+                  style={{ padding: "0 6px", fontSize: 13 }}
+                >
+                  重置密码
+                </Button>
+                {r.is_active && (
+                  <Popconfirm
+                    title="停用该账号？"
+                    description="该账号将无法登录"
+                    icon={<ExclamationCircleFilled style={{ color: "#ff4d4f" }} />}
+                    onConfirm={() => disableM.mutate(r.id)}
+                    okText="确定停用"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                  >
+                    <Button
+                      type="link"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      style={{ padding: "0 6px", fontSize: 13 }}
+                    >
+                      停用
+                    </Button>
+                  </Popconfirm>
+                )}
+              </div>
+            ),
+          },
+        ]}
+      />
+
+      <Modal
+        title="新增管理员账号"
+        open={createOpen}
+        onOk={() => createForm.submit()}
+        onCancel={() => setCreateOpen(false)}
+        confirmLoading={createM.isPending}
+        destroyOnClose
+      >
+        <Form form={createForm} layout="vertical" onFinish={(v) => createM.mutate(v)}>
+          <Form.Item name="username" label="用户名" rules={[{ required: true, min: 3 }]}>
+            <Input placeholder="登录用户名" />
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="初始密码"
+            rules={[{ required: true, min: 6, message: "密码至少 6 位" }]}
+          >
+            <Input.Password placeholder="请输入初始密码" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={`重置密码 · ${resetting?.username ?? ""}`}
+        open={!!resetting}
+        onOk={() => resetForm.submit()}
+        onCancel={() => setResetting(null)}
+        confirmLoading={resetM.isPending}
+        destroyOnClose
+      >
+        <Form
+          form={resetForm}
+          layout="vertical"
+          onFinish={(v) => resetting && resetM.mutate({ id: resetting.id, password: v.password })}
+        >
+          <Form.Item
+            name="password"
+            label="新密码"
+            rules={[{ required: true, min: 6, message: "密码至少 6 位" }]}
+          >
+            <Input.Password placeholder="请输入新密码" />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  );
+}
+
+// ============ 系统参数 Tab ============
+function SystemSettingsTab() {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<SystemSettingItem[]>({
+    queryKey: ["admin", "system-settings"],
+    queryFn: async () => (await api.get<SystemSettingItem[]>("/config/system-settings")).data,
+  });
+  const [editing, setEditing] = useState<SystemSettingItem | null>(null);
+  const [form] = Form.useForm<{ value: string; description: string }>();
+
+  const updateM = useMutation({
+    mutationFn: async (v: { key: string; value: string; description: string }) =>
+      (await api.put(`/config/system-settings/${v.key}`, v)).data,
+    onSuccess: () => {
+      message.success("已保存");
+      setEditing(null);
+      form.resetFields();
+      qc.invalidateQueries({ queryKey: ["admin", "system-settings"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
+  const openEdit = (r: SystemSettingItem) => {
+    form.setFieldsValue({ value: r.value, description: r.description ?? "" });
+    setEditing(r);
+  };
+
+  const submit = async () => {
+    if (!editing) return;
+    const v = await form.validateFields();
+    updateM.mutate({ key: editing.key, value: v.value, description: v.description ?? "" });
+  };
+
+  return (
+    <>
+      <div style={{ marginBottom: 12, color: "#8c8c8c", fontSize: 13 }}>
+        系统运行期可调整的参数。修改后即时生效（部分需要点击"刷新/自动联动"按钮才重新计算）。
+      </div>
+      <Table<SystemSettingItem>
+        rowKey="key"
+        loading={isLoading}
+        dataSource={data}
+        pagination={false}
+        columns={[
+          { title: "键", dataIndex: "key", width: 240 },
+          { title: "值", dataIndex: "value", width: 200 },
+          { title: "说明", dataIndex: "description" },
+          {
+            title: "操作",
+            width: 120,
+            render: (_, r) => (
+              <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+                编辑
+              </Button>
+            ),
+          },
+        ]}
+      />
+      <Modal
+        title={`编辑系统参数 · ${editing?.key ?? ""}`}
+        open={!!editing}
+        onOk={submit}
+        onCancel={() => setEditing(null)}
+        confirmLoading={updateM.isPending}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical">
+          {editing?.key === "trailing_vacation_weeks" ? (
+            <Form.Item
+              name="value"
+              label="值（5-8 之间的整数）"
+              rules={[
+                { required: true },
+                {
+                  validator: (_, v) =>
+                    Number.isInteger(Number(v)) && Number(v) >= 5 && Number(v) <= 8
+                      ? Promise.resolve()
+                      : Promise.reject(new Error("必须在 5-8 之间")),
+                },
+              ]}
+            >
+              <InputNumber min={5} max={8} style={{ width: "100%" }} />
+            </Form.Item>
+          ) : (
+            <Form.Item name="value" label="值" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+          )}
+          <Form.Item name="description" label="说明">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  );
+}
+
+// ============ 审计日志 Tab ============
+function AuditLogsTab() {
+  const [limit, setLimit] = useState(50);
+  const { data, isLoading } = useQuery<AuditLogItem[]>({
+    queryKey: ["admin", "audit-logs", limit],
+    queryFn: async () => (await api.get<AuditLogItem[]>("/config/audit-logs", { params: { limit } })).data,
+  });
+
+  return (
+    <>
+      <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between" }}>
+        <span style={{ color: "#8c8c8c", fontSize: 13 }}>
+          系统所有敏感操作（排班发布、人员调动、规则变更、删除等）的审计记录。
+        </span>
+        <Select
+          value={limit}
+          onChange={(v) => setLimit(v)}
+          options={[
+            { label: "最近 50 条", value: 50 },
+            { label: "最近 100 条", value: 100 },
+            { label: "最近 200 条", value: 200 },
+            { label: "最近 500 条", value: 500 },
+          ]}
+          style={{ width: 140 }}
+        />
+      </div>
+      <Table<AuditLogItem>
+        rowKey="id"
+        loading={isLoading}
+        dataSource={data}
+        size="small"
+        pagination={{ showSizeChanger: false, defaultPageSize: 20 }}
+        columns={[
+          {
+            title: "时间",
+            dataIndex: "created_at",
+            width: 170,
+            render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm:ss"),
+          },
+          { title: "操作者", dataIndex: "actor_username", width: 120, render: (v) => v ?? "—系统" },
+          { title: "动作", dataIndex: "action", width: 180 },
+          { title: "对象类型", dataIndex: "entity_type", width: 120 },
+          { title: "对象 ID", dataIndex: "entity_id", width: 240, render: (v) => v ?? "—" },
+          { title: "原因/备注", dataIndex: "reason" },
+        ]}
+      />
     </>
   );
 }

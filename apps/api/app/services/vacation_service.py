@@ -29,6 +29,7 @@ def get_default_trailing_vacation_weeks(db: Session | None = None) -> int:
         return DEFAULT_TRAILING_VACATION_WEEKS
     try:
         from app.models.config import SystemSetting
+
         row = db.get(SystemSetting, "trailing_vacation_weeks")
         if row and row.value:
             v = int(row.value)

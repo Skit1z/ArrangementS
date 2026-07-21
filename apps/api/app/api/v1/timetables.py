@@ -141,6 +141,7 @@ def upload(
 
 @router.get("/active", response_model=list[ActiveTimetableOut])
 def get_active(
+    semester_id: uuid.UUID | None = None,
     _: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> list[ActiveTimetableOut]:
@@ -151,15 +152,18 @@ def get_active(
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
 
-    current_sem = semester_service.get_current_semester(db)
-    if not current_sem:
-        return []
+    target_sem_id = semester_id
+    if target_sem_id is None:
+        current_sem = semester_service.get_current_semester(db)
+        if not current_sem:
+            return []
+        target_sem_id = current_sem.id
 
     stmt = (
         select(TimetableUpload, PersonProfile)
         .join(PersonProfile, TimetableUpload.person_id == PersonProfile.id)
         .where(
-            TimetableUpload.semester_id == current_sem.id,
+            TimetableUpload.semester_id == target_sem_id,
             TimetableUpload.review_status == ReviewStatus.approved,
         )
         .options(selectinload(TimetableUpload.course_rules))

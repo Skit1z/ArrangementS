@@ -138,10 +138,7 @@ def list_system_settings(
     _: User = Depends(require_admin), db: Session = Depends(get_db)
 ) -> list[dict]:
     rows = db.scalars(select(SystemSetting).order_by(SystemSetting.key)).all()
-    return [
-        {"key": r.key, "value": r.value, "description": r.description}
-        for r in rows
-    ]
+    return [{"key": r.key, "value": r.value, "description": r.description} for r in rows]
 
 
 @router.put("/system-settings/{key}")

@@ -90,6 +90,13 @@ export default function PeoplePage() {
         rowKey="id"
         loading={isLoading}
         dataSource={data}
+        pagination={{
+          showSizeChanger: true,
+          showQuickJumper: true,
+          pageSizeOptions: ["10", "20", "50"],
+          showTotal: (total) => `共 ${total} 人`,
+          defaultPageSize: 20,
+        }}
         columns={[
           { title: "学号", dataIndex: "student_no" },
           { title: "班级", dataIndex: "class_name", render: (v) => v || "—" },

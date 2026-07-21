@@ -441,7 +441,8 @@ export const adminApi = {
 
   // 课表
   timetables: {
-    active: async () => (await api.get<ActiveTimetableOut[]>("/timetables/active")).data,
+    active: async (params?: { semester_id?: string }) =>
+      (await api.get<ActiveTimetableOut[]>("/timetables/active", { params })).data,
     parsePdf: async (file: File, semesterId?: string) => {
       const form = new FormData();
       form.append("file", file);
