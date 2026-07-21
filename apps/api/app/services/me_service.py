@@ -156,7 +156,9 @@ def get_current_on_duty_staff(db: Session) -> list[dict]:
 
     每条记录同时返回同场地的「前/后一班」在岗人员（仅已发布计划），便于前端展示。
     """
-    now_beijing = datetime.now(BEIJING_TZ)
+    # 无论服务器时区如何，都取实际北京时间（UTC+8）
+    now_utc = datetime.now(timezone.utc)
+    now_beijing = (now_utc + timedelta(hours=8)).replace(tzinfo=BEIJING_TZ)
 
     stmt = (
         select(Assignment, DutySlot, Venue, PersonProfile)
