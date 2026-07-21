@@ -146,10 +146,11 @@ export default function SchedulePage() {
     },
     onError: (e) => {
       const msg = errorMessage(e);
-      if (msg.includes("锁定") || msg.includes("冲突")) {
+      const alreadyCleared = generate.variables?.clear_locks === true;
+      if (!alreadyCleared && (msg.includes("锁定") || msg.includes("冲突"))) {
         Modal.confirm({
           title: "锁定岗位冲突提示",
-          content: `${msg}`,
+          content: msg,
           okText: "解锁所有岗位并重新生成",
           okType: "danger",
           cancelText: "稍后处理",

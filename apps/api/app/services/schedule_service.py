@@ -101,12 +101,17 @@ def generate(
                     conflicts_msg.append(
                         f"{person_obj.full_name} 在 {slot_obj.slot_start_at.strftime('%m-%d %H:%M')} 存在约束冲突"
                     )
-        msg_suffix = "。建议在确定重新排班时选择【解锁所有岗位重置】后重新生成。"
-        detail = (
-            "锁定分配与当前排班约束冲突（" + "；".join(conflicts_msg) + "）" + msg_suffix
-            if conflicts_msg
-            else "存在锁定人员/班次冲突（如时间重叠或周班次超限）" + msg_suffix
-        )
+        if conflicts_msg:
+            msg_suffix = "。建议在确定重新排班时选择【解锁所有岗位重置】后重新生成。"
+            detail = "锁定分配与当前排班约束冲突（" + "；".join(conflicts_msg) + "）" + msg_suffix
+        elif solver_input.locked:
+            msg_suffix = "。建议在确定重新排班时选择【解锁所有岗位重置】后重新生成。"
+            detail = "存在锁定人员/班次冲突（如时间重叠或周班次超限）" + msg_suffix
+        else:
+            detail = (
+                "自动排班求解失败：当前可用人员不足或约束条件过于严格，"
+                "无法为所有岗位安排人员。请检查人员可用性设置、课程表及场馆约束。"
+            )
         raise HTTPException(status_code=409, detail=detail)
 
     _persist_assignments(db, plan, result, actor_id)
