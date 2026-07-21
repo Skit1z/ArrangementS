@@ -10,6 +10,7 @@ import { Button, Card, Col, Row, Statistic } from "antd";
 import { useNavigate } from "react-router-dom";
 import { BeijingTimeBanner } from "@/components/BeijingTimeBanner";
 import { CurrentDutyCard } from "@/components/CurrentDutyCard";
+import { SystemStatusCard } from "@/components/SystemStatusCard";
 import { adminApi } from "@/features/admin/api";
 
 export default function AdminHomePage() {
@@ -32,6 +33,9 @@ export default function AdminHomePage() {
     <div>
       {/* 显眼的实时北京时间横幅 */}
       <BeijingTimeBanner />
+
+      {/* 系统构建与存活状态 Card */}
+      <SystemStatusCard />
 
       {/* 实时值班人员与联系方式 Card */}
       <CurrentDutyCard />

@@ -10,18 +10,20 @@ from app.api.v1 import (
     config,
     constraints,
     me,
+    overtime,
     people,
     schedule,
     semesters,
     statistics,
+    system,
     timetables,
     vacations,
     venues,
     workflow_admin,
-    overtime,
 )
 
 api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(system.router)
 api_router.include_router(auth.router)
 api_router.include_router(admins.router)
 api_router.include_router(people.router)
