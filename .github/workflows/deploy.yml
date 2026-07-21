@@ -1,5 +1,13 @@
 name: Deploy ArrangementS
 
+# 让 run 标题显示 commit message（workflow_run 触发默认只显示 workflow 名）
+run-name: >-
+  ${{
+    github.event_name == 'workflow_dispatch'
+    && format('🚀 手动触发部署 by @{0}', github.actor)
+    || format('🚀 {0}', github.event.workflow_run.head_commit.message)
+  }}
+
 on:
   workflow_run:
     workflows: ["CI (Code Quality & Testing)"]
