@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_admin
 from app.db.session import get_db
 from app.models.audit import AuditLog
+from app.models.config import SystemSetting
 from app.models.user import User
 from app.schemas.auth import MessageOut
 from app.schemas.venue import (
@@ -129,3 +130,46 @@ def list_audit_logs(
         }
         for log, user in rows
     ]
+
+
+# --- 系统设置 (K-V) ---
+@router.get("/system-settings")
+def list_system_settings(
+    _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> list[dict]:
+    rows = db.scalars(select(SystemSetting).order_by(SystemSetting.key)).all()
+    return [
+        {"key": r.key, "value": r.value, "description": r.description}
+        for r in rows
+    ]
+
+
+@router.put("/system-settings/{key}")
+def upsert_system_setting(
+    key: str,
+    payload: dict,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    if "value" not in payload:
+        raise HTTPException(status_code=422, detail="缺少 value 字段")
+    value = str(payload["value"])
+    description = payload.get("description")
+    # 业务校验：寒暑假默认周数 5-8
+    if key == "trailing_vacation_weeks":
+        try:
+            v = int(value)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="value 必须为整数") from None
+        if v < 5 or v > 8:
+            raise HTTPException(status_code=422, detail="寒暑假默认周数必须在 5-8 之间")
+    row = db.get(SystemSetting, key)
+    if row is None:
+        row = SystemSetting(key=key, value=value, description=description)
+        db.add(row)
+    else:
+        row.value = value
+        if description is not None:
+            row.description = description
+    db.commit()
+    return {"key": key, "value": value, "description": description}

@@ -3,6 +3,7 @@
 from app.db.base import Base
 from app.models.audit import AuditLog
 from app.models.availability import AvailabilityBlock, AvailabilityRequest
+from app.models.config import SystemSetting
 from app.models.constraint import PersonConstraint
 from app.models.enums import (
     AssignmentSource,
@@ -53,6 +54,7 @@ from app.models.venue_task import VenueTask
 __all__ = [
     "Base",
     "AuditLog",
+    "SystemSetting",
     "ImportBatch",
     "PersonProfile",
     "PersonConstraint",

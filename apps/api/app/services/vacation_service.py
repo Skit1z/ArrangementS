@@ -14,6 +14,29 @@ from app.services.intervals import merge_intervals
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 
+# 寒暑假默认周数：用于没有任何后续学期可推算时使用，可由 settings 模块调整
+DEFAULT_TRAILING_VACATION_WEEKS = 6
+MIN_VACATION_WEEKS = 5
+MAX_VACATION_WEEKS = 8
+
+
+def get_default_trailing_vacation_weeks(db: Session | None = None) -> int:
+    """读取运行期配置的"末个学期寒暑假默认周数"，缺省返回 6。
+
+    若系统设置表 (system_settings) 存在可读取对应键，否则使用 DEFAULT_TRAILING_VACATION_WEEKS。
+    """
+    if db is None:
+        return DEFAULT_TRAILING_VACATION_WEEKS
+    try:
+        from app.models.config import SystemSetting
+        row = db.get(SystemSetting, "trailing_vacation_weeks")
+        if row and row.value:
+            v = int(row.value)
+            return max(MIN_VACATION_WEEKS, min(MAX_VACATION_WEEKS, v))
+    except Exception:
+        pass
+    return DEFAULT_TRAILING_VACATION_WEEKS
+
 
 def sync_vacation_periods(db: Session) -> list[VacationPeriod]:
     """根据已有学期的首周周一和周数，自动计算并同步学期之间的寒暑假区间。"""
@@ -22,6 +45,8 @@ def sync_vacation_periods(db: Session) -> list[VacationPeriod]:
     semesters = list(db.scalars(select(Semester).order_by(Semester.first_monday.asc())))
     if not semesters:
         return list(db.scalars(select(VacationPeriod).order_by(VacationPeriod.start_date.desc())))
+
+    trailing_weeks = get_default_trailing_vacation_weeks(db)
 
     for i in range(len(semesters)):
         sem_i = semesters[i]
@@ -32,7 +57,7 @@ def sync_vacation_periods(db: Session) -> list[VacationPeriod]:
             vac_end = next_sem.first_monday - timedelta(days=1)
         else:
             vac_start = sem_i_end
-            vac_end = sem_i_end + timedelta(weeks=8) - timedelta(days=1)
+            vac_end = sem_i_end + timedelta(weeks=trailing_weeks) - timedelta(days=1)
 
         if vac_start > vac_end:
             continue
