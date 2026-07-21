@@ -1290,14 +1290,14 @@ function SystemSettingsTab() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery<SystemSettingItem[]>({
     queryKey: ["admin", "system-settings"],
-    queryFn: async () => (await api.get<SystemSettingItem[]>("/config/system-settings")).data,
+    queryFn: async () => (await api.get<SystemSettingItem[]>("/system-settings")).data,
   });
   const [editing, setEditing] = useState<SystemSettingItem | null>(null);
   const [form] = Form.useForm<{ value: string; description: string }>();
 
   const updateM = useMutation({
     mutationFn: async (v: { key: string; value: string; description: string }) =>
-      (await api.put(`/config/system-settings/${v.key}`, v)).data,
+      (await api.put(`/system-settings/${v.key}`, v)).data,
     onSuccess: () => {
       message.success("已保存");
       setEditing(null);
@@ -1387,7 +1387,7 @@ function AuditLogsTab() {
   const [limit, setLimit] = useState(50);
   const { data, isLoading } = useQuery<AuditLogItem[]>({
     queryKey: ["admin", "audit-logs", limit],
-    queryFn: async () => (await api.get<AuditLogItem[]>("/config/audit-logs", { params: { limit } })).data,
+    queryFn: async () => (await api.get<AuditLogItem[]>("/audit-logs", { params: { limit } })).data,
   });
 
   return (
