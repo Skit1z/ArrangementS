@@ -327,4 +327,3 @@ def test_consecutive_shift_reward_prefers_same_person():
     # 在 4 个岗位中，p1 与 p2 同人，p3 与 p4 同人（且工时各 240min 保持均衡）
     assert result.assignments["p1"] == result.assignments["p2"]
     assert result.assignments["p3"] == result.assignments["p4"]
-

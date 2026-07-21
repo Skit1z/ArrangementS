@@ -97,7 +97,9 @@ def _do_unassign(db: Session, plan: WeeklyPlan, op: dict) -> None:
     raw_slot_id = op.get("slot_id")
     raw_pos = op.get("position_index")
     if not raw_slot_id or raw_pos is None:
-        raise HTTPException(status_code=422, detail="取消分配操作缺少必要的 slot_id 或 position_index")
+        raise HTTPException(
+            status_code=422, detail="取消分配操作缺少必要的 slot_id 或 position_index"
+        )
     try:
         slot_id = uuid.UUID(str(raw_slot_id))
         position_index = int(raw_pos)
@@ -128,7 +130,9 @@ def _do_assign(
     raw_pos = op.get("position_index")
     raw_person_id = op.get("person_id")
     if not raw_slot_id or raw_pos is None or not raw_person_id:
-        raise HTTPException(status_code=422, detail="分配操作缺少必要的 slot_id, position_index 或 person_id")
+        raise HTTPException(
+            status_code=422, detail="分配操作缺少必要的 slot_id, position_index 或 person_id"
+        )
     try:
         slot_id = uuid.UUID(str(raw_slot_id))
         position_index = int(raw_pos)

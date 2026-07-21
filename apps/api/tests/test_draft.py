@@ -388,8 +388,9 @@ def test_draft_invalid_operations_raises_422(db_session):
             db_session,
             week_start=MONDAY,
             expected_version=plan.version,
-            operations=[{"op": "assign", "slot_id": "invalid-uuid", "position_index": 0, "person_id": None}],
+            operations=[
+                {"op": "assign", "slot_id": "invalid-uuid", "position_index": 0, "person_id": None}
+            ],
             actor_id=None,
         )
     assert ei.value.status_code == 422
-
