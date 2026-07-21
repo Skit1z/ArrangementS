@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.availability import AvailabilityBlock
@@ -21,7 +21,6 @@ from app.models.enums import (
     AvailabilityStatus,
     PersonStatus,
     PlanAssignmentStatus,
-    SlotSourceType,
 )
 from app.models.person import PersonProfile
 from app.models.schedule import Assignment, DutySlot
@@ -162,7 +161,7 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
         .join(DutySlot, Assignment.duty_slot_id == DutySlot.id)
         .where(
             DutySlot.weekly_plan_id == plan.id,
-            or_(DutySlot.is_locked.is_(True), DutySlot.source_type == SlotSourceType.manual),
+            DutySlot.is_locked.is_(True),
             Assignment.person_id.is_not(None),
         )
     )

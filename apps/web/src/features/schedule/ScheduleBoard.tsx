@@ -236,15 +236,14 @@ export default function ScheduleBoard({
   function clearAll() {
     Modal.confirm({
       title: "确定清空当前所有排班吗？",
-      content: "该操作将清空本周草稿中的所有人员安排，保存后生效。",
+      content: "该操作将清空本周草稿中的所有人员安排（包含锁定/手工安排），保存草稿后生效。",
       okText: "确定清空",
       okType: "danger",
       cancelText: "取消",
       onOk: () => {
         const next = { ...board };
         for (const key of Object.keys(next)) {
-          const slot = slotsById[parsePosKey(key).slotId];
-          if (!slot?.is_locked) next[key] = null;
+          next[key] = null;
         }
         pushHistory(next);
       },

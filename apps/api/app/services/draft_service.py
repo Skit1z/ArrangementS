@@ -108,7 +108,7 @@ def _do_unassign(db: Session, plan: WeeklyPlan, op: dict) -> None:
 
     slot = _slot_of(db, plan, slot_id)
     if slot.is_locked:
-        raise HTTPException(status_code=422, detail="锁定岗位不可修改，请先解锁")
+        slot.is_locked = False
     a = _assignment_at(db, slot, position_index)
     if a is None:
         return
@@ -142,7 +142,7 @@ def _do_assign(
 
     slot = _slot_of(db, plan, slot_id)
     if slot.is_locked:
-        raise HTTPException(status_code=422, detail="锁定岗位不可修改，请先解锁")
+        slot.is_locked = False
     forced = bool(op.get("forced", False))
     forced_reason = (op.get("forced_reason") or "").strip()
 
