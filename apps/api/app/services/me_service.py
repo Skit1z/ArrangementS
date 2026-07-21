@@ -152,7 +152,10 @@ def next_duty(db: Session, person_id: uuid.UUID) -> dict | None:
 
 
 def get_current_on_duty_staff(db: Session) -> list[dict]:
-    """获取当前时刻正处于在岗值班状态的人员及其联系电话（高效 SQL 过滤）。"""
+    """获取当前时刻正处于在岗值班状态的人员及其联系电话（高效 SQL 过滤）。
+
+    每条记录同时返回同场地的「前/后一班」在岗人员（仅已发布计划），便于前端展示。
+    """
     now_beijing = datetime.now(BEIJING_TZ)
 
     stmt = (
@@ -186,7 +189,20 @@ def get_current_on_duty_staff(db: Session) -> list[dict]:
                 "full_name": person.full_name,
                 "class_name": person.class_name,
                 "phone": person.phone,
+                "previous_shift": _adjacent_shift_people_public(
+                    db, venue.id, slot.slot_start_at, find_next=False
+                ),
+                "next_shift": _adjacent_shift_people_public(
+                    db, venue.id, slot.slot_end_at, find_next=True
+                ),
             }
         )
 
     return current_items
+
+
+def _adjacent_shift_people_public(
+    db: Session, venue_id: uuid.UUID, reference_time: datetime, find_next: bool
+) -> list[dict]:
+    """在岗人员展示中获取同场地前/后一班信息（仅展示姓名+班级+电话，敏感字段已剔除）。"""
+    return _adjacent_shift_people(db, venue_id, reference_time, find_next)

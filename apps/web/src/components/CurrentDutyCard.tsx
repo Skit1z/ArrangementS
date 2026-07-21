@@ -1,27 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Card, Empty, Skeleton, Space, Tag } from "antd";
+import { Badge, Card, Empty, Skeleton, Space } from "antd";
 import { ClockCircleOutlined, PhoneOutlined, UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { useEffect, useState } from "react";
 import { adminApi, type CurrentDutyItem } from "@/features/admin/api";
-
-export function LiveClock() {
-  const [timeStr, setTimeStr] = useState(() => dayjs().format("YYYY-MM-DD HH:mm:ss ddd"));
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeStr(dayjs().format("YYYY-MM-DD HH:mm:ss ddd"));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <Space size={4} style={{ color: "#888", fontWeight: 500, fontSize: 12 }}>
-      <ClockCircleOutlined />
-      <span>{timeStr}</span>
-    </Space>
-  );
-}
 
 export function CurrentDutyCard() {
   const { data, isLoading } = useQuery<CurrentDutyItem[]>({
@@ -39,10 +20,9 @@ export function CurrentDutyCard() {
       title={
         <Space>
           <Badge status="processing" color="green" />
-          <span style={{ fontWeight: 600, fontSize: 15 }}>当前在岗 / 实时值班人员</span>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>当前值班人员</span>
         </Space>
       }
-      extra={<LiveClock />}
       style={{ marginBottom: 16, borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
     >
       {isLoading ? (
@@ -63,6 +43,11 @@ export function CurrentDutyCard() {
               slotStart && slotEnd
                 ? `${dayjs(slotStart).format("HH:mm")} - ${dayjs(slotEnd).format("HH:mm")}`
                 : "";
+            const slotDate = slotStart ? dayjs(slotStart).format("MM-DD") : "";
+
+            // 取同一场地的第一项的 previous/next shift（这些字段后端已下发到每条记录）
+            const previousShift = venueItems[0]?.previous_shift ?? [];
+            const nextShift = venueItems[0]?.next_shift ?? [];
 
             return (
               <div
@@ -74,14 +59,37 @@ export function CurrentDutyCard() {
                   border: "1px solid #f0f0f0",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 10,
+                    flexWrap: "wrap",
+                    gap: 6,
+                  }}
+                >
                   <span style={{ fontWeight: 600, color: "#1F497D", fontSize: 14 }}>
                     📍 {venueName}
                   </span>
                   {timeRange && (
-                    <Tag color="blue" style={{ margin: 0 }}>
-                      在岗时段：{timeRange}
-                    </Tag>
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        background: "linear-gradient(135deg, #1677ff 0%, #4096ff 100%)",
+                        color: "#fff",
+                        fontWeight: 600,
+                        fontSize: 13,
+                        padding: "4px 12px",
+                        borderRadius: 14,
+                        boxShadow: "0 2px 6px rgba(22, 119, 255, 0.25)",
+                      }}
+                    >
+                      <ClockCircleOutlined />
+                      <span>{slotDate && `${slotDate} `}{timeRange}</span>
+                    </div>
                   )}
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
@@ -101,7 +109,9 @@ export function CurrentDutyCard() {
                     >
                       <UserOutlined style={{ color: "#52c41a", fontSize: 16 }} />
                       <span style={{ fontWeight: 600, fontSize: 14 }}>{item.full_name}</span>
-                      <span style={{ fontSize: 12, color: "#888" }}>（{item.class_name}）</span>
+                      {item.class_name ? (
+                        <span style={{ fontSize: 12, color: "#888" }}>（{item.class_name}）</span>
+                      ) : null}
                       {item.phone ? (
                         <a
                           href={`tel:${item.phone}`}
@@ -124,6 +134,43 @@ export function CurrentDutyCard() {
                     </div>
                   ))}
                 </div>
+
+                {/* 前/后一班提示 */}
+                {(previousShift.length > 0 || nextShift.length > 0) && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      paddingTop: 10,
+                      borderTop: "1px dashed #e0e0e0",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 16,
+                      fontSize: 12,
+                      color: "#666",
+                    }}
+                  >
+                    {previousShift.length > 0 && (
+                      <div>
+                        <span style={{ color: "#8c8c8c" }}>上一班：</span>
+                        <span style={{ color: "#262626", fontWeight: 500 }}>
+                          {previousShift
+                            .map((p) => `${p.full_name}${p.phone ? `(${p.phone})` : ""}`)
+                            .join("、")}
+                        </span>
+                      </div>
+                    )}
+                    {nextShift.length > 0 && (
+                      <div>
+                        <span style={{ color: "#8c8c8c" }}>下一班：</span>
+                        <span style={{ color: "#262626", fontWeight: 500 }}>
+                          {nextShift
+                            .map((p) => `${p.full_name}${p.phone ? `(${p.phone})` : ""}`)
+                            .join("、")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

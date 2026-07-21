@@ -671,4 +671,12 @@ export interface CurrentDutyItem {
   full_name: string;
   class_name: string;
   phone: string;
+  previous_shift?: ShiftPersonItem[];
+  next_shift?: ShiftPersonItem[];
+}
+
+export interface ShiftPersonItem {
+  full_name: string;
+  class_name: string | null;
+  phone: string | null;
 }
