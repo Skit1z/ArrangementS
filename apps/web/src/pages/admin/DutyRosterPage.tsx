@@ -1,23 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  App,
-  Button,
-  Card,
-  DatePicker,
-  Empty,
-  Space,
-  Spin,
-  Tag,
-} from "antd";
-import {
-  DownloadOutlined,
-  CameraOutlined,
-  CalendarOutlined,
-} from "@ant-design/icons";
+import { App, Button, Card, DatePicker, Empty, Space, Spin, Tag } from "antd";
+import { DownloadOutlined, CameraOutlined, CalendarOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
 
+import { api } from "@/api/client";
 import { adminApi, type Semester } from "@/features/admin/api";
 import type { SlotView, WeekView } from "@/features/schedule/types";
 
@@ -28,8 +16,11 @@ function mondayOf(d: Dayjs): string {
 
 function computeWeekLabel(weekStartStr: string, semesters: Semester[]): string {
   const target = dayjs(weekStartStr);
-  if (!semesters || semesters.length === 0) return `${target.format("YYYY年")} 第 ${target.isoWeek()} 周`;
-  const sorted = [...semesters].sort((a, b) => dayjs(a.first_monday).diff(dayjs(b.first_monday)));
+  if (!semesters || semesters.length === 0)
+    return `${target.format("YYYY年")} 第 ${target.isoWeek()} 周`;
+  const sorted = [...semesters].sort((a, b) =>
+    dayjs(a.first_monday).diff(dayjs(b.first_monday)),
+  );
   for (const sem of sorted) {
     const s = dayjs(sem.first_monday);
     const e = s.add(sem.week_count, "week");
@@ -48,18 +39,21 @@ function computeWeekLabel(weekStartStr: string, semesters: Semester[]): string {
   return `${target.format("YYYY年")} 第 ${target.isoWeek()} 周`;
 }
 
-/** 按 venue + day 聚合成矩阵 */
-function buildMatrix(slots: SlotView[], venueNames: Map<string, string>) {
+function buildMatrix(
+  slots: SlotView[],
+  venueNames: Map<string, string>,
+  phoneMap: Map<string, string>,
+) {
   const days: string[] = [];
   const venueMap = new Map<string, string>();
-  const matrix: Record<string, Record<string, string[]>> = {};
-
+  const matrix: Record<string, Record<string, { name: string; phone: string }[]>> = {};
   const normalSlots = slots.filter((s) => s.source_type === "fixed_shift");
 
   for (const slot of normalSlots) {
     const date = dayjs(slot.slot_start_at).format("MM-DD (ddd)");
     if (!days.includes(date)) days.push(date);
-    if (!venueMap.has(slot.venue_id)) venueMap.set(slot.venue_id, venueNames.get(slot.venue_id) ?? slot.venue_id);
+    if (!venueMap.has(slot.venue_id))
+      venueMap.set(slot.venue_id, venueNames.get(slot.venue_id) ?? slot.venue_id);
   }
 
   for (const [vid] of venueMap) {
@@ -72,11 +66,14 @@ function buildMatrix(slots: SlotView[], venueNames: Map<string, string>) {
     for (const [vid] of venueMap) {
       if (!matrix[vid][date]) matrix[vid][date] = [];
     }
-    const names = slot.assignments
+    const entries = slot.assignments
       .filter((a) => a.person_name)
-      .map((a) => a.person_name!);
+      .map((a) => ({
+        name: a.person_name!,
+        phone: phoneMap.get(a.person_id ?? "") ?? "",
+      }));
     if (slot.venue_id in matrix && date in matrix[slot.venue_id]) {
-      matrix[slot.venue_id][date].push(...names);
+      matrix[slot.venue_id][date].push(...entries);
     }
   }
 
@@ -93,43 +90,65 @@ export default function DutyRosterPage() {
     queryFn: adminApi.semesters.list,
   });
 
-  const weekQuery = useQuery<WeekView>({
-    queryKey: ["schedule", "weeks", weekStart],
-    queryFn: async () => {
-      const res = await import("@/api/client").then((m) => m.api);
-      return (await res.get<WeekView>(`/schedule/weeks/${weekStart}`)).data;
-    },
-    enabled: !!weekStart,
-  });
-
   const venuesQ = useQuery({
     queryKey: ["admin", "venues"],
     queryFn: adminApi.venues.list,
   });
 
+  const peopleQ = useQuery({
+    queryKey: ["admin", "people"],
+    queryFn: adminApi.people.list,
+  });
+
+  const weekQuery = useQuery<WeekView>({
+    queryKey: ["schedule", "weeks", weekStart],
+    queryFn: async () => (await api.get<WeekView>(`/schedule/weeks/${weekStart}`)).data,
+    enabled: !!weekStart,
+  });
+
   const venueNameMap = new Map((venuesQ.data ?? []).map((v) => [v.id, v.name]));
+  const phoneMap = new Map((peopleQ.data ?? []).map((p) => [p.id, p.phone ?? ""]));
 
   const handleExportExcel = () => {
     if (!weekQuery.data) return;
     try {
-      const { days, venueMap: vm, matrix } = buildMatrix(weekQuery.data.slots, venueNameMap);
-      const BOM = "\uFEFF";
-      const header = ["场地", ...days];
-      const rows = Array.from(vm).map(([vid, name]) => {
-        const cells = days.map((d) => (matrix[vid]?.[d] ?? []).join("、"));
+      const { days, venueMap, matrix } = buildMatrix(
+        weekQuery.data.slots,
+        venueNameMap,
+        phoneMap,
+      );
+
+      // 使用 HTML 表格生成格式化 Excel
+      const rows = Array.from(venueMap).map(([vid, name]) => {
+        const cells = days.map((d) => {
+          const entries = matrix[vid]?.[d] ?? [];
+          return entries.map((e) => (e.phone ? `${e.name} ${e.phone}` : e.name)).join("\n");
+        });
         return [name, ...cells];
       });
-      const csv = BOM + [header, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        table { border-collapse: collapse; font-family: 'Microsoft YaHei', SimHei, sans-serif; }
+        th { background: #1F497D; color: #fff; font-weight: 600; padding: 8px 10px; border: 1px solid #1F497D; text-align: center; font-size: 13px; }
+        td { padding: 8px 10px; border: 1px solid #b8cce4; text-align: center; font-size: 12px; vertical-align: middle; white-space: pre-line; }
+        tr:nth-child(even) td { background: #f5f8fc; }
+        tr:nth-child(odd) td { background: #ffffff; }
+        td:first-child { font-weight: 700; background: #e9edf4; color: #1F497D; min-width: 80px; }
+      </style></head><body><table>
+        <thead><tr><th>场地</th>${days.map((d) => `<th>${d}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c || "—"}</td>`).join("")}</tr>`).join("")}</tbody>
+      </table></body></html>`;
+
+      const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `值班表_${weekStart}.csv`;
+      a.download = `${weekQuery.data.week_label ?? "值班表"}_${weekStart}.xls`;
       a.click();
       URL.revokeObjectURL(url);
-      message.success("值班表 CSV 已导出（可用 Excel 打开）");
+      message.success("值班表已导出（Excel 格式）");
     } catch {
-      message.error("导出 CSV 失败");
+      message.error("导出失败");
     }
   };
 
@@ -169,10 +188,19 @@ export default function DutyRosterPage() {
             allowClear={false}
             format="YYYY-MM-DD"
           />
-          <Button icon={<DownloadOutlined />} onClick={handleExportExcel} disabled={!weekQuery.data}>
+          <Button
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={handleExportExcel}
+            disabled={!weekQuery.data}
+          >
             导出 Excel
           </Button>
-          <Button icon={<CameraOutlined />} onClick={handleExportImage} disabled={!weekQuery.data}>
+          <Button
+            icon={<CameraOutlined />}
+            onClick={handleExportImage}
+            disabled={!weekQuery.data}
+          >
             导出图片
           </Button>
         </Space>
@@ -186,7 +214,6 @@ export default function DutyRosterPage() {
         <Empty description={`${wl} — 暂无排班数据`} style={{ margin: "40px 0" }} />
       ) : (
         <div ref={printRef}>
-          {/* 标题区块 */}
           <div style={{ textAlign: "center", marginBottom: 16 }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1F497D" }}>
               值班安排表
@@ -202,10 +229,14 @@ export default function DutyRosterPage() {
             </Tag>
           </div>
 
-          {/* 表格 */}
           {(() => {
-            const { days, venueMap: vm, matrix } = buildMatrix(weekQuery.data.slots, venueNameMap);
-            if (vm.size === 0) return <Empty description="本周暂无固定班次数据" />;
+            const { days, venueMap, matrix } = buildMatrix(
+              weekQuery.data.slots,
+              venueNameMap,
+              phoneMap,
+            );
+            if (venueMap.size === 0)
+              return <Empty description="本周暂无固定班次数据" />;
 
             return (
               <div style={{ overflowX: "auto" }}>
@@ -223,7 +254,8 @@ export default function DutyRosterPage() {
                         style={{
                           border: "1px solid #d9d9d9",
                           padding: "8px 12px",
-                          background: "#f0f5ff",
+                          background: "#1F497D",
+                          color: "#fff",
                           fontWeight: 600,
                           minWidth: 90,
                         }}
@@ -236,7 +268,8 @@ export default function DutyRosterPage() {
                           style={{
                             border: "1px solid #d9d9d9",
                             padding: "8px 12px",
-                            background: "#f0f5ff",
+                            background: "#1F497D",
+                            color: "#fff",
                             fontWeight: 600,
                             minWidth: 100,
                           }}
@@ -247,21 +280,22 @@ export default function DutyRosterPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {Array.from(vm).map(([vid, name]) => (
+                    {Array.from(venueMap).map(([vid, name]) => (
                       <tr key={vid}>
                         <td
                           style={{
                             border: "1px solid #d9d9d9",
                             padding: "8px 12px",
                             fontWeight: 600,
-                            background: "#fafafa",
+                            background: "#e9edf4",
                             textAlign: "center",
+                            color: "#1F497D",
                           }}
                         >
                           {name}
                         </td>
                         {days.map((d) => {
-                          const ppl = matrix[vid]?.[d] ?? [];
+                          const entries = matrix[vid]?.[d] ?? [];
                           return (
                             <td
                               key={d}
@@ -272,14 +306,33 @@ export default function DutyRosterPage() {
                                 minWidth: 100,
                               }}
                             >
-                              {ppl.length > 0 ? (
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
-                                  {ppl.map((name, i) => (
-                                    <Tag key={i} color="blue" style={{ margin: 0 }}>
-                                      {name}
-                                    </Tag>
-                                  ))}
-                                </div>
+                              {entries.length > 0 ? (
+                                entries.map((e, i) => (
+                                  <div
+                                    key={i}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 6,
+                                      margin: "2px 3px",
+                                      padding: "2px 8px",
+                                      borderRadius: 4,
+                                      background: "#e6f4ff",
+                                      border: "1px solid #91caff",
+                                      fontSize: 12,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    <span style={{ fontWeight: 600, color: "#1F497D" }}>
+                                      {e.name}
+                                    </span>
+                                    {e.phone && (
+                                      <span style={{ color: "#666", fontSize: 11 }}>
+                                        {e.phone}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))
                               ) : (
                                 <span style={{ color: "#d9d9d9" }}>—</span>
                               )}

@@ -281,6 +281,7 @@ export interface AdminPerson {
   full_name: string;
   student_no: string;
   class_name: string;
+  phone: string;
   status: string;
 }
 
