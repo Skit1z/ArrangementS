@@ -12,6 +12,7 @@ import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 
 import { router } from "@/router";
+import { antdTheme } from "@/theme";
 
 // 注册 Day.js 周数计算与高级格式化插件，避免 Antd DatePicker picker="week" 报 s.isoWeek is not a function 错误
 dayjs.extend(isoWeek);
@@ -28,7 +29,7 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider locale={zhCN} theme={antdTheme}>
       <AntdApp>
         <QueryClientProvider client={queryClient}>
           <RouterProvider router={router} />

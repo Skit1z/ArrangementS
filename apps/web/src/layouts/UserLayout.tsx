@@ -5,6 +5,7 @@ import {
 } from "@ant-design/icons";
 import { Layout } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { colors } from "@/theme";
 
 // 移动端底部导航
 const tabs = [
@@ -18,8 +19,8 @@ export default function UserLayout() {
   const location = useLocation();
 
   return (
-    <Layout style={{ minHeight: "100vh", maxWidth: 640, margin: "0 auto", background: "#fff" }}>
-      <Layout.Content style={{ padding: 16, paddingBottom: 72 }}>
+    <Layout style={{ minHeight: "100vh", maxWidth: 640, margin: "0 auto", background: colors.bgPage }}>
+      <Layout.Content style={{ padding: "16px 16px 80px" }}>
         <Outlet />
       </Layout.Content>
       <div
@@ -31,8 +32,8 @@ export default function UserLayout() {
           maxWidth: 640,
           margin: "0 auto",
           display: "flex",
-          borderTop: "1px solid #eee",
-          background: "#fff",
+          borderTop: `1px solid ${colors.borderLight}`,
+          background: colors.bgContainer,
         }}
       >
         {tabs.map((t) => {
@@ -44,13 +45,13 @@ export default function UserLayout() {
               style={{
                 flex: 1,
                 textAlign: "center",
-                padding: "10px 0",
-                color: active ? "#1677ff" : "#888",
+                padding: "8px 0 6px",
+                color: active ? colors.primary : colors.textTertiary,
                 cursor: "pointer",
               }}
             >
-              <div style={{ fontSize: 20 }}>{t.icon}</div>
-              <div style={{ fontSize: 12 }}>{t.label}</div>
+              <div style={{ fontSize: 20, lineHeight: 1.4 }}>{t.icon}</div>
+              <div style={{ fontSize: 12, fontWeight: active ? 600 : 400 }}>{t.label}</div>
             </div>
           );
         })}

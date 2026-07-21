@@ -12,6 +12,7 @@ import { Button, Layout, Menu } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/stores/auth";
+import { colors } from "@/theme";
 
 const items = [
   { key: "/admin/home", icon: <HomeOutlined />, label: "首页" },
@@ -34,23 +35,54 @@ export default function AdminLayout() {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <Layout.Sider theme="light" breakpoint="lg" collapsedWidth="0">
-        <div style={{ height: 48, margin: 16, fontWeight: 600 }}>排班管理后台</div>
+      <Layout.Sider
+        theme="light"
+        breakpoint="lg"
+        collapsedWidth="0"
+        style={{ borderRight: `1px solid ${colors.borderLight}` }}
+      >
+        <div
+          style={{
+            height: 56,
+            display: "flex",
+            alignItems: "center",
+            padding: "0 20px",
+            fontWeight: 600,
+            fontSize: 15,
+            color: colors.textPrimary,
+            borderBottom: `1px solid ${colors.borderLight}`,
+            letterSpacing: 0.5,
+          }}
+        >
+          排班管理后台
+        </div>
         <Menu
           mode="inline"
           selectedKeys={[location.pathname]}
           items={items}
           onClick={(e) => navigate(e.key)}
+          style={{ borderInlineEnd: "none", padding: "8px 8px" }}
         />
       </Layout.Sider>
       <Layout>
-        <Layout.Header style={{ background: "#fff", display: "flex", justifyContent: "flex-end", alignItems: "center", paddingRight: 24 }}>
-          <span style={{ marginRight: 16 }}>{user?.username}</span>
+        <Layout.Header
+          style={{
+            background: colors.bgContainer,
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            paddingRight: 24,
+            borderBottom: `1px solid ${colors.borderLight}`,
+            height: 56,
+            lineHeight: "normal",
+          }}
+        >
+          <span style={{ marginRight: 16, color: colors.textSecondary, fontSize: 13 }}>{user?.username}</span>
           <Button icon={<LogoutOutlined />} onClick={() => logout().then(() => navigate("/login"))}>
             退出
           </Button>
         </Layout.Header>
-        <Layout.Content style={{ margin: 16 }}>
+        <Layout.Content style={{ padding: "20px 24px", maxWidth: 1280, width: "100%", margin: "0 auto" }}>
           <Outlet />
         </Layout.Content>
       </Layout>

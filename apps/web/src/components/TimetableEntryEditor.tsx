@@ -3,6 +3,7 @@ import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useState } from "react";
 
 import type { ParsedEntry } from "@/features/me/api";
+import { colors } from "@/theme";
 
 const WEEKDAYS = [
   { value: 1, label: "周一" },
@@ -189,8 +190,8 @@ export function TimetableEntryEditor({ value, onChange }: Props) {
                             transition: "all 0.2s",
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#f0f7ff";
-                            e.currentTarget.style.color = "#1677ff";
+                            e.currentTarget.style.background = colors.primaryBg;
+                            e.currentTarget.style.color = colors.primary;
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.background = "transparent";

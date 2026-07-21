@@ -1,6 +1,7 @@
 import { ClockCircleOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
+import { cardShadow, colors, fontSize, radius } from "@/theme";
 
 export function BeijingTimeBanner() {
   const [timeStr, setTimeStr] = useState(() => dayjs().format("YYYY年MM月DD日 HH:mm:ss ddd"));
@@ -15,28 +16,39 @@ export function BeijingTimeBanner() {
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, #1F497D 0%, #1677ff 100%)",
-        color: "#fff",
-        borderRadius: 12,
-        padding: "16px 22px",
-        marginBottom: 20,
+        background: colors.bgContainer,
+        border: `1px solid ${colors.borderLight}`,
+        borderRadius: radius.card,
+        padding: "14px 20px",
+        marginBottom: 16,
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        boxShadow: "0 4px 16px rgba(22, 119, 255, 0.18)",
+        boxShadow: cardShadow,
       }}
     >
       <div>
-        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-          <ClockCircleOutlined />
+        <div
+          style={{
+            fontSize: fontSize.caption,
+            color: colors.textTertiary,
+            marginBottom: 2,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <ClockCircleOutlined style={{ fontSize: 12 }} />
           <span>实时北京时间</span>
         </div>
         <div
           style={{
-            fontSize: 26,
-            fontWeight: 700,
-            letterSpacing: 1.2,
+            fontSize: fontSize.display,
+            fontWeight: 600,
+            letterSpacing: 0.5,
+            color: colors.textPrimary,
             fontFamily: "'SF Mono', Consolas, Monaco, monospace, sans-serif",
+            fontVariantNumeric: "tabular-nums",
           }}
         >
           {timeStr}

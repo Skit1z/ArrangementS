@@ -9,6 +9,7 @@ import {
   SyncOutlined,
 } from "@ant-design/icons";
 import { api } from "@/api/client";
+import { cardShadow, colors, radius } from "@/theme";
 
 interface SystemStatus {
   status: string;
@@ -35,8 +36,8 @@ export function SystemStatusCard() {
       size="small"
       title={
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>
-            <HddOutlined style={{ marginRight: 6, color: "#1677ff" }} />
+          <span style={{ fontWeight: 600, fontSize: 14, color: colors.textPrimary }}>
+            <HddOutlined style={{ marginRight: 6, color: colors.textTertiary }} />
             系统构建与存活状态
           </span>
           {isLoading ? (
@@ -61,10 +62,10 @@ export function SystemStatusCard() {
       }
       bordered={false}
       style={{
-        borderRadius: 10,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-        marginBottom: 20,
-        background: "linear-gradient(135deg, #ffffff 0%, #fafafa 100%)",
+        borderRadius: radius.card,
+        boxShadow: cardShadow,
+        marginBottom: 16,
+        background: colors.bgContainer,
       }}
     >
       <Row gutter={[16, 12]} align="middle">

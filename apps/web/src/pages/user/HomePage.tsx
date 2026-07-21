@@ -8,6 +8,7 @@ import { useAuth } from "@/stores/auth";
 import { CurrentDutyCard } from "@/components/CurrentDutyCard";
 import { BeijingTimeBanner } from "@/components/BeijingTimeBanner";
 import { SystemStatusCard } from "@/components/SystemStatusCard";
+import { colors } from "@/theme";
 
 export default function HomePage() {
   const user = useAuth((s) => s.user);
@@ -38,11 +39,11 @@ export default function HomePage() {
         size="small"
         hoverable
         onClick={() => navigate("/app/timetable")}
-        style={{ marginBottom: 12, background: "#e6f4ff", border: "1px solid #91caff" }}
+        style={{ marginBottom: 12 }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontWeight: 600 }}>📄 上传我的课表 PDF</span>
-          <span style={{ color: "#1677ff" }}>去上传 →</span>
+          <span style={{ fontWeight: 600, color: colors.textPrimary }}>上传我的课表 PDF</span>
+          <span style={{ color: colors.primary, fontSize: 13 }}>去上传 →</span>
         </div>
       </Card>
 
@@ -83,7 +84,7 @@ export default function HomePage() {
         hoverable
         onClick={() => navigate("/app/hours")}
         style={{ marginBottom: 12 }}
-        extra={<span style={{ color: "#1677ff", fontSize: 13 }}>详情 →</span>}
+        extra={<span style={{ color: colors.primary, fontSize: 13 }}>详情 →</span>}
       >
         {hours.isLoading ? (
           <Skeleton active paragraph={{ rows: 1 }} />

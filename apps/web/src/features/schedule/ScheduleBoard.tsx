@@ -32,6 +32,7 @@ import {
   type WeekView,
 } from "./types";
 import { adminApi, TASK_STATUS_COLOR, TASK_STATUS_LABEL, type Venue } from "@/features/admin/api";
+import { colors } from "@/theme";
 
 const MAX_HISTORY = 50;
 
@@ -622,7 +623,7 @@ export default function ScheduleBoard({
                   width: 6,
                   cursor: "col-resize",
                   zIndex: 1020,
-                  background: isResizing ? "#1890ff" : "transparent",
+                  background: isResizing ? colors.primary : "transparent",
                   transition: "background 0.2s",
                 }}
                 onMouseDown={startResize}
@@ -636,7 +637,7 @@ export default function ScheduleBoard({
                   height: 6,
                   cursor: "row-resize",
                   zIndex: 1020,
-                  background: isResizingHeight ? "#1890ff" : "transparent",
+                  background: isResizingHeight ? colors.primary : "transparent",
                   transition: "background 0.2s",
                 }}
                 onMouseDown={startResizeHeight}

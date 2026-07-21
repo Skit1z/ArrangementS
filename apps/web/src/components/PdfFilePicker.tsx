@@ -1,5 +1,6 @@
 import { App, Spin } from "antd";
 import { useState } from "react";
+import { colors } from "@/theme";
 
 interface Props {
   disabled?: boolean;
@@ -55,9 +56,9 @@ export function PdfFilePicker({
       onDrop={handleDrop}
       style={{
         position: "relative",
-        border: `2px dashed ${isDragOver ? "#1677ff" : disabled ? "#d9d9d9" : "#91caff"}`,
+        border: `2px dashed ${isDragOver ? colors.primary : disabled ? "#d9d9d9" : colors.primaryBorder}`,
         borderRadius: 8,
-        background: isDragOver ? "#e6f4ff" : disabled ? "#fafafa" : "#f0f7ff",
+        background: isDragOver ? colors.primaryBg : disabled ? "#fafafa" : colors.bgFill,
         padding: "28px 16px",
         textAlign: "center",
         cursor: disabled || isPending ? "not-allowed" : "pointer",
@@ -88,8 +89,8 @@ export function PdfFilePicker({
         <Spin tip="正在智能解析 PDF 课表，请稍候..." />
       ) : (
         <>
-          <p style={{ fontSize: 42, color: disabled ? "#ccc" : "#1677ff", margin: "4px 0" }}>📄</p>
-          <p style={{ color: disabled ? "#999" : "#1677ff", margin: "6px 0", fontWeight: 600, fontSize: 16 }}>
+          <p style={{ fontSize: 42, color: disabled ? "#ccc" : colors.primary, margin: "4px 0" }}>📄</p>
+          <p style={{ color: disabled ? "#999" : colors.primary, margin: "6px 0", fontWeight: 600, fontSize: 16 }}>
             {disabled ? disabledReason || "当前不可上传" : "点击此区域选择 或 拖拽 PDF 课表文件至此"}
           </p>
           <p style={{ color: "#888", fontSize: 13, margin: "4px 0 0" }}>

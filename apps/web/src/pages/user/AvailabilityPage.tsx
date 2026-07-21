@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 
 import { errorMessage } from "@/api/client";
 import { meApi, STATUS_COLOR, STATUS_LABEL } from "@/features/me/api";
+import { colors } from "@/theme";
 
 interface FormValues {
   range: [Dayjs, Dayjs];
@@ -115,7 +116,7 @@ export default function AvailabilityPage({ hideTitle }: { hideTitle?: boolean })
                     </Tag>
                   </div>
                   <div style={{ fontSize: 12, color: "#888" }}>{r.reason}</div>
-                  {r.recurrence_rule && <div style={{ fontSize: 12, color: "#1677ff" }}>每周重复</div>}
+                  {r.recurrence_rule && <div style={{ fontSize: 12, color: colors.primary }}>每周重复</div>}
                 </div>
               </List.Item>
             )}

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import dayjs from "dayjs";
 import PersonChip from "./PersonChip";
 import type { Board, WeekPerson, WeekView } from "./types";
+import { colors } from "@/theme";
 
 interface Props {
   week?: WeekView;
@@ -91,7 +92,7 @@ export default function PersonDrawer({
         border: "1px solid #e8e8e8",
         borderRadius: 8,
         boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-        outline: isOver ? "2px solid #1677ff" : "none",
+        outline: isOver ? `2px solid ${colors.primary}` : "none",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -105,15 +106,14 @@ export default function PersonDrawer({
         style={{
           height: 44,
           padding: "0 14px",
-          background: "linear-gradient(135deg, #1F497D 0%, #1677ff 100%)",
+          background: colors.primary,
           color: "#fff",
-          borderBottom: collapsed ? "none" : "1px solid #102A45",
+          borderBottom: collapsed ? "none" : "1px solid rgba(0,0,0,0.15)",
           cursor: "grab",
           userSelect: "none",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
           whiteSpace: "nowrap",
           overflow: "hidden",
           boxSizing: "border-box",
@@ -148,11 +148,10 @@ export default function PersonDrawer({
             collapsed
               ? {
                   background: "#fff",
-                  color: "#1677ff",
+                  color: colors.primary,
                   fontWeight: 700,
                   borderColor: "#fff",
                   borderRadius: 14,
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                   whiteSpace: "nowrap",
                   flexShrink: 0,
                 }

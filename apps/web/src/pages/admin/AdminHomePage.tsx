@@ -13,6 +13,7 @@ import { BeijingTimeBanner } from "@/components/BeijingTimeBanner";
 import { CurrentDutyCard } from "@/components/CurrentDutyCard";
 import { SystemStatusCard } from "@/components/SystemStatusCard";
 import { adminApi, type Semester } from "@/features/admin/api";
+import { cardShadow, colors, radius } from "@/theme";
 
 interface CurrentWeek {
   week: number;
@@ -99,34 +100,34 @@ export default function AdminHomePage() {
       <CurrentDutyCard />
 
       {/* 统计指标卡片 */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={8} md={8}>
-          <Card size="small" bordered={false} style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+          <Card size="small" style={{ borderRadius: radius.card, boxShadow: cardShadow }}>
             <Statistic
               title="在岗人员"
               value={activePeopleCount}
               suffix="人"
-              prefix={<TeamOutlined style={{ color: "#1890ff" }} />}
+              prefix={<TeamOutlined style={{ color: colors.primary }} />}
             />
           </Card>
         </Col>
 
         <Col xs={24} sm={8} md={8}>
-          <Card size="small" bordered={false} style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+          <Card size="small" style={{ borderRadius: radius.card, boxShadow: cardShadow }}>
             <Statistic
               title="当前学期"
               value={currentSemester?.name ?? "未设置"}
-              prefix={<ClockCircleOutlined style={{ color: "#fa8c16" }} />}
+              prefix={<ClockCircleOutlined style={{ color: colors.textTertiary }} />}
             />
           </Card>
         </Col>
 
         <Col xs={24} sm={8} md={8}>
-          <Card size="small" bordered={false} style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+          <Card size="small" style={{ borderRadius: radius.card, boxShadow: cardShadow }}>
             <Statistic
               title="当前周数"
               value={currentWeek?.label ?? "—"}
-              prefix={<NumberOutlined style={{ color: "#722ed1" }} />}
+              prefix={<NumberOutlined style={{ color: colors.textTertiary }} />}
             />
           </Card>
         </Col>
@@ -136,8 +137,7 @@ export default function AdminHomePage() {
       <Card
         size="small"
         title={<span style={{ fontWeight: 600 }}>快捷管理操作</span>}
-        bordered={false}
-        style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)", marginBottom: 20 }}
+        style={{ borderRadius: radius.card, boxShadow: cardShadow, marginBottom: 16 }}
       >
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12}>
@@ -148,18 +148,18 @@ export default function AdminHomePage() {
               onClick={() => navigate("/admin/schedule")}
               style={{
                 height: 60,
-                borderRadius: 8,
+                borderRadius: radius.inner,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                background: "#fff",
+                background: colors.bgContainer,
               }}
             >
               <div style={{ textAlign: "left" }}>
-                <div style={{ fontWeight: 600, fontSize: 15, color: "#262626" }}>查看本周值班表</div>
-                <div style={{ fontSize: 12, opacity: 0.7, color: "#595959" }}>进入周排班大盘查看及调整值班安排</div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: colors.textPrimary }}>查看本周值班表</div>
+                <div style={{ fontSize: 12, color: colors.textTertiary }}>进入周排班大盘查看及调整值班安排</div>
               </div>
-              <RightOutlined style={{ color: "#8c8c8c" }} />
+              <RightOutlined style={{ color: colors.textTertiary }} />
             </Button>
           </Col>
 
@@ -171,18 +171,18 @@ export default function AdminHomePage() {
               onClick={() => navigate(currentWeek ? `/admin/timetables?week=${currentWeek.week}` : "/admin/timetables")}
               style={{
                 height: 60,
-                borderRadius: 8,
+                borderRadius: radius.inner,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                background: "#fff",
+                background: colors.bgContainer,
               }}
             >
               <div style={{ textAlign: "left" }}>
-                <div style={{ fontWeight: 600, fontSize: 15, color: "#262626" }}>查看本周无课表</div>
-                <div style={{ fontSize: 12, opacity: 0.7, color: "#595959" }}>查看全员课程安排及空闲时间段</div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: colors.textPrimary }}>查看本周无课表</div>
+                <div style={{ fontSize: 12, color: colors.textTertiary }}>查看全员课程安排及空闲时间段</div>
               </div>
-              <RightOutlined style={{ color: "#8c8c8c" }} />
+              <RightOutlined style={{ color: colors.textTertiary }} />
             </Button>
           </Col>
         </Row>

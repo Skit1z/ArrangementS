@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import PersonChip from "./PersonChip";
 import { VERDICT_COLOR, type DropVerdict } from "./conflicts";
 import { type Board, posKey, type SlotView } from "./types";
+import { colors } from "@/theme";
 
 interface Props {
   slot: SlotView;
@@ -38,7 +39,7 @@ function Position({
           borderRadius: 4,
           marginBottom: 3,
           boxSizing: "border-box",
-          outline: isOver && !verdict ? "1px solid #1677ff" : "none",
+          outline: isOver && !verdict ? `1px solid ${colors.primary}` : "none",
         }}
       >
         <PersonChip
@@ -91,7 +92,7 @@ function Position({
         fontSize: 12,
         fontWeight,
         boxSizing: "border-box",
-        outline: isOver && !verdict ? "1px solid #1677ff" : "none",
+        outline: isOver && !verdict ? `1px solid ${colors.primary}` : "none",
       }}
     >
       {text}
