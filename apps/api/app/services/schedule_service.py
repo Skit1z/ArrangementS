@@ -57,6 +57,13 @@ def generate(db: Session, week_start: date, actor_id: uuid.UUID | None, seed: in
     if plan.status == PlanStatus.published:
         raise HTTPException(status_code=409, detail="已发布计划请使用重新优化或增量排班")
 
+    # 自动解锁无有效人员分配的空缺锁定岗位，避免无人员锁定阻塞生成
+    for s in list(db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))):
+        if s.is_locked:
+            has_assigned_person = any(a.person_id is not None for a in s.assignments)
+            if not has_assigned_person:
+                s.is_locked = False
+
     # 草稿重建只清除自动生成且未锁定的岗位；手工岗位和锁定岗位必须保留。
     for s in list(db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))):
         if not s.is_locked and s.source_type != SlotSourceType.manual:
@@ -70,10 +77,26 @@ def generate(db: Session, week_start: date, actor_id: uuid.UUID | None, seed: in
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if result.status not in {"OPTIMAL", "FEASIBLE"}:
-        raise HTTPException(
-            status_code=409,
-            detail="锁定分配与当前排班约束冲突，请先解锁冲突岗位后再生成",
+        from app.models.person import PersonProfile
+
+        conflicts_msg = []
+        for pos_id, person_id in solver_input.locked.items():
+            slot_id_str, _pidx = pos_id.split(":", 1)
+            slot_obj = db.get(DutySlot, uuid.UUID(slot_id_str))
+            person_obj = db.get(PersonProfile, uuid.UUID(person_id))
+            if person_obj and slot_obj:
+                if not eligibility.check_person_available_for_slot(db, person_obj, slot_obj):
+                    conflicts_msg.append(
+                        f"{person_obj.full_name} 在 {slot_obj.slot_start_at.strftime('%m-%d %H:%M')} 的锁定岗位存在冲突"
+                    )
+        detail = (
+            "锁定分配与当前排班约束冲突（"
+            + "；".join(conflicts_msg)
+            + "），请先解锁冲突岗位后再生成"
+            if conflicts_msg
+            else "锁定分配与当前排班约束冲突，请先解锁冲突岗位后再生成"
         )
+        raise HTTPException(status_code=409, detail=detail)
 
     _persist_assignments(db, plan, result, actor_id)
 

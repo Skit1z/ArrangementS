@@ -2,7 +2,6 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
-  closestCenter,
   pointerWithin,
   rectIntersection,
   useSensor,
@@ -59,14 +58,15 @@ export function compactBoard(board: Board): Board {
 }
 
 /**
- * 人员标签很小、位置槽较窄，纯矩形相交常常判不到目标。
- * 优先用指针位置命中，落空再退回矩形相交 / 最近中心。
+ * 优先使用指针位置命中，其次使用矩形相交；
+ * 当拖拽在空白区域释放（未相交任何槽位或抽屉）时返回空数组，触发拖落空删除操作。
  */
 const collisionDetection: CollisionDetection = (args) => {
   const pointerHits = pointerWithin(args);
   if (pointerHits.length > 0) return pointerHits;
   const rectHits = rectIntersection(args);
-  return rectHits.length > 0 ? rectHits : closestCenter(args);
+  if (rectHits.length > 0) return rectHits;
+  return [];
 };
 
 interface Props {
