@@ -119,7 +119,7 @@ def _do_unassign(db: Session, plan: WeeklyPlan, op: dict) -> None:
     a.weighted_minutes_before_round = Decimal(0)
     a.credited_minutes = 0
     a.balance_minutes = 0
-    a.version += 1
+    a.version = (a.version or 0) + 1
     db.flush()
 
 
@@ -206,7 +206,7 @@ def _do_assign(
     existing.credited_minutes = credited
     existing.balance_minutes = credited
     existing.forced_reason = forced_reason or None
-    existing.version += 1
+    existing.version = (existing.version or 0) + 1
     db.flush()
 
     if forced:
