@@ -24,6 +24,7 @@ W_HOURS_BALANCE = 1000  # 月度工时均衡（主目标，原权重）
 W_WEEKEND_BALANCE = 200  # 周末/节假日次数均衡
 W_SHIFT_TYPE_BALANCE = 150  # 早班/晚班次数均衡
 W_VENUE_BALANCE = 150  # 场地（蓝厅/图书馆）任务次数均衡
+W_CONSECUTIVE_REWARD = 100  # 连班正向奖励权重（鼓励一人连值两班）
 W_PREFERENCE = 50  # 个人偏好（软目标，违反降分）
 
 
@@ -83,6 +84,25 @@ def _overlapping_position_pairs(positions: list[Position]) -> list[tuple[int, in
             if (
                 positions[i].start_at < positions[j].end_at
                 and positions[j].start_at < positions[i].end_at
+            ):
+                pairs.append((i, j))
+    return pairs
+
+
+def _consecutive_position_pairs(positions: list[Position]) -> list[tuple[int, int]]:
+    """找出同一场地、同一天且时间衔接（间隔 <= 30 分钟）的相邻岗位对。"""
+    pairs: list[tuple[int, int]] = []
+    for i in range(len(positions)):
+        pi = positions[i]
+        for j in range(len(positions)):
+            if i == j:
+                continue
+            pj = positions[j]
+            if (
+                pi.venue_id == pj.venue_id
+                and pi.start_at.date() == pj.start_at.date()
+                and pi.end_at <= pj.start_at
+                and (pj.start_at - pi.end_at).total_seconds() <= 1800
             ):
                 pairs.append((i, j))
     return pairs
@@ -230,6 +250,18 @@ def solve(data: SolverInput) -> SolverResult:
                 if (person, idx) in x and (pos.id == key or pos.venue_id == key):
                     pref_terms.append(-x[(person, idx)] * score)  # 偏好加分=目标减分
 
+    # 连续班次奖励（同一人在同一场地连续值两班）
+    consec_terms = []
+    for i, j in _consecutive_position_pairs(positions):
+        for person in persons:
+            vi, vj = x.get((person, i)), x.get((person, j))
+            if vi is not None and vj is not None:
+                b = model.NewBoolVar(f"consec_{person}_{i}_{j}")
+                model.Add(b <= vi)
+                model.Add(b <= vj)
+                model.Add(b >= vi + vj - 1)
+                consec_terms.append(-W_CONSECUTIVE_REWARD * b)
+
     # 确定性微扰打破平局（可复现）
     rng = random.Random(data.seed)
     tie_terms = []
@@ -243,6 +275,7 @@ def solve(data: SolverInput) -> SolverResult:
         W_HOURS_BALANCE * (max_m - min_m),
         sum(tie_terms),
         sum(pref_terms),
+        sum(consec_terms),
     ]
     if weekend_max is not None and weekend_min is not None:
         objective_terms.append(W_WEEKEND_BALANCE * (weekend_max - weekend_min))

@@ -300,14 +300,15 @@ export default function ScheduleBoard({
     const overId = String(e.over?.id ?? "");
     const fromKey = person.from.startsWith("pos:") ? person.from.slice(4) : null;
 
-    // 拖回抽屉 -> 取消安排
-    if (overId === "drawer") {
-      if (!fromKey) return;
-      const next = { ...board, [fromKey]: null };
-      pushHistory(next);
+    // 拖到空白区域 / 拖回抽屉 / 释放在非槽位区域 -> 从原岗位删除
+    if (!overId.startsWith("pos:")) {
+      if (fromKey) {
+        const next = { ...board, [fromKey]: null };
+        pushHistory(next);
+        message.info(`已移除 ${person.name} 在该班次的安排`);
+      }
       return;
     }
-    if (!overId.startsWith("pos:")) return;
 
     const targetKey = overId.slice(4);
     if (targetKey === fromKey) return;
@@ -362,6 +363,53 @@ export default function ScheduleBoard({
 
       if (reason) setForcedReasons((m) => ({ ...m, [targetKey]: reason }));
       pushHistory(next);
+
+      // 检测相邻连续班次，提示一键连排
+      const consecSlot = week.slots.find((s) => {
+        if (s.id === slot.id || s.venue_id !== slot.venue_id) return false;
+        if (!dayjs(s.slot_start_at).isSame(dayjs(slot.slot_start_at), "day")) return false;
+        const gap = Math.abs(dayjs(s.slot_start_at).diff(dayjs(slot.slot_end_at), "minute"));
+        const gapBack = Math.abs(dayjs(slot.slot_start_at).diff(dayjs(s.slot_end_at), "minute"));
+        return gap <= 30 || gapBack <= 30;
+      });
+
+      if (consecSlot) {
+        let openIdx = -1;
+        for (let i = 0; i < consecSlot.required_people; i++) {
+          if (!next[`${consecSlot.id}:${i}`]) {
+            openIdx = i;
+            break;
+          }
+        }
+        if (openIdx >= 0) {
+          const openKey = `${consecSlot.id}:${openIdx}`;
+          const check = evaluateDrop(
+            person.id,
+            consecSlot,
+            openKey,
+            next,
+            slotsById,
+            peopleById[person.id],
+            null,
+          );
+          if (check.verdict === "ok" || check.verdict === "preference") {
+            Modal.confirm({
+              title: "顺便安排连续班次？",
+              content: `${person.name} 已安排于 ${dayjs(slot.slot_start_at).format("HH:mm")}–${dayjs(slot.slot_end_at).format("HH:mm")}。相邻班次 (${dayjs(consecSlot.slot_start_at).format("HH:mm")}–${dayjs(consecSlot.slot_end_at).format("HH:mm")}) 尚有空缺，是否顺便连排两班？`,
+              okText: "顺便连排",
+              cancelText: "暂不",
+              onOk: () => {
+                const doubleNext = {
+                  ...next,
+                  [openKey]: { person_id: person.id, person_name: person.name },
+                };
+                pushHistory(doubleNext);
+                message.success(`已顺便将 ${person.name} 安排至相邻连班 (${dayjs(consecSlot.slot_start_at).format("HH:mm")}–${dayjs(consecSlot.slot_end_at).format("HH:mm")})`);
+              },
+            });
+          }
+        }
+      }
     };
 
     if (verdict === "hard") {
@@ -555,6 +603,8 @@ export default function ScheduleBoard({
           )}
 
           <PersonDrawer
+            week={week}
+            board={board}
             people={people}
             focusSlotId={focusSlotId}
             collapsed={drawerCollapsed}

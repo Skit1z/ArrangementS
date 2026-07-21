@@ -3,10 +3,13 @@ import { DownOutlined, UpOutlined } from "@ant-design/icons";
 import { Button, Empty, Input, Select, Space, Tooltip } from "antd";
 import { useMemo, useState } from "react";
 
+import dayjs from "dayjs";
 import PersonChip from "./PersonChip";
-import type { WeekPerson } from "./types";
+import type { Board, WeekPerson, WeekView } from "./types";
 
 interface Props {
+  week?: WeekView;
+  board?: Board;
   people: WeekPerson[];
   /** 当前拖拽悬停的岗位（用于按该岗位可用性过滤） */
   focusSlotId: string | null;
@@ -20,6 +23,8 @@ function hours(minutes: number) {
 }
 
 export default function PersonDrawer({
+  week,
+  board,
   people,
   focusSlotId,
   collapsed,
@@ -38,6 +43,35 @@ export default function PersonDrawer({
     () => Array.from(new Set(people.map((p) => p.class_name))).sort(),
     [people],
   );
+
+  const consecutivePersonIds = useMemo(() => {
+    if (!focusSlotId || !week || !board) return new Set<string>();
+    const slot = week.slots.find((s) => s.id === focusSlotId);
+    if (!slot) return new Set<string>();
+
+    const slotStart = dayjs(slot.slot_start_at);
+    const slotEnd = dayjs(slot.slot_end_at);
+
+    // 寻找同一场地、同一天、时间衔接（间隔 <= 30 min）的相邻班次
+    const adjSlots = week.slots.filter((s) => {
+      if (s.id === slot.id || s.venue_id !== slot.venue_id) return false;
+      if (!dayjs(s.slot_start_at).isSame(slotStart, "day")) return false;
+      const gap1 = Math.abs(dayjs(s.slot_end_at).diff(slotStart, "minute"));
+      const gap2 = Math.abs(dayjs(s.slot_start_at).diff(slotEnd, "minute"));
+      return gap1 <= 30 || gap2 <= 30;
+    });
+
+    const set = new Set<string>();
+    for (const adj of adjSlots) {
+      for (let i = 0; i < adj.required_people; i++) {
+        const occ = board[`${adj.id}:${i}`];
+        if (occ?.person_id) {
+          set.add(occ.person_id);
+        }
+      }
+    }
+    return set;
+  }, [focusSlotId, week, board]);
 
   const filtered = useMemo(() => {
     return people.filter((p) => {
@@ -168,19 +202,22 @@ export default function PersonDrawer({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(105px, 1fr))", gap: 6 }}>
               {filtered.map((p) => {
                 const unavailable = focusSlotId ? p.unavailable_slot_ids.includes(focusSlotId) : false;
+                const isConsecutive = consecutivePersonIds.has(p.person_id);
                 return (
                   <Tooltip
                     key={p.person_id}
                     title={`${p.class_name} · 本周 ${p.week_shift_count} 班${
-                      unavailable ? " · 该岗位不可用" : ""
-                    }${p.in_scheduling_pool ? "" : " · 未参与自动排班"}`}
+                      isConsecutive ? " · ⚡相邻班次已排（推荐连班）" : ""
+                    }${unavailable ? " · 该岗位不可用" : ""}${
+                      p.in_scheduling_pool ? "" : " · 未参与自动排班"
+                    }`}
                   >
                     <div>
                       <PersonChip
                         id={`drawer:${p.person_id}`}
                         personId={p.person_id}
-                        label={`${p.full_name} ${hours(p.month_balance_minutes)}h`}
-                        color={unavailable ? "red" : p.in_scheduling_pool ? "blue" : "orange"}
+                        label={`${p.full_name}${isConsecutive ? " ⚡连班" : ""} ${hours(p.month_balance_minutes)}h`}
+                        color={unavailable ? "red" : isConsecutive ? "green" : p.in_scheduling_pool ? "blue" : "orange"}
                         compact
                       />
                     </div>

@@ -271,3 +271,60 @@ def test_preference_soft_objective_preferred_person_picked():
         )
     )
     assert result.assignments["p0"] == "a"
+
+
+def test_consecutive_shift_reward_prefers_same_person():
+    """测试同场地连续两个班次在保证工时均衡的前提下优先排同一个人。"""
+    from datetime import datetime
+    from app.scheduling.solver import Position, SolverInput, solve
+
+    # 第 1 天 2 连班，第 2 天 2 连班
+    p1 = Position(
+        id="p1",
+        slot_id="s1",
+        month_key="2026-03",
+        credited_minutes=120,
+        venue_id="HL",
+        start_at=datetime(2026, 3, 2, 8, 0),
+        end_at=datetime(2026, 3, 2, 10, 0),
+    )
+    p2 = Position(
+        id="p2",
+        slot_id="s2",
+        month_key="2026-03",
+        credited_minutes=120,
+        venue_id="HL",
+        start_at=datetime(2026, 3, 2, 10, 0),
+        end_at=datetime(2026, 3, 2, 12, 0),
+    )
+    p3 = Position(
+        id="p3",
+        slot_id="s3",
+        month_key="2026-03",
+        credited_minutes=120,
+        venue_id="HL",
+        start_at=datetime(2026, 3, 3, 8, 0),
+        end_at=datetime(2026, 3, 3, 10, 0),
+    )
+    p4 = Position(
+        id="p4",
+        slot_id="s4",
+        month_key="2026-03",
+        credited_minutes=120,
+        venue_id="HL",
+        start_at=datetime(2026, 3, 3, 10, 0),
+        end_at=datetime(2026, 3, 3, 12, 0),
+    )
+    persons = ["a", "b"]
+    positions = [p1, p2, p3, p4]
+    result = solve(
+        SolverInput(
+            positions=positions,
+            persons=persons,
+            available={(p, pos.id): True for p in persons for pos in positions},
+        )
+    )
+    # 在 4 个岗位中，p1 与 p2 同人，p3 与 p4 同人（且工时各 240min 保持均衡）
+    assert result.assignments["p1"] == result.assignments["p2"]
+    assert result.assignments["p3"] == result.assignments["p4"]
+

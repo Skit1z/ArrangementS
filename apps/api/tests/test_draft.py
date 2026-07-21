@@ -378,3 +378,18 @@ def test_week_people_returns_unavailable_slots(db_session):
     assert str(slot.id) in me["unavailable_slot_ids"]
     other = next(r for r in rows if r["person_id"] == str(ps[1].id))
     assert str(slot.id) not in other["unavailable_slot_ids"]
+
+
+def test_draft_invalid_operations_raises_422(db_session):
+    _setup(db_session, templates=1, people=2)
+    plan = schedule_service.get_plan(db_session, MONDAY)
+    with pytest.raises(HTTPException) as ei:
+        draft_service.apply_operations(
+            db_session,
+            week_start=MONDAY,
+            expected_version=plan.version,
+            operations=[{"op": "assign", "slot_id": "invalid-uuid", "position_index": 0, "person_id": None}],
+            actor_id=None,
+        )
+    assert ei.value.status_code == 422
+

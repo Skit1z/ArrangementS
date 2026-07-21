@@ -94,10 +94,20 @@ def apply_operations(
 
 
 def _do_unassign(db: Session, plan: WeeklyPlan, op: dict) -> None:
-    slot = _slot_of(db, plan, uuid.UUID(op["slot_id"]))
+    raw_slot_id = op.get("slot_id")
+    raw_pos = op.get("position_index")
+    if not raw_slot_id or raw_pos is None:
+        raise HTTPException(status_code=422, detail="取消分配操作缺少必要的 slot_id 或 position_index")
+    try:
+        slot_id = uuid.UUID(str(raw_slot_id))
+        position_index = int(raw_pos)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422, detail="取消分配操作的参数格式无效")
+
+    slot = _slot_of(db, plan, slot_id)
     if slot.is_locked:
         raise HTTPException(status_code=422, detail="锁定岗位不可修改，请先解锁")
-    a = _assignment_at(db, slot, int(op["position_index"]))
+    a = _assignment_at(db, slot, position_index)
     if a is None:
         return
     a.person_id = None
@@ -114,11 +124,21 @@ def _do_unassign(db: Session, plan: WeeklyPlan, op: dict) -> None:
 def _do_assign(
     db: Session, plan: WeeklyPlan, op: dict, actor_id: uuid.UUID | None, engine_rules
 ) -> None:
-    slot = _slot_of(db, plan, uuid.UUID(op["slot_id"]))
+    raw_slot_id = op.get("slot_id")
+    raw_pos = op.get("position_index")
+    raw_person_id = op.get("person_id")
+    if not raw_slot_id or raw_pos is None or not raw_person_id:
+        raise HTTPException(status_code=422, detail="分配操作缺少必要的 slot_id, position_index 或 person_id")
+    try:
+        slot_id = uuid.UUID(str(raw_slot_id))
+        position_index = int(raw_pos)
+        person_id = uuid.UUID(str(raw_person_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422, detail="分配操作的参数格式无效")
+
+    slot = _slot_of(db, plan, slot_id)
     if slot.is_locked:
         raise HTTPException(status_code=422, detail="锁定岗位不可修改，请先解锁")
-    position_index = int(op["position_index"])
-    person_id = uuid.UUID(op["person_id"])
     forced = bool(op.get("forced", False))
     forced_reason = (op.get("forced_reason") or "").strip()
 

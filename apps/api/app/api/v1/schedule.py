@@ -78,6 +78,7 @@ def save_draft(
         actor_id=actor.id,
     )
     db.commit()
+    db.expire_all()
     return schedule_service.serialize_week(db, plan)
 
 
