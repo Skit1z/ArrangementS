@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # AES-256-GCM 字段级加密密钥：base64(32 字节)。为空时启动即报错（生产必须提供）。
     field_encryption_key: str = Field(default="", alias="FIELD_ENCRYPTION_KEY")
 
-    access_token_ttl_minutes: int = Field(default=60, alias="ACCESS_TOKEN_TTL_MINUTES")
+    access_token_ttl_minutes: int = Field(default=240, alias="ACCESS_TOKEN_TTL_MINUTES")
     refresh_token_ttl_days: int = Field(default=14, alias="REFRESH_TOKEN_TTL_DAYS")
 
     file_storage_path: str = Field(default="./var/files", alias="FILE_STORAGE_PATH")

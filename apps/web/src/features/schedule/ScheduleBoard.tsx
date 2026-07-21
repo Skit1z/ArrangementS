@@ -108,7 +108,9 @@ export default function ScheduleBoard({
   const [forcedReasons, setForcedReasons] = useState<Record<PositionKey, string>>({});
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(260);
+  const [drawerHeight, setDrawerHeight] = useState(520);
   const [isResizing, setIsResizing] = useState(false);
+  const [isResizingHeight, setIsResizingHeight] = useState(false);
   const [drawerPos, setDrawerPos] = useState({ x: window.innerWidth - 290, y: 120 });
   const [isDraggingPos, setIsDraggingPos] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -116,6 +118,11 @@ export default function ScheduleBoard({
   const startResize = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
+  };
+
+  const startResizeHeight = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingHeight(true);
   };
 
   const startDrag = (e: React.MouseEvent) => {
@@ -145,6 +152,26 @@ export default function ScheduleBoard({
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isResizing]);
+
+  useEffect(() => {
+    if (!isResizingHeight) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const headerH = 44;
+      const newHeight = e.clientY - drawerPos.y - headerH;
+      if (newHeight > 200 && newHeight < 900) {
+        setDrawerHeight(newHeight);
+      }
+    };
+    const handleMouseUp = () => {
+      setIsResizingHeight(false);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizingHeight, drawerPos.y]);
 
   useEffect(() => {
     if (!isDraggingPos) return;
@@ -578,27 +605,43 @@ export default function ScheduleBoard({
             left: drawerPos.x,
             top: drawerPos.y,
             width: drawerWidth,
-            height: drawerCollapsed ? 44 : 520,
+            height: drawerCollapsed ? 44 : drawerHeight,
             zIndex: 1000,
-            transition: isResizing || isDraggingPos ? "none" : "left 0.2s, top 0.2s, width 0.2s, height 0.2s",
+            transition: isResizing || isResizingHeight || isDraggingPos ? "none" : "left 0.2s, top 0.2s, width 0.2s, height 0.2s",
             overflow: "visible",
           }}
         >
           {!drawerCollapsed && (
-            <div
-              style={{
-                position: "absolute",
-                left: -3,
-                top: 0,
-                bottom: 0,
-                width: 6,
-                cursor: "col-resize",
-                zIndex: 1020,
-                background: isResizing ? "#1890ff" : "transparent",
-                transition: "background 0.2s",
-              }}
-              onMouseDown={startResize}
-            />
+            <>
+              <div
+                style={{
+                  position: "absolute",
+                  left: -3,
+                  top: 0,
+                  bottom: 0,
+                  width: 6,
+                  cursor: "col-resize",
+                  zIndex: 1020,
+                  background: isResizing ? "#1890ff" : "transparent",
+                  transition: "background 0.2s",
+                }}
+                onMouseDown={startResize}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: -3,
+                  height: 6,
+                  cursor: "row-resize",
+                  zIndex: 1020,
+                  background: isResizingHeight ? "#1890ff" : "transparent",
+                  transition: "background 0.2s",
+                }}
+                onMouseDown={startResizeHeight}
+              />
+            </>
           )}
 
           <PersonDrawer

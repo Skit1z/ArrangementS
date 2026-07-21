@@ -16,9 +16,9 @@ export function LiveClock() {
   }, []);
 
   return (
-    <Space size={4} style={{ color: "#1677ff", fontWeight: 600, fontSize: 13 }}>
+    <Space size={4} style={{ color: "#888", fontWeight: 500, fontSize: 12 }}>
       <ClockCircleOutlined />
-      <span>北京时间：{timeStr}</span>
+      <span>{timeStr}</span>
     </Space>
   );
 }

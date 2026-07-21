@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarOutlined,
-  CheckCircleOutlined,
   ClockCircleOutlined,
+  NumberOutlined,
   RightOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Col, Row, Statistic } from "antd";
 import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
 import { BeijingTimeBanner } from "@/components/BeijingTimeBanner";
 import { CurrentDutyCard } from "@/components/CurrentDutyCard";
 import { SystemStatusCard } from "@/components/SystemStatusCard";
@@ -28,6 +29,15 @@ export default function AdminHomePage() {
 
   const activePeopleCount = (peopleQuery.data ?? []).filter((p) => p.status === "active").length;
   const currentSemester = (semestersQuery.data ?? []).find((s) => s.is_current);
+
+  // 计算当前周数
+  const currentWeekNum = currentSemester?.first_monday
+    ? (() => {
+        const diff = dayjs().diff(dayjs(currentSemester.first_monday), "day");
+        const week = Math.floor(diff / 7) + 1;
+        return week >= 1 && week <= (currentSemester.week_count || 20) ? week : null;
+      })()
+    : null;
 
   return (
     <div>
@@ -66,9 +76,9 @@ export default function AdminHomePage() {
         <Col xs={24} sm={8} md={8}>
           <Card size="small" bordered={false} style={{ borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
             <Statistic
-              title="首周起始日期"
-              value={currentSemester?.first_monday ?? "—"}
-              prefix={<CheckCircleOutlined style={{ color: "#722ed1" }} />}
+              title="当前周数"
+              value={currentWeekNum ? `第 ${currentWeekNum} 周` : "—"}
+              prefix={<NumberOutlined style={{ color: "#722ed1" }} />}
             />
           </Card>
         </Col>
@@ -105,7 +115,7 @@ export default function AdminHomePage() {
               block
               size="large"
               icon={<CalendarOutlined />}
-              onClick={() => navigate("/admin/timetables")}
+              onClick={() => navigate(currentWeekNum ? `/admin/timetables?week=${currentWeekNum}` : "/admin/timetables")}
               style={{ height: 60, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}
             >
               <div style={{ textAlign: "left" }}>

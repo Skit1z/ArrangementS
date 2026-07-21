@@ -1,12 +1,16 @@
 name: Deploy ArrangementS
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI (Code Quality & Testing)"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
 jobs:
   deploy:
+    # 仅当 CI 通过时才执行部署；手动触发 (workflow_dispatch) 无 conclusion 字段，同样允许执行
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

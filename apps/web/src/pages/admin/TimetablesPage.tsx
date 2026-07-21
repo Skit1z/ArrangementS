@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { App, Button, Card, Modal, Select, Space, Spin, Tag } from "antd";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { errorMessage } from "@/api/client";
 import { PdfFilePicker } from "@/components/PdfFilePicker";
 import { TimetableEntryEditor } from "@/components/TimetableEntryEditor";
@@ -47,6 +48,7 @@ function isRuleActiveOnWeek(rule: CourseRuleOut, targetWeek: number): boolean {
 export default function TimetablesPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const [searchParams] = useSearchParams();
   const { data, isLoading } = useQuery<ActiveTimetableOut[]>({
     queryKey: ["admin", "timetables", "active"],
     queryFn: adminApi.timetables.active,
@@ -59,6 +61,19 @@ export default function TimetablesPage() {
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"busy" | "free">("busy");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
+
+  // 从 URL 参数读取周次
+  useEffect(() => {
+    const weekParam = searchParams.get("week");
+    if (weekParam) {
+      const weekNum = parseInt(weekParam, 10);
+      if (weekNum >= 1 && weekNum <= 20) {
+        setSelectedWeek(weekNum);
+        // 跳转到本周时自动切换到无课表视图
+        setViewMode("free");
+      }
+    }
+  }, [searchParams]);
 
   // admin 代传 state
   const [proxyOpen, setProxyOpen] = useState(false);

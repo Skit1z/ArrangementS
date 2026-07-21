@@ -24,7 +24,7 @@ W_HOURS_BALANCE = 1000  # 月度工时均衡（主目标，原权重）
 W_WEEKEND_BALANCE = 200  # 周末/节假日次数均衡
 W_SHIFT_TYPE_BALANCE = 150  # 早班/晚班次数均衡
 W_VENUE_BALANCE = 150  # 场地（蓝厅/图书馆）任务次数均衡
-W_CONSECUTIVE_REWARD = 100  # 连班正向奖励权重（鼓励一人连值两班）
+W_CONSECUTIVE_REWARD = 400  # 连班正向奖励权重（鼓励一人连值两班）
 W_PREFERENCE = 50  # 个人偏好（软目标，违反降分）
 
 
@@ -58,7 +58,7 @@ class SolverInput:
     preferences: dict[str, dict[str, int]] = field(default_factory=dict)
     allow_vacancy: bool = True
     seed: int = 42
-    max_time_seconds: float = 10.0
+    max_time_seconds: float = 15.0
 
 
 @dataclass
@@ -106,6 +106,155 @@ def _consecutive_position_pairs(positions: list[Position]) -> list[tuple[int, in
             ):
                 pairs.append((i, j))
     return pairs
+
+
+def _add_solution_hint(
+    model: cp_model.CpModel,
+    data: SolverInput,
+    x: dict[tuple[str, int], cp_model.IntVar],
+    positions: list[Position],
+    persons: list[str],
+) -> None:
+    """启发式构造连班优先与工时均衡的贪心初解提示。"""
+    person_shift_count: dict[str, int] = {p: 0 for p in persons}
+    person_assigned_intervals: dict[str, list[tuple[datetime, datetime]]] = {
+        p: [] for p in persons
+    }
+
+    # 1. 优先满足人工锁定
+    for pos_id, person in data.locked.items():
+        pos_obj = next((p for p in positions if p.id == pos_id), None)
+        if pos_obj and person in person_shift_count:
+            person_shift_count[person] += 1
+            person_assigned_intervals[person].append((pos_obj.start_at, pos_obj.end_at))
+
+    consec_pairs = _consecutive_position_pairs(positions)
+    consec_map: dict[int, int] = {}
+    for i, j in consec_pairs:
+        if i not in consec_map:
+            consec_map[i] = j
+
+    assigned_indices: set[int] = set()
+
+    # 阶段 1：优先为每个人匹配一组同天同场地的 2 连班（构造 4.0h 基础工时）
+    for idx, pos in enumerate(positions):
+        if idx in assigned_indices or pos.id in data.locked:
+            continue
+
+        next_idx = consec_map.get(idx)
+        if (
+            next_idx is not None
+            and next_idx not in assigned_indices
+            and positions[next_idx].id not in data.locked
+        ):
+            next_pos = positions[next_idx]
+            best_person = None
+            best_count = 999999
+
+            for person in persons:
+                # 优先给班次少于 2 班（尚未满 4.0h）的人安排
+                if person_shift_count[person] >= 2:
+                    continue
+                if (person, idx) not in x or (person, next_idx) not in x:
+                    continue
+
+                limit = data.weekly_limit.get(person)
+                if limit is not None and person_shift_count[person] + 2 > limit:
+                    continue
+
+                has_overlap = False
+                for st, et in person_assigned_intervals[person]:
+                    if (pos.start_at < et and st < pos.end_at) or (
+                        next_pos.start_at < et and st < next_pos.end_at
+                    ):
+                        has_overlap = True
+                        break
+
+                if not has_overlap and person_shift_count[person] < best_count:
+                    best_count = person_shift_count[person]
+                    best_person = person
+
+            if best_person is not None:
+                model.AddHint(x[(best_person, idx)], 1)
+                model.AddHint(x[(best_person, next_idx)], 1)
+                person_shift_count[best_person] += 2
+                person_assigned_intervals[best_person].append((pos.start_at, pos.end_at))
+                person_assigned_intervals[best_person].append((next_pos.start_at, next_pos.end_at))
+                assigned_indices.add(idx)
+                assigned_indices.add(next_idx)
+
+    # 阶段 2：对剩余岗位按连班或单班轮询平摊分配
+    for idx, pos in enumerate(positions):
+        if idx in assigned_indices or pos.id in data.locked:
+            continue
+
+        next_idx = consec_map.get(idx)
+        if (
+            next_idx is not None
+            and next_idx not in assigned_indices
+            and positions[next_idx].id not in data.locked
+        ):
+            next_pos = positions[next_idx]
+            best_person = None
+            best_count = 999999
+
+            for person in persons:
+                if (person, idx) not in x or (person, next_idx) not in x:
+                    continue
+
+                limit = data.weekly_limit.get(person)
+                if limit is not None and person_shift_count[person] + 2 > limit:
+                    continue
+
+                has_overlap = False
+                for st, et in person_assigned_intervals[person]:
+                    if (pos.start_at < et and st < pos.end_at) or (
+                        next_pos.start_at < et and st < next_pos.end_at
+                    ):
+                        has_overlap = True
+                        break
+
+                if not has_overlap and person_shift_count[person] < best_count:
+                    best_count = person_shift_count[person]
+                    best_person = person
+
+            if best_person is not None:
+                model.AddHint(x[(best_person, idx)], 1)
+                model.AddHint(x[(best_person, next_idx)], 1)
+                person_shift_count[best_person] += 2
+                person_assigned_intervals[best_person].append((pos.start_at, pos.end_at))
+                person_assigned_intervals[best_person].append((next_pos.start_at, next_pos.end_at))
+                assigned_indices.add(idx)
+                assigned_indices.add(next_idx)
+                continue
+
+        # 单班分配降级
+        best_person = None
+        best_count = 999999
+
+        for person in persons:
+            if (person, idx) not in x:
+                continue
+
+            limit = data.weekly_limit.get(person)
+            if limit is not None and person_shift_count[person] >= limit:
+                continue
+
+            has_overlap = False
+            for st, et in person_assigned_intervals[person]:
+                if pos.start_at < et and st < pos.end_at:
+                    has_overlap = True
+                    break
+
+            if not has_overlap and person_shift_count[person] < best_count:
+                best_count = person_shift_count[person]
+                best_person = person
+
+        if best_person is not None:
+            model.AddHint(x[(best_person, idx)], 1)
+            person_shift_count[best_person] += 1
+            person_assigned_intervals[best_person].append((pos.start_at, pos.end_at))
+            assigned_indices.add(idx)
 
 
 def solve(data: SolverInput) -> SolverResult:
@@ -285,6 +434,8 @@ def solve(data: SolverInput) -> SolverResult:
         objective_terms.append(W_VENUE_BALANCE * (venue_max - venue_min))
 
     model.Minimize(sum(objective_terms))
+
+    _add_solution_hint(model, data, x, positions, persons)
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = data.max_time_seconds

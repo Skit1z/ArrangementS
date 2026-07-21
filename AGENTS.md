@@ -1,22 +1,30 @@
 # Agent Guidelines & Rules
 
-## 1. CI Quality Red Line (CI 质量红线)
-- **CI 不通过严禁提交**：在进行任何 `git commit` 或 `git push` 操作前，必须先在本地运行并通过所有 CI 关联的校验（包括前端类型检查与构建 `pnpm --filter meeting-scheduler-web typecheck && pnpm --filter meeting-scheduler-web build`，以及后端代码检查与单元测试 `cd apps/api && uv run ruff check . && uv run pytest`）。
-- 若上述任何一项校验存在报错或失败，**绝对不允许提交或推送代码**，必须先排查修复至全量通过后方可提交。
+## 1. CI Quality Red Line (CI 质量红线) —— 绝对强制
 
-<claude-mem-context>
-# Memory Context
+**CI 不通过，严禁 commit，严禁 push。没有例外。**
 
-# claude-mem status
+在进行任何 `git commit` 或 `git push` 操作前，必须先在本地依次执行并通过以下全部校验，**缺一不可**：
 
-This project has no memory yet. The current session will seed it; subsequent sessions will receive auto-injected context for relevant past work.
+### 前端校验（必须全部通过）
+```bash
+pnpm --filter meeting-scheduler-web typecheck  # TypeScript 类型检查
+pnpm --filter meeting-scheduler-web build      # Vite 生产构建
+```
 
-Memory injection starts on your second session in a project.
+### 后端校验（必须全部通过）
+```bash
+cd apps/api && uv run ruff check .   # Python 代码检查
+cd apps/api && uv run pytest          # 单元测试
+```
 
-`/learn-codebase` is available if the user wants to front-load the entire repo into memory in a single pass (~5 minutes on a typical repo, optional). Otherwise memory builds passively as work happens.
+### 执行顺序与阻断规则
+1. **先跑校验，后 commit** —— 顺序不可颠倒。
+2. 上述四项校验中**任何一项**有报错、警告或失败，**立即停止**，禁止执行 `git commit` 和 `git push`。
+3. 必须先排查并修复所有问题，直到全部零报错通过后，才允许提交。
+4. 不允许 `--no-verify`、`--force` 或任何跳过检查的手段。
+5. 不允许仅部分通过就提交（如仅通过前端校验但后端未通过）。
 
-Live activity: http://localhost:37701
-How it works: `/how-it-works`
-
-This message disappears once the first observation lands.
-</claude-mem-context>
+### GitHub Actions 自动部署依赖
+- 部署 workflow (`deploy.yml`) 已配置为依赖 CI workflow 完成：仅当 CI 在 `main` 分支上**全部通过**后，才会自动触发部署。
+- 手动部署 (`workflow_dispatch`) 不受此限制，但仅限紧急情况使用。

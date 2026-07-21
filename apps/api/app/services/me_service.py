@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,6 +19,7 @@ from app.models.schedule import Assignment, DutySlot, WeeklyPlan
 from app.models.venue import Venue
 
 VISIBLE_PLAN_STATUSES = (PlanAssignmentStatus.assigned, PlanAssignmentStatus.pending)
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 def my_assignments(
@@ -152,7 +153,7 @@ def next_duty(db: Session, person_id: uuid.UUID) -> dict | None:
 
 def get_current_on_duty_staff(db: Session) -> list[dict]:
     """获取当前时刻正处于在岗值班状态的人员及其联系电话（高效 SQL 过滤）。"""
-    now_naive = datetime.now()
+    now_beijing = datetime.now(BEIJING_TZ)
 
     stmt = (
         select(Assignment, DutySlot, Venue, PersonProfile)
@@ -163,8 +164,8 @@ def get_current_on_duty_staff(db: Session) -> list[dict]:
         .where(
             WeeklyPlan.status == PlanStatus.published,
             Assignment.plan_status.in_(VISIBLE_PLAN_STATUSES),
-            DutySlot.slot_start_at <= now_naive,
-            DutySlot.slot_end_at >= now_naive,
+            DutySlot.slot_start_at <= now_beijing,
+            DutySlot.slot_end_at >= now_beijing,
         )
         .order_by(Venue.sort_order, DutySlot.slot_start_at)
     )

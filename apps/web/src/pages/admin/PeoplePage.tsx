@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, List, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TimePicker, Upload } from "antd";
-import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined, UserAddOutlined, EditOutlined } from "@ant-design/icons";
+import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined, UserAddOutlined, EditOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { useState } from "react";
 
 import { adminApi } from "@/features/admin/api";
@@ -114,33 +114,47 @@ export default function PeoplePage() {
           {
             title: "操作",
             key: "action",
-            width: 240,
+            width: 200,
             render: (_, r: Person) => (
-              <Space wrap>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
                 <Button
-                  icon={<EditOutlined />}
+                  type="link"
                   size="small"
+                  icon={<EditOutlined />}
                   onClick={() => setEditingPerson(r)}
+                  style={{ padding: "0 6px", fontSize: 13 }}
                 >
                   编辑
                 </Button>
                 <Button
-                  icon={<SettingOutlined />}
+                  type="link"
                   size="small"
+                  icon={<SettingOutlined />}
                   onClick={() => setRulesPerson(r)}
+                  style={{ padding: "0 6px", fontSize: 13 }}
                 >
                   规则
                 </Button>
                 <Popconfirm
                   title="确定删除该人员及其关联账号？"
                   description="该删除不可撤销，确定操作？"
+                  icon={<ExclamationCircleFilled style={{ color: "#ff4d4f" }} />}
                   onConfirm={() => deletePersonM.mutate(r.id)}
+                  okText="确定删除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
                 >
-                  <Button danger icon={<DeleteOutlined />} size="small">
+                  <Button
+                    type="link"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    style={{ padding: "0 6px", fontSize: 13 }}
+                  >
                     删除
                   </Button>
                 </Popconfirm>
-              </Space>
+              </div>
             ),
           },
         ]}
