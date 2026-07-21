@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,7 +19,6 @@ from app.models.schedule import Assignment, DutySlot, WeeklyPlan
 from app.models.venue import Venue
 
 VISIBLE_PLAN_STATUSES = (PlanAssignmentStatus.assigned, PlanAssignmentStatus.pending)
-BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 def my_assignments(
@@ -105,7 +104,7 @@ def _adjacent_shift_people(
     if slot is None:
         return []
 
-    rows = db.execute(
+    rows = db.scalars(
         select(PersonProfile)
         .join(Assignment, Assignment.person_id == PersonProfile.id)
         .where(
@@ -152,13 +151,11 @@ def next_duty(db: Session, person_id: uuid.UUID) -> dict | None:
 
 
 def get_current_on_duty_staff(db: Session) -> list[dict]:
-    """获取当前时刻正处于在岗值班状态的人员及其联系电话（高效 SQL 过滤）。
+    """获取当前时刻正处于在岗值班状态的人员及其联系电话。
 
     每条记录同时返回同场地的「前/后一班」在岗人员（仅已发布计划），便于前端展示。
     """
-    # 无论服务器时区如何，都取实际北京时间（UTC+8）
     now_utc = datetime.now(timezone.utc)
-    now_beijing = (now_utc + timedelta(hours=8)).replace(tzinfo=BEIJING_TZ)
 
     stmt = (
         select(Assignment, DutySlot, Venue, PersonProfile)
@@ -169,8 +166,6 @@ def get_current_on_duty_staff(db: Session) -> list[dict]:
         .where(
             WeeklyPlan.status == PlanStatus.published,
             Assignment.plan_status.in_(VISIBLE_PLAN_STATUSES),
-            DutySlot.slot_start_at <= now_beijing,
-            DutySlot.slot_end_at >= now_beijing,
         )
         .order_by(Venue.sort_order, DutySlot.slot_start_at)
     )
@@ -179,6 +174,16 @@ def get_current_on_duty_staff(db: Session) -> list[dict]:
 
     current_items: list[dict] = []
     for a, slot, venue, person in rows:
+        # 兼容时区：DB 中如果存的是 naive（SQLite 测试库）则按 UTC 解读
+        s_start = slot.slot_start_at
+        if s_start.tzinfo is None:
+            s_start = s_start.replace(tzinfo=timezone.utc)
+        s_end = slot.slot_end_at
+        if s_end.tzinfo is None:
+            s_end = s_end.replace(tzinfo=timezone.utc)
+        if not (s_start <= now_utc <= s_end):
+            continue
+
         current_items.append(
             {
                 "assignment_id": str(a.id),
