@@ -4,6 +4,8 @@
 
 **CI 不通过，严禁 commit，严禁 push。没有例外。**
 
+> **重要提示**：本地必跑项必须与 `.github/workflows/ci.yml` **逐项对齐**。每次修改 CI workflow 时，必须同步更新下方命令列表，**不得遗漏任何一项**。
+
 在进行任何 `git commit` 或 `git push` 操作前，必须先在本地依次执行并通过以下全部校验，**缺一不可**：
 
 ### 前端校验（必须全部通过）
@@ -14,8 +16,9 @@ pnpm --filter meeting-scheduler-web build      # Vite 生产构建
 
 ### 后端校验（必须全部通过）
 ```bash
-cd apps/api && uv run ruff check .   # Python 代码检查
-cd apps/api && uv run pytest          # 单元测试
+cd apps/api && uv run ruff format --check .   # 格式检查（CI 必跑项，漏掉会被卡！）
+cd apps/api && uv run ruff check .            # 代码检查（lint）
+cd apps/api && uv run pytest                  # 单元测试
 ```
 
 ### 执行顺序与阻断规则

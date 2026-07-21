@@ -117,9 +117,7 @@ def _add_solution_hint(
 ) -> None:
     """启发式构造连班优先与工时均衡的贪心初解提示。"""
     person_shift_count: dict[str, int] = {p: 0 for p in persons}
-    person_assigned_intervals: dict[str, list[tuple[datetime, datetime]]] = {
-        p: [] for p in persons
-    }
+    person_assigned_intervals: dict[str, list[tuple[datetime, datetime]]] = {p: [] for p in persons}
 
     # 1. 优先满足人工锁定
     for pos_id, person in data.locked.items():
