@@ -49,7 +49,13 @@ def mark_plan_changed(db: Session, plan: WeeklyPlan) -> None:
     db.flush()
 
 
-def generate(db: Session, week_start: date, actor_id: uuid.UUID | None, seed: int = 42) -> dict:
+def generate(
+    db: Session,
+    week_start: date,
+    actor_id: uuid.UUID | None,
+    seed: int = 42,
+    clear_locks: bool = False,
+) -> dict:
     if week_start.isoweekday() != 1:
         raise HTTPException(status_code=422, detail="周起始日必须为周一")
 
@@ -57,14 +63,20 @@ def generate(db: Session, week_start: date, actor_id: uuid.UUID | None, seed: in
     if plan.status == PlanStatus.published:
         raise HTTPException(status_code=409, detail="已发布计划请使用重新优化或增量排班")
 
-    # 自动解锁无有效人员分配的空缺锁定岗位，避免无人员锁定阻塞生成
-    for s in list(db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))):
-        if s.is_locked:
+    all_slots = list(db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id)))
+
+    # 若请求强制解锁所有锁定，或自动清除无人员分配的空锁
+    for s in all_slots:
+        if clear_locks:
+            s.is_locked = False
+            if s.source_type == SlotSourceType.manual:
+                s.source_type = SlotSourceType.auto
+        elif s.is_locked:
             has_assigned_person = any(a.person_id is not None for a in s.assignments)
             if not has_assigned_person:
                 s.is_locked = False
 
-    # 草稿重建只清除自动生成且未锁定的岗位；手工岗位和锁定岗位必须保留。
+    # 草稿重建：清除未锁定的岗位
     for s in list(db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id))):
         if not s.is_locked and s.source_type != SlotSourceType.manual:
             db.delete(s)
@@ -87,14 +99,13 @@ def generate(db: Session, week_start: date, actor_id: uuid.UUID | None, seed: in
             if person_obj and slot_obj:
                 if not eligibility.check_person_available_for_slot(db, person_obj, slot_obj):
                     conflicts_msg.append(
-                        f"{person_obj.full_name} 在 {slot_obj.slot_start_at.strftime('%m-%d %H:%M')} 的锁定岗位存在冲突"
+                        f"{person_obj.full_name} 在 {slot_obj.slot_start_at.strftime('%m-%d %H:%M')} 存在约束冲突"
                     )
+        msg_suffix = "。建议在确定重新排班时选择【解锁所有岗位重置】后重新生成。"
         detail = (
-            "锁定分配与当前排班约束冲突（"
-            + "；".join(conflicts_msg)
-            + "），请先解锁冲突岗位后再生成"
+            "锁定分配与当前排班约束冲突（" + "；".join(conflicts_msg) + "）" + msg_suffix
             if conflicts_msg
-            else "锁定分配与当前排班约束冲突，请先解锁冲突岗位后再生成"
+            else "存在锁定人员/班次冲突（如时间重叠或周班次超限）" + msg_suffix
         )
         raise HTTPException(status_code=409, detail=detail)
 

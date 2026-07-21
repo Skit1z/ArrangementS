@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 class GenerateRequest(BaseModel):
     seed: int = 42
+    clear_locks: bool = False
 
 
 class DraftOperation(BaseModel):

@@ -57,7 +57,9 @@ def generate_week(
     actor: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict:
-    summary = schedule_service.generate(db, week_start, actor.id, seed=payload.seed)
+    summary = schedule_service.generate(
+        db, week_start, actor.id, seed=payload.seed, clear_locks=payload.clear_locks
+    )
     db.commit()
     return summary
 

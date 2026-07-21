@@ -132,13 +132,35 @@ export default function SchedulePage() {
   }, [weekQuery.data]);
 
   const generate = useMutation({
-    mutationFn: async () => (await api.post(`/schedule/weeks/${week}/generate`, { seed: 42 })).data,
+    mutationFn: async (params?: { seed?: number; clear_locks?: boolean } | void) =>
+      (
+        await api.post(`/schedule/weeks/${week}/generate`, {
+          seed: params?.seed ?? 42,
+          clear_locks: params?.clear_locks ?? false,
+        })
+      ).data,
     onSuccess: (d) => {
       message.success(`已生成：${d.status}，空缺 ${d.vacancies}，耗时 ${d.solve_time_seconds.toFixed(2)}s`);
       qc.invalidateQueries({ queryKey: ["week", week] });
       qc.invalidateQueries({ queryKey: ["week-people", week] });
     },
-    onError: (e) => message.error(errorMessage(e)),
+    onError: (e) => {
+      const msg = errorMessage(e);
+      if (msg.includes("锁定") || msg.includes("冲突")) {
+        Modal.confirm({
+          title: "锁定岗位冲突提示",
+          content: `${msg}`,
+          okText: "解锁所有岗位并重新生成",
+          okType: "danger",
+          cancelText: "稍后处理",
+          onOk: () => {
+            generate.mutate({ clear_locks: true });
+          },
+        });
+      } else {
+        message.error(msg);
+      }
+    },
   });
 
   const save = useMutation({
