@@ -258,9 +258,22 @@ def _is_available(
             continue
         if _violates_constraint(c, slot):
             return False
-    # 假期白名单：假期内仅登记时间段可用
+    # 假期白名单：假期内仅登记时间段可用。
+    # 如果没有任何人登记该假期的可值班时段，则不做白名单过滤（避免误伤所有人）。
     if vacation is not None:
-        return is_person_available(db, vacation.id, person.id, slot.slot_start_at, slot.slot_end_at)
+        from app.models.vacation import VacationAvailability
+
+        any_registered = db.scalar(
+            select(VacationAvailability)
+            .where(
+                VacationAvailability.vacation_period_id == vacation.id,
+            )
+            .limit(1)
+        )
+        if any_registered is not None:
+            return is_person_available(
+                db, vacation.id, person.id, slot.slot_start_at, slot.slot_end_at
+            )
     return True
 
 
