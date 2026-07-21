@@ -196,12 +196,10 @@ def get_current_on_duty_staff(db: Session) -> list[dict]:
                 "full_name": person.full_name,
                 "class_name": person.class_name,
                 "phone": person.phone,
-                "previous_shift": _adjacent_shift_people_public(
+                "previous_shift": _adjacent_shift_full(
                     db, venue.id, slot.slot_start_at, find_next=False
                 ),
-                "next_shift": _adjacent_shift_people_public(
-                    db, venue.id, slot.slot_end_at, find_next=True
-                ),
+                "next_shift": _adjacent_shift_full(db, venue.id, slot.slot_end_at, find_next=True),
             }
         )
 
@@ -213,3 +211,44 @@ def _adjacent_shift_people_public(
 ) -> list[dict]:
     """在岗人员展示中获取同场地前/后一班信息（仅展示姓名+班级+电话，敏感字段已剔除）。"""
     return _adjacent_shift_people(db, venue_id, reference_time, find_next)
+
+
+def _adjacent_shift_full(
+    db: Session, venue_id: uuid.UUID, reference_time: datetime, find_next: bool
+) -> dict | None:
+    """获取同场地前/后一班完整信息（含时段 + 人员列表），用于首页卡片展示。
+
+    返回 None 表示没有相邻班次。
+    """
+    boundary = DutySlot.slot_start_at if find_next else DutySlot.slot_end_at
+    stmt = (
+        select(DutySlot)
+        .join(WeeklyPlan, DutySlot.weekly_plan_id == WeeklyPlan.id)
+        .where(
+            DutySlot.venue_id == venue_id,
+            WeeklyPlan.status == PlanStatus.published,
+            boundary >= reference_time if find_next else boundary <= reference_time,
+        )
+        .order_by(DutySlot.slot_start_at.asc() if find_next else DutySlot.slot_end_at.desc())
+        .limit(1)
+    )
+    slot = db.scalar(stmt)
+    if slot is None:
+        return None
+
+    people = db.scalars(
+        select(PersonProfile)
+        .join(Assignment, Assignment.person_id == PersonProfile.id)
+        .where(
+            Assignment.duty_slot_id == slot.id,
+            Assignment.plan_status.in_(VISIBLE_PLAN_STATUSES),
+        )
+    ).all()
+
+    return {
+        "start_at": slot.slot_start_at.isoformat(),
+        "end_at": slot.slot_end_at.isoformat(),
+        "people": [
+            {"full_name": p.full_name, "class_name": p.class_name, "phone": p.phone} for p in people
+        ],
+    }
