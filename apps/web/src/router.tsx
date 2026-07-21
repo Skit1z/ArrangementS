@@ -11,6 +11,7 @@ import SettingsPage from "@/pages/admin/SettingsPage";
 import StatisticsPage from "@/pages/admin/StatisticsPage";
 import TasksPage from "@/pages/admin/TasksPage";
 import TimetablesPage from "@/pages/admin/TimetablesPage";
+import DutyRosterPage from "@/pages/admin/DutyRosterPage";
 import VenuesPage from "@/pages/admin/VenuesPage";
 import AdminOvertimePage from "@/pages/admin/AdminOvertimePage";
 import AdminHomePage from "@/pages/admin/AdminHomePage";
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/admin/home" replace /> },
           { path: "home", element: <AdminHomePage /> },
           { path: "schedule", element: <SchedulePage /> },
+          { path: "roster", element: <DutyRosterPage /> },
           { path: "people", element: <PeoplePage /> },
           { path: "review", element: <ReviewCenterPage /> },
           { path: "timetables", element: <TimetablesPage /> },

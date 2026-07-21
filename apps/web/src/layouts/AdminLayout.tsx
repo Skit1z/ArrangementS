@@ -1,6 +1,7 @@
 import {
   AuditOutlined,
   CalendarOutlined,
+  FileTextOutlined,
   HomeOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
@@ -17,6 +18,7 @@ import { colors } from "@/theme";
 const items = [
   { key: "/admin/home", icon: <HomeOutlined />, label: "首页" },
   { key: "/admin/schedule", icon: <CalendarOutlined />, label: "排班" },
+  { key: "/admin/roster", icon: <FileTextOutlined />, label: "值班表" },
   { key: "/admin/people", icon: <TeamOutlined />, label: "人员" },
   { key: "/admin/timetables", icon: <CalendarOutlined />, label: "全员课表" },
   { key: "/admin/venues", icon: <ShopOutlined />, label: "场地管理" },
