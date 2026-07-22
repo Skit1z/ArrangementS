@@ -25,6 +25,8 @@ export default function PeoplePage() {
   const { data, isLoading } = useQuery<Person[]>({
     queryKey: ["people", keyword],
     queryFn: async () => (await api.get("/people", { params: { keyword: keyword || undefined } })).data,
+    staleTime: 60 * 1000,
+    placeholderData: (prev) => prev,
   });
 
   const [importVisible, setImportVisible] = useState(false);
@@ -99,7 +101,7 @@ export default function PeoplePage() {
       
       <Table<Person>
         rowKey="id"
-        loading={isLoading}
+        loading={isLoading && !data}
         dataSource={data}
         pagination={{
           showSizeChanger: true,

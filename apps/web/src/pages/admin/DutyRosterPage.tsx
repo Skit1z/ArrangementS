@@ -125,27 +125,49 @@ export default function DutyRosterPage() {
   const handleExportExcel = () => {
     if (!roster || !activeVenue) return;
     try {
-      // 转置：行=时段，列=星期
-      const header = ["时段", ...WEEKDAY.map((w) => `周${w}`)];
       const rows = TIME_SLOTS.map((s) => {
         const cells = WEEKDAY.map((w) =>
-          (roster[w]?.[s.key] ?? []).map((e) => (e.phone ? `${e.name} ${e.phone}` : e.name)).join("\n"),
+          (roster[w]?.[s.key] ?? []).map((e) => (e.phone ? `${e.name} (${e.phone})` : e.name)).join("\n"),
         );
-        return [`${s.label} ${s.range}`, ...cells];
+        return [s.label, ...cells];
       });
 
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-        table { border-collapse: collapse; font-family: 'Microsoft YaHei', SimHei, sans-serif; }
-        th { background: #1F497D; color: #fff; font-weight: 600; padding: 8px 10px; border: 1px solid #1F497D; text-align: center; font-size: 13px; }
-        td { padding: 8px 10px; border: 1px solid #b8cce4; text-align: center; font-size: 12px; vertical-align: top; white-space: pre-line; min-width:80px; }
-        tr:nth-child(even) td { background: #f5f8fc; }
-        tr:nth-child(odd) td { background: #ffffff; }
-        td:first-child { font-weight: 700; background: #e9edf4; color: #1F497D; min-width: 50px; }
+        table { border-collapse: collapse; font-family: 'Microsoft YaHei', sans-serif; table-layout: fixed; width: 100%; }
+        th { background-color: #1F497D; color: #ffffff; font-weight: bold; padding: 12px 8px; border: 1px solid #1F497D; text-align: center; font-size: 13px; height: 36px; }
+        th.weekend { background-color: #fa8c16; border-color: #fa8c16; }
+        td { padding: 10px 8px; border: 1px solid #d9d9d9; text-align: center; font-size: 12px; vertical-align: top; white-space: pre-line; word-wrap: break-word; line-height: 1.6; mso-number-format:'\\@'; }
+        tr:nth-child(even) td { background-color: #fcfcfc; }
+        tr:nth-child(odd) td { background-color: #ffffff; }
+        td.row-header { font-weight: bold; background-color: #e9edf4; color: #1F497D; width: 110px; vertical-align: middle; }
       </style></head><body>
-        <h2 style="text-align:center;color:#1F497D;font-size:16px;margin:8px 0 4px;">${currentVenueName} · ${weekQuery.data?.week_label ?? ""}</h2>
-        <table><thead><tr>${header.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-        <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c || "—"}</td>`).join("")}</tr>`).join("")}</tbody>
-      </table></body></html>`;
+        <h2 style="text-align:center;color:#1F497D;font-size:18px;margin:12px 0 6px;">${currentVenueName} · ${wl}</h2>
+        <div style="text-align:center;color:#666666;font-size:12px;margin-bottom:16px;">${weekQuery.data?.week_start ?? ""} ~ ${weekQuery.data?.week_end ?? ""}</div>
+        <table border="1">
+          <colgroup>
+            <col style="width: 110px;" />
+            ${WEEKDAY.map(() => '<col style="width: 140px;" />').join("")}
+          </colgroup>
+          <thead>
+            <tr>
+              <th>时段</th>
+              ${WEEKDAY.map((w, idx) => `<th class="${idx >= 5 ? "weekend" : ""}">周${w}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map(
+                (r) =>
+                  `<tr>${r
+                    .map((c, i) =>
+                      i === 0 ? `<td class="row-header">${c}</td>` : `<td>${c || "—"}</td>`,
+                    )
+                    .join("")}</tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </body></html>`;
 
       const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -227,36 +249,38 @@ export default function DutyRosterPage() {
             </Radio.Group>
           </div>
 
-          <div ref={printRef}>
-            <div style={{ textAlign: "center", marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1F497D" }}>
-                {currentVenueName} · 值班安排表
-              </h2>
-              <div style={{ fontSize: 13, color: "#595959", marginTop: 2 }}>
-                {wl} · {weekQuery.data.week_start} ~ {weekQuery.data.week_end}
+          {/* 外层限制溢出横向滚动，内层 printRef 展开全宽不含滚动条 */}
+          <div style={{ overflowX: "auto" }}>
+            <div ref={printRef} style={{ background: "#ffffff", padding: "16px 20px", minWidth: 950, boxSizing: "border-box" }}>
+              <div style={{ textAlign: "center", marginBottom: 16 }}>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1F497D" }}>
+                  {currentVenueName} · 值班安排表
+                </h2>
+                <div style={{ fontSize: 13, color: "#595959", marginTop: 4 }}>
+                  {wl} · {weekQuery.data.week_start} ~ {weekQuery.data.week_end}
+                </div>
+                <Tag color={weekQuery.data.status === "published" ? "green" : "orange"} style={{ marginTop: 4 }}>
+                  {weekQuery.data.status === "published" ? "已发布" : "草稿"}
+                </Tag>
               </div>
-              <Tag color={weekQuery.data.status === "published" ? "green" : "orange"} style={{ marginTop: 2 }}>
-                {weekQuery.data.status === "published" ? "已发布" : "草稿"}
-              </Tag>
-            </div>
 
-            {roster ? (
-              <div style={{ overflowX: "auto" }}>
+              {roster ? (
                 <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 900, fontSize: 13 }}>
                   <thead>
                     <tr>
                       <th style={thStyle}>时段</th>
                       {WEEKDAY.map((w, wi) => (
-                        <th key={w} style={{ ...thStyle, background: wi >= 5 ? "#fa8c16" : "#1F497D" }}>{w}</th>
+                        <th key={w} style={{ ...thStyle, background: wi >= 5 ? "#fa8c16" : "#1F497D" }}>
+                          {w}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {TIME_SLOTS.map((s) => (
                       <tr key={s.key}>
-                        <td style={{ ...rowHeaderStyle(0), fontSize: 12 }}>
+                        <td style={{ ...rowHeaderStyle(0), fontSize: 13 }}>
                           <div style={{ fontWeight: 600 }}>{s.label}</div>
-                          <div style={{ fontSize: 10, color: "#888" }}>{s.range}</div>
                         </td>
                         {WEEKDAY.map((w) => {
                           const entries = roster[w]?.[s.key] ?? [];
@@ -279,10 +303,10 @@ export default function DutyRosterPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            ) : (
-              <Empty description="请选择值班场地" />
-            )}
+              ) : (
+                <Empty description="请选择值班场地" />
+              )}
+            </div>
           </div>
         </>
       )}
