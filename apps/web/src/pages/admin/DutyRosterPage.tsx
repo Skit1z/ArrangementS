@@ -4,6 +4,7 @@ import { DownloadOutlined, CameraOutlined, CalendarOutlined } from "@ant-design/
 import dayjs, { type Dayjs } from "dayjs";
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
+import * as XLSX from "xlsx";
 
 import { api } from "@/api/client";
 import { adminApi, type Semester } from "@/features/admin/api";
@@ -125,58 +126,40 @@ export default function DutyRosterPage() {
   const handleExportExcel = () => {
     if (!roster || !activeVenue) return;
     try {
-      const rows = TIME_SLOTS.map((s) => {
+      const titleRow = [`${currentVenueName} · 值班安排表`];
+      const subTitleRow = [`${wl} · ${weekQuery.data?.week_start ?? ""} ~ ${weekQuery.data?.week_end ?? ""}`];
+      const headerRow = ["时段", ...WEEKDAY.map((w) => `周${w}`)];
+
+      const bodyRows = TIME_SLOTS.map((s) => {
         const cells = WEEKDAY.map((w) =>
-          (roster[w]?.[s.key] ?? []).map((e) => (e.phone ? `${e.name} (${e.phone})` : e.name)).join("\n"),
+          (roster[w]?.[s.key] ?? [])
+            .map((e) => (e.phone ? `${e.name} (${e.phone})` : e.name))
+            .join("\n") || "—",
         );
         return [s.label, ...cells];
       });
 
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-        table { border-collapse: collapse; font-family: 'Microsoft YaHei', sans-serif; table-layout: fixed; width: 100%; }
-        th { background-color: #1F497D; color: #ffffff; font-weight: bold; padding: 12px 8px; border: 1px solid #1F497D; text-align: center; font-size: 13px; height: 36px; }
-        th.weekend { background-color: #fa8c16; border-color: #fa8c16; }
-        td { padding: 10px 8px; border: 1px solid #d9d9d9; text-align: center; font-size: 12px; vertical-align: top; white-space: pre-line; word-wrap: break-word; line-height: 1.6; mso-number-format:'\\@'; }
-        tr:nth-child(even) td { background-color: #fcfcfc; }
-        tr:nth-child(odd) td { background-color: #ffffff; }
-        td.row-header { font-weight: bold; background-color: #e9edf4; color: #1F497D; width: 110px; vertical-align: middle; }
-      </style></head><body>
-        <h2 style="text-align:center;color:#1F497D;font-size:18px;margin:12px 0 6px;">${currentVenueName} · ${wl}</h2>
-        <div style="text-align:center;color:#666666;font-size:12px;margin-bottom:16px;">${weekQuery.data?.week_start ?? ""} ~ ${weekQuery.data?.week_end ?? ""}</div>
-        <table border="1">
-          <colgroup>
-            <col style="width: 110px;" />
-            ${WEEKDAY.map(() => '<col style="width: 140px;" />').join("")}
-          </colgroup>
-          <thead>
-            <tr>
-              <th>时段</th>
-              ${WEEKDAY.map((w, idx) => `<th class="${idx >= 5 ? "weekend" : ""}">周${w}</th>`).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${rows
-              .map(
-                (r) =>
-                  `<tr>${r
-                    .map((c, i) =>
-                      i === 0 ? `<td class="row-header">${c}</td>` : `<td>${c || "—"}</td>`,
-                    )
-                    .join("")}</tr>`,
-              )
-              .join("")}
-          </tbody>
-        </table>
-      </body></html>`;
+      const sheetData = [titleRow, subTitleRow, [], headerRow, ...bodyRows];
+      const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
 
-      const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${currentVenueName}_值班表_${weekStart}.xls`;
-      a.click();
-      URL.revokeObjectURL(url);
-      message.success("值班表已导出（Excel 格式）");
+      // 设置列宽，保证每列能够完整容纳姓名+手机号不换行拆断
+      worksheet["!cols"] = [
+        { wch: 14 }, // 时段列
+        { wch: 28 }, // 周一
+        { wch: 28 }, // 周二
+        { wch: 28 }, // 周三
+        { wch: 28 }, // 周四
+        { wch: 28 }, // 周五
+        { wch: 28 }, // 周六
+        { wch: 28 }, // 周日
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "值班安排表");
+
+      // 导出为真正无兼容警告的标准 .xlsx 文件
+      XLSX.writeFile(workbook, `${currentVenueName}_值班表_${weekStart}.xlsx`);
+      message.success("值班表已成功导出为 Excel (.xlsx)");
     } catch {
       message.error("导出失败");
     }
