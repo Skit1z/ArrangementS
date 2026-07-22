@@ -19,14 +19,12 @@ const TIME_SLOTS = [
   { key: "F", label: "17:30-19:00", range: "17:30-19:00" },
 ] as const;
 
-/** 将 UTC 时间字符串转为北京时间 (Date) */
+/** 解析 ISO 时间为 Date 对象 */
 function toBeijingDate(iso: string): Date {
-  const d = new Date(iso);
-  d.setHours(d.getHours() + 8);
-  return d;
+  return new Date(iso);
 }
 
-/** 根据北京时间起点将槽位映射到 6 个时段 */
+/** 根据时间起点将槽位映射到 6 个时段 */
 function classifyTimeSlot(slot: SlotView): string {
   const bj = toBeijingDate(slot.slot_start_at);
   const h = bj.getHours();
@@ -139,7 +137,7 @@ export default function DutyRosterPage() {
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
         table { border-collapse: collapse; font-family: 'Microsoft YaHei', SimHei, sans-serif; }
         th { background: #1F497D; color: #fff; font-weight: 600; padding: 8px 10px; border: 1px solid #1F497D; text-align: center; font-size: 13px; }
-        td { padding: 8px 10px; border: 1px solid #b8cce4; text-align: center; font-size: 12px; vertical-align: middle; white-space: pre-line; min-width:80px; }
+        td { padding: 8px 10px; border: 1px solid #b8cce4; text-align: center; font-size: 12px; vertical-align: top; white-space: pre-line; min-width:80px; }
         tr:nth-child(even) td { background: #f5f8fc; }
         tr:nth-child(odd) td { background: #ffffff; }
         td:first-child { font-weight: 700; background: #e9edf4; color: #1F497D; min-width: 50px; }
@@ -317,7 +315,7 @@ const cellStyle: React.CSSProperties = {
   padding: "6px 6px",
   textAlign: "center",
   minWidth: 90,
-  verticalAlign: "middle",
+  verticalAlign: "top",
 };
 
 const tagStyle: React.CSSProperties = {

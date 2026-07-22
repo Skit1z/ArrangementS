@@ -19,15 +19,14 @@
                        │ APScheduler│               │
                        │ 周期任务  │               │
                        └──────────┘                │
-                      ┌───────────┐    ┌──────────┐│
-                      │  postgres │    │  redis   ││（仅登录限速，内存回退）
-                      └───────────┘    └──────────┘│
+                      ┌───────────┐
+                      │  postgres │
+                      └───────────┘
 ```
 
 | 服务 | 作用 |
 |---|---|
 | `postgres` | 业务数据（人员、排班、统计等） |
-| `redis` | 登录失败计数；不可用时自动回退到 api 进程内字典 |
 | `arrangements-api` | FastAPI REST（Systemd 服务）；启动时自动 `alembic upgrade head` + 幂等种子 |
 | `arrangements-worker` | 周期任务（Systemd 服务）：班次自动完成（5 分钟）、学期结束旧课表失效（每日 02:00 UTC） |
 | `1Panel OpenResty` | 反向代理 + 前端 SPA 静态托管 + 自动 HTTPS |
