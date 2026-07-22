@@ -130,7 +130,9 @@ def _forbidden_pairs(
     return pairs
 
 
-def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
+def build_solver_input(
+    db: Session, plan, seed: int = 42, max_time_seconds: float | None = None
+) -> SolverInput:
     slots = list(db.scalars(select(DutySlot).where(DutySlot.weekly_plan_id == plan.id)))
 
     people = list(
@@ -233,6 +235,7 @@ def build_solver_input(db: Session, plan, seed: int = 42) -> SolverInput:
         locked=locked,
         history_minutes=history,
         seed=seed,
+        max_time_seconds=15.0 if max_time_seconds is None else max_time_seconds,
     )
 
 

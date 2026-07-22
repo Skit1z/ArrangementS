@@ -72,7 +72,7 @@ def _setup(db, templates=1, people=4):
     _yellow(db, templates)
     ps = [_person(db, i) for i in range(people)]
     db.commit()
-    schedule_service.generate(db, MONDAY, actor_id=None, seed=1)
+    schedule_service.generate(db, MONDAY, actor_id=None, max_time_seconds=2.0, seed=1)
     db.commit()
     return ps
 

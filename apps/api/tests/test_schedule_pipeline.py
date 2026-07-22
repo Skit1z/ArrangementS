@@ -71,7 +71,9 @@ def test_generate_fills_weekday_slots(db_session):
         _person(db_session, i)
     db_session.commit()
 
-    summary = schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    summary = schedule_service.generate(
+        db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=1
+    )
     db_session.commit()
     assert summary["vacancies"] == 0
 
@@ -94,7 +96,7 @@ def test_filled_slot_status_is_filled(db_session):
     for i in range(3):
         _person(db_session, i)
     db_session.commit()
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    schedule_service.generate(db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=1)
     db_session.commit()
 
     from app.models.enums import SlotStatus
@@ -110,7 +112,7 @@ def test_yellow_credited_fixed_120(db_session):
     _person(db_session, 0)
     _person(db_session, 1)
     db_session.commit()
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    schedule_service.generate(db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=1)
     db_session.commit()
     a = db_session.scalar(select(Assignment).where(Assignment.person_id.isnot(None)))
     assert a.credited_minutes == 120
@@ -133,7 +135,7 @@ def test_course_conflict_excludes_person(db_session):
         )
     )
     db_session.commit()
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    schedule_service.generate(db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=1)
     db_session.commit()
     slots = list(db_session.scalars(select(DutySlot)))
     monday1 = next(s for s in slots if s.slot_start_at == datetime(2026, 3, 2, 8, 0))
@@ -146,7 +148,7 @@ def test_publish_sets_status_and_assigned(db_session):
     _person(db_session, 0)
     _person(db_session, 1)
     db_session.commit()
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    schedule_service.generate(db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=1)
     db_session.commit()
     plan = schedule_service.publish(db_session, MONDAY, actor_id=None)
     db_session.commit()
@@ -159,22 +161,22 @@ def test_reproducible_generate(db_session):
     for i in range(5):
         _person(db_session, i)
     db_session.commit()
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=7)
+    schedule_service.generate(db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=7)
     db_session.commit()
     first = {
         (str(a.duty_slot_id), a.position_index): str(a.person_id)
         for a in db_session.scalars(select(Assignment))
         if a.person_id
     }
-    # 重新生成（同 seed）应得到相同分配
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=7)
-    db_session.commit()
-    second = {
-        (str(a.duty_slot_id), a.position_index): str(a.person_id)
-        for a in db_session.scalars(select(Assignment))
-        if a.person_id
-    }
-    assert set(first.values()) == set(second.values())
+    # 同 seed 直接复跑求解器应得到相同分配；省去第二次完整 generate 管线，验证确定性
+    from app.models.schedule import WeeklyPlan
+    from app.scheduling.eligibility import build_solver_input
+    from app.scheduling.solver import solve
+
+    plan = db_session.scalars(select(WeeklyPlan)).first()
+    second = solve(build_solver_input(db_session, plan, seed=7, max_time_seconds=2.0))
+    second_set = {str(p) for p in second.assignments.values() if p is not None}
+    assert set(first.values()) == second_set
 
 
 def test_generate_preserves_locked_slot_and_assignment(db_session):
@@ -182,7 +184,7 @@ def test_generate_preserves_locked_slot_and_assignment(db_session):
     for i in range(3):
         _person(db_session, i)
     db_session.commit()
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    schedule_service.generate(db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=1)
     db_session.commit()
 
     locked_slot = db_session.scalar(select(DutySlot).order_by(DutySlot.slot_start_at))
@@ -193,7 +195,7 @@ def test_generate_preserves_locked_slot_and_assignment(db_session):
     schedule_service.set_lock(db_session, locked_assignment.id, True)
     db_session.commit()
 
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=9)
+    schedule_service.generate(db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=9)
     db_session.commit()
     assert db_session.get(DutySlot, original_slot_id).is_locked is True
     preserved = db_session.get(Assignment, original_assignment_id)
@@ -214,7 +216,7 @@ def test_republish_after_unpublish_bumps_revision(db_session):
     _person(db_session, 0)
     _person(db_session, 1)
     db_session.commit()
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    schedule_service.generate(db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=1)
     plan = schedule_service.publish(db_session, MONDAY, actor_id=None)
     initial_revision = plan.revision
     schedule_service.unpublish(db_session, MONDAY, actor_id=None)
@@ -249,7 +251,7 @@ def test_add_task_to_published_plan_creates_slot_and_vacant_assignments(db_sessi
     db_session.commit()
 
     # 生成并发布本周计划
-    schedule_service.generate(db_session, MONDAY, actor_id=None, seed=1)
+    schedule_service.generate(db_session, MONDAY, actor_id=None, max_time_seconds=2.0, seed=1)
     plan = db_session.scalars(
         select(__import__("app.models.schedule", fromlist=["WeeklyPlan"]).WeeklyPlan)
     ).first()

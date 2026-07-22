@@ -55,6 +55,7 @@ def generate(
     actor_id: uuid.UUID | None,
     seed: int = 42,
     clear_locks: bool = False,
+    max_time_seconds: float | None = None,
 ) -> dict:
     if week_start.isoweekday() != 1:
         raise HTTPException(status_code=422, detail="周起始日必须为周一")
@@ -83,7 +84,9 @@ def generate(
     db.flush()
 
     slots.generate_slots(db, plan)
-    solver_input = eligibility.build_solver_input(db, plan, seed=seed)
+    solver_input = eligibility.build_solver_input(
+        db, plan, seed=seed, max_time_seconds=max_time_seconds
+    )
     try:
         result = solve(solver_input)
     except ValueError as exc:
