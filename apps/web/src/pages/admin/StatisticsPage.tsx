@@ -19,11 +19,13 @@ import {
   Checkbox,
   Table,
   Tag,
+  Tabs,
 } from "antd";
 import dayjs from "dayjs";
 import { useState } from "react";
 
 import { errorMessage } from "@/api/client";
+import SettingsPage from "@/pages/admin/SettingsPage";
 import {
   adminApi,
   type AdjustmentIn,
@@ -78,109 +80,125 @@ export default function StatisticsPage() {
   );
 
   return (
-    <Card
-      title="月度统计"
-      extra={
-        <Space wrap>
-          <DatePicker
-            picker="month"
-            value={dayjs(month)}
-            onChange={(v) => v && setMonth(v.format("YYYY-MM"))}
-            allowClear={false}
-          />
-          <Button onClick={() => recalcM.mutate()} loading={recalcM.isPending}>
-            重算
-          </Button>
-          <Popconfirm title="锁定后该月数据不可再重算覆盖" onConfirm={() => lockM.mutate()}>
-            <Button loading={lockM.isPending}>锁定</Button>
-          </Popconfirm>
-          <Button onClick={() => (window.location.href = adminApi.statistics.exportUrl(month))}>
-            导出 Excel
-          </Button>
-        </Space>
-      }
-    >
-      {query.isLoading && <Spin />}
-      {query.error && (
-        <Alert type="info" showIcon message="该月尚无统计，点击「重算」生成" />
-      )}
-      {data.length > 0 && (
-        <Space size="large" style={{ marginBottom: 16 }}>
-          <Statistic title="全员完成工时" value={hoursOf(totals.completed)} suffix="h" />
-          <Statistic title="全员倍率增加" value={hoursOf(totals.extra)} suffix="h" />
-          <Statistic title="人员数" value={data.length} />
-        </Space>
-      )}
-
-      <Table<MonthlySummary>
-        rowKey="person_id"
-        loading={query.isLoading}
-        dataSource={data}
-        pagination={{ pageSize: 20 }}
-        locale={{ emptyText: <Empty description="该月暂无统计数据" /> }}
-        columns={[
-          { title: "学号", dataIndex: "student_no", width: 110 },
-          { title: "姓名", dataIndex: "person_name", width: 90 },
-          { title: "班级", dataIndex: "class_name", width: 100 },
-          {
-            title: "完成(h)",
-            dataIndex: "completed_minutes",
-            width: 90,
-            render: (v: number) => hoursOf(v),
-          },
-          {
-            title: "倍率(h)",
-            dataIndex: "multiplier_extra_minutes",
-            width: 90,
-            render: (v: number) => hoursOf(v),
-          },
-          { title: "请假", dataIndex: "leave_count", width: 70 },
-          { title: "换出", dataIndex: "swap_out_count", width: 70 },
-          { title: "未到岗", dataIndex: "absence_count", width: 80 },
-          {
-            title: "状态",
-            dataIndex: "status",
-            width: 90,
-            render: (s: string) => (
-              <Tag color={s === "locked" ? "red" : s === "confirmed" ? "green" : "default"}>
-                {MONTHLY_STATUS_LABEL[s] ?? s}
-              </Tag>
-            ),
-          },
-          {
-            title: "操作",
-            width: 140,
-            render: (_, r) => (
-              <Space>
-                <Button size="small" onClick={() => setDetailFor(r)}>
-                  明细
-                </Button>
-                {r.status !== "locked" && (
-                  <Button size="small" onClick={() => setAdjustFor(r)}>
-                    调整
+    <Tabs
+      defaultActiveKey="stats"
+      items={[
+        {
+          key: "stats",
+          label: "月度工时统计与导出",
+          children: (
+            <Card
+              title="月度统计"
+              extra={
+                <Space wrap>
+                  <DatePicker
+                    picker="month"
+                    value={dayjs(month)}
+                    onChange={(v) => v && setMonth(v.format("YYYY-MM"))}
+                    allowClear={false}
+                  />
+                  <Button onClick={() => recalcM.mutate()} loading={recalcM.isPending}>
+                    重算
                   </Button>
-                )}
-              </Space>
-            ),
-          },
-        ]}
-      />
+                  <Popconfirm title="锁定后该月数据不可再重算覆盖" onConfirm={() => lockM.mutate()}>
+                    <Button loading={lockM.isPending}>锁定</Button>
+                  </Popconfirm>
+                  <Button onClick={() => (window.location.href = adminApi.statistics.exportUrl(month))}>
+                    导出 Excel
+                  </Button>
+                </Space>
+              }
+            >
+              {query.isLoading && <Spin />}
+              {query.error && (
+                <Alert type="info" showIcon message="该月尚无统计，点击「重算」生成" />
+              )}
+              {data.length > 0 && (
+                <Space size="large" style={{ marginBottom: 16 }}>
+                  <Statistic title="全员完成工时" value={hoursOf(totals.completed)} suffix="h" />
+                  <Statistic title="全员倍率增加" value={hoursOf(totals.extra)} suffix="h" />
+                  <Statistic title="人员数" value={data.length} />
+                </Space>
+              )}
 
-      {adjustFor && (
-        <AdjustModal
-          month={month}
-          summary={adjustFor}
-          onClose={() => setAdjustFor(null)}
-          onDone={() => {
-            setAdjustFor(null);
-            invalidate();
-          }}
-        />
-      )}
-      {detailFor && (
-        <DetailDrawer month={month} summary={detailFor} onClose={() => setDetailFor(null)} />
-      )}
-    </Card>
+              <Table<MonthlySummary>
+                rowKey="person_id"
+                loading={query.isLoading}
+                dataSource={data}
+                pagination={{ pageSize: 20 }}
+                locale={{ emptyText: <Empty description="该月暂无统计数据" /> }}
+                columns={[
+                  { title: "学号", dataIndex: "student_no", width: 110 },
+                  { title: "姓名", dataIndex: "person_name", width: 90 },
+                  { title: "班级", dataIndex: "class_name", width: 100 },
+                  {
+                    title: "完成(h)",
+                    dataIndex: "completed_minutes",
+                    width: 90,
+                    render: (v: number) => hoursOf(v),
+                  },
+                  {
+                    title: "倍率(h)",
+                    dataIndex: "multiplier_extra_minutes",
+                    width: 90,
+                    render: (v: number) => hoursOf(v),
+                  },
+                  { title: "请假", dataIndex: "leave_count", width: 70 },
+                  { title: "换出", dataIndex: "swap_out_count", width: 70 },
+                  { title: "未到岗", dataIndex: "absence_count", width: 80 },
+                  {
+                    title: "状态",
+                    dataIndex: "status",
+                    width: 90,
+                    render: (s: string) => (
+                      <Tag color={s === "locked" ? "red" : s === "confirmed" ? "green" : "default"}>
+                        {MONTHLY_STATUS_LABEL[s] ?? s}
+                      </Tag>
+                    ),
+                  },
+                  {
+                    title: "操作",
+                    width: 140,
+                    render: (_, r) => (
+                      <Space>
+                        <Button size="small" onClick={() => setDetailFor(r)}>
+                          明细
+                        </Button>
+                        {r.status !== "locked" && (
+                          <Button size="small" onClick={() => setAdjustFor(r)}>
+                            调整
+                          </Button>
+                        )}
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+
+              {adjustFor && (
+                <AdjustModal
+                  month={month}
+                  summary={adjustFor}
+                  onClose={() => setAdjustFor(null)}
+                  onDone={() => {
+                    setAdjustFor(null);
+                    invalidate();
+                  }}
+                />
+              )}
+              {detailFor && (
+                <DetailDrawer month={month} summary={detailFor} onClose={() => setDetailFor(null)} />
+              )}
+            </Card>
+          ),
+        },
+        {
+          key: "settings",
+          label: "系统规则与常规配置",
+          children: <SettingsPage />,
+        },
+      ]}
+    />
   );
 }
 

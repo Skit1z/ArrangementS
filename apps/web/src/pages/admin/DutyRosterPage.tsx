@@ -249,64 +249,68 @@ export default function DutyRosterPage() {
             </Radio.Group>
           </div>
 
-          {/* 外层限制溢出横向滚动，内层 printRef 展开全宽不含滚动条 */}
-          <div style={{ overflowX: "auto" }}>
-            <div ref={printRef} style={{ background: "#ffffff", padding: "16px 20px", minWidth: 950, boxSizing: "border-box" }}>
-              <div style={{ textAlign: "center", marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1F497D" }}>
-                  {currentVenueName} · 值班安排表
-                </h2>
-                <div style={{ fontSize: 13, color: "#595959", marginTop: 4 }}>
-                  {wl} · {weekQuery.data.week_start} ~ {weekQuery.data.week_end}
-                </div>
-                <Tag color={weekQuery.data.status === "published" ? "green" : "orange"} style={{ marginTop: 4 }}>
-                  {weekQuery.data.status === "published" ? "已发布" : "草稿"}
-                </Tag>
+          {/* 容器自适应 100% 显示，不产生横向滚动 */}
+          <div ref={printRef} style={{ background: "#ffffff", padding: "12px 4px", width: "100%", boxSizing: "border-box" }}>
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1F497D" }}>
+                {currentVenueName} · 值班安排表
+              </h2>
+              <div style={{ fontSize: 13, color: "#595959", marginTop: 4 }}>
+                {wl} · {weekQuery.data.week_start} ~ {weekQuery.data.week_end}
               </div>
-
-              {roster ? (
-                <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 900, fontSize: 13 }}>
-                  <thead>
-                    <tr>
-                      <th style={thStyle}>时段</th>
-                      {WEEKDAY.map((w, wi) => (
-                        <th key={w} style={{ ...thStyle, background: wi >= 5 ? "#fa8c16" : "#1F497D" }}>
-                          {w}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {TIME_SLOTS.map((s) => (
-                      <tr key={s.key}>
-                        <td style={{ ...rowHeaderStyle(0), fontSize: 13 }}>
-                          <div style={{ fontWeight: 600 }}>{s.label}</div>
-                        </td>
-                        {WEEKDAY.map((w) => {
-                          const entries = roster[w]?.[s.key] ?? [];
-                          return (
-                            <td key={w} style={cellStyle}>
-                              {entries.length > 0 ? (
-                                entries.map((e, i) => (
-                                  <span key={i} style={tagStyle}>
-                                    <strong style={{ color: "#1F497D" }}>{e.name}</strong>
-                                    {e.phone && <span style={{ color: "#666", marginLeft: 4 }}>{e.phone}</span>}
-                                  </span>
-                                ))
-                              ) : (
-                                <span style={{ color: "#d9d9d9" }}>—</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <Empty description="请选择值班场地" />
-              )}
+              <Tag color={weekQuery.data.status === "published" ? "green" : "orange"} style={{ marginTop: 4 }}>
+                {weekQuery.data.status === "published" ? "已发布" : "草稿"}
+              </Tag>
             </div>
+
+            {roster ? (
+              <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", fontSize: 12 }}>
+                <colgroup>
+                  <col style={{ width: "10%" }} />
+                  {WEEKDAY.map((_, i) => (
+                    <col key={i} style={{ width: "12.85%" }} />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>时段</th>
+                    {WEEKDAY.map((w, wi) => (
+                      <th key={w} style={{ ...thStyle, background: wi >= 5 ? "#fa8c16" : "#1F497D" }}>
+                        {w}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {TIME_SLOTS.map((s) => (
+                    <tr key={s.key}>
+                      <td style={{ ...rowHeaderStyle(0), fontSize: 12 }}>
+                        <div style={{ fontWeight: 600 }}>{s.label}</div>
+                      </td>
+                      {WEEKDAY.map((w) => {
+                        const entries = roster[w]?.[s.key] ?? [];
+                        return (
+                          <td key={w} style={cellStyle}>
+                            {entries.length > 0 ? (
+                              entries.map((e, i) => (
+                                <span key={i} style={tagStyle}>
+                                  <strong style={{ color: "#1F497D" }}>{e.name}</strong>
+                                  {e.phone && <span style={{ color: "#666", marginLeft: 3 }}>{e.phone}</span>}
+                                </span>
+                              ))
+                            ) : (
+                              <span style={{ color: "#d9d9d9" }}>—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <Empty description="请选择值班场地" />
+            )}
           </div>
         </>
       )}
@@ -316,41 +320,42 @@ export default function DutyRosterPage() {
 
 const thStyle: React.CSSProperties = {
   border: "1px solid #d9d9d9",
-  padding: "7px 8px",
+  padding: "6px 2px",
   background: "#1F497D",
   color: "#fff",
   textAlign: "center",
   fontWeight: 600,
-  minWidth: 90,
 };
 
 const rowHeaderStyle = (wi: number): React.CSSProperties => ({
   border: "1px solid #d9d9d9",
-  padding: "8px 10px",
+  padding: "6px 4px",
   fontWeight: 700,
   background: wi >= 5 ? "#fff7e6" : "#e9edf4",
   textAlign: "center",
   color: "#1F497D",
-  fontSize: 14,
+  fontSize: 12,
 });
 
 const cellStyle: React.CSSProperties = {
   border: "1px solid #d9d9d9",
-  padding: "6px 6px",
+  padding: "4px 2px",
   textAlign: "center",
-  minWidth: 90,
   verticalAlign: "top",
+  wordBreak: "break-word",
 };
 
 const tagStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  gap: 4,
-  margin: "2px 2px",
-  padding: "2px 6px",
+  gap: 2,
+  margin: "1px 1px",
+  padding: "2px 4px",
   borderRadius: 3,
   background: "#e6f4ff",
   border: "1px solid #91caff",
-  fontSize: 12,
+  fontSize: 11,
   whiteSpace: "nowrap",
+  maxWidth: "100%",
+  boxSizing: "border-box",
 };

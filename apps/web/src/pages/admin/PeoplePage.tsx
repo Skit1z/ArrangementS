@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Card, DatePicker, Form, Input, InputNumber, List, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TimePicker, Upload } from "antd";
+import { App, Button, Card, DatePicker, Form, Input, InputNumber, List, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TimePicker, Upload, Tabs } from "antd";
 import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined, UserAddOutlined, EditOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { useState } from "react";
 
 import { adminApi } from "@/features/admin/api";
 import { api, errorMessage } from "@/api/client";
+import TimetablesPage from "@/pages/admin/TimetablesPage";
 
 interface Person {
   id: string;
@@ -37,17 +38,6 @@ export default function PeoplePage() {
     initialPassword: string;
   } | null>(null);
 
-  const updateStatusM = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await adminApi.people.update(id, { status });
-    },
-    onSuccess: () => {
-      message.success("人员状态已更新");
-      qc.invalidateQueries({ queryKey: ["people"] });
-    },
-    onError: (e) => message.error(errorMessage(e)),
-  });
-
   const toggleSchedulingPool = useMutation({
     mutationFn: async ({ personIds, enabled }: { personIds: string[]; enabled: boolean }) => {
       await api.put("/people/scheduling-pool", { person_ids: personIds, enabled });
@@ -69,194 +59,192 @@ export default function PeoplePage() {
   });
 
   return (
-    <Card title="人员管理">
-      <Space style={{ marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
-        <Input.Search
-          placeholder="按姓名或学号搜索"
-          allowClear
-          style={{ width: 320 }}
-          onSearch={setKeyword}
-        />
-        <Space>
-          <Button
-            type="primary"
-            icon={<UserAddOutlined />}
-            onClick={() => setAddPersonVisible(true)}
-          >
-            手动添加人员
-          </Button>
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={() => {
-              window.open(api.defaults.baseURL + "/people/import/template");
-            }}
-          >
-            下载导入模板
-          </Button>
-          <Button icon={<UploadOutlined />} onClick={() => setImportVisible(true)}>
-            批量导入人员
-          </Button>
-        </Space>
-      </Space>
-      
-      <Table<Person>
-        rowKey="id"
-        loading={isLoading && !data}
-        dataSource={data}
-        pagination={{
-          showSizeChanger: true,
-          showQuickJumper: true,
-          pageSizeOptions: ["10", "20", "50"],
-          showTotal: (total) => `共 ${total} 人`,
-          defaultPageSize: 20,
-        }}
-        columns={[
-          { title: "学号", dataIndex: "student_no" },
-          { title: "班级", dataIndex: "class_name", render: (v) => v || "—" },
-          { title: "姓名", dataIndex: "full_name" },
-          { title: "手机号", dataIndex: "phone" },
-          {
-            title: "状态",
-            dataIndex: "status",
-            render: (v: string, r: Person) => (
-              <Select
-                value={v}
-                size="small"
-                variant="borderless"
-                onChange={(newStatus) => updateStatusM.mutate({ id: r.id, status: newStatus })}
-                loading={updateStatusM.isPending}
-                options={[
-                  { value: "active", label: <Tag color="green">active</Tag> },
-                  { value: "suspended", label: <Tag color="orange">suspended</Tag> },
-                  { value: "left", label: <Tag color="default">left</Tag> },
+    <Tabs
+      defaultActiveKey="people"
+      items={[
+        {
+          key: "people",
+          label: "人员档案与管理",
+          children: (
+            <Card title="人员管理">
+              <Space style={{ marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
+                <Input.Search
+                  placeholder="按姓名或学号搜索"
+                  allowClear
+                  style={{ width: 320 }}
+                  onSearch={setKeyword}
+                />
+                <Space>
+                  <Button
+                    type="primary"
+                    icon={<UserAddOutlined />}
+                    onClick={() => setAddPersonVisible(true)}
+                  >
+                    手动添加人员
+                  </Button>
+                  <Button
+                    icon={<DownloadOutlined />}
+                    onClick={() => {
+                      window.open(api.defaults.baseURL + "/people/import/template");
+                    }}
+                  >
+                    下载导入模板
+                  </Button>
+                  <Button icon={<UploadOutlined />} onClick={() => setImportVisible(true)}>
+                    批量导入人员
+                  </Button>
+                </Space>
+              </Space>
+              
+              <Table<Person>
+                rowKey="id"
+                loading={isLoading && !data}
+                dataSource={data}
+                pagination={{
+                  showSizeChanger: true,
+                  showQuickJumper: true,
+                  pageSizeOptions: ["10", "20", "50"],
+                  showTotal: (total) => `共 ${total} 人`,
+                  defaultPageSize: 20,
+                }}
+                columns={[
+                  { title: "学号", dataIndex: "student_no" },
+                  { title: "班级", dataIndex: "class_name", render: (v) => v || "—" },
+                  { title: "姓名", dataIndex: "full_name" },
+                  { title: "手机号", dataIndex: "phone" },
+                  {
+                    title: "自动排班",
+                    dataIndex: "is_in_scheduling_pool",
+                    render: (v: boolean, r: Person) => (
+                      <Switch
+                        checked={v}
+                        onChange={(checked) => toggleSchedulingPool.mutate({ personIds: [r.id], enabled: checked })}
+                        loading={toggleSchedulingPool.isPending}
+                      />
+                    ),
+                  },
+                  {
+                    title: "操作",
+                    key: "action",
+                    width: 200,
+                    render: (_, r: Person) => (
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<EditOutlined />}
+                          onClick={() => setEditingPerson(r)}
+                          style={{ padding: "0 6px", fontSize: 13 }}
+                        >
+                          编辑
+                        </Button>
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<SettingOutlined />}
+                          onClick={() => setRulesPerson(r)}
+                          style={{ padding: "0 6px", fontSize: 13 }}
+                        >
+                          规则
+                        </Button>
+                        <Popconfirm
+                          title="确定删除该人员及其关联账号？"
+                          description="该删除不可撤销，确定操作？"
+                          icon={<ExclamationCircleFilled style={{ color: "#ff4d4f" }} />}
+                          onConfirm={() => deletePersonM.mutate(r.id)}
+                          okText="确定删除"
+                          cancelText="取消"
+                          okButtonProps={{ danger: true }}
+                        >
+                          <Button
+                            type="link"
+                            danger
+                            size="small"
+                            icon={<DeleteOutlined />}
+                            style={{ padding: "0 6px", fontSize: 13 }}
+                          >
+                            删除
+                          </Button>
+                        </Popconfirm>
+                      </div>
+                    ),
+                  },
                 ]}
               />
-            ),
-          },
-          {
-            title: "自动排班",
-            dataIndex: "is_in_scheduling_pool",
-            render: (v: boolean, r: Person) => (
-              <Switch
-                checked={v}
-                onChange={(checked) => toggleSchedulingPool.mutate({ personIds: [r.id], enabled: checked })}
-                loading={toggleSchedulingPool.isPending}
-              />
-            ),
-          },
-          {
-            title: "操作",
-            key: "action",
-            width: 200,
-            render: (_, r: Person) => (
-              <div style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => setEditingPerson(r)}
-                  style={{ padding: "0 6px", fontSize: 13 }}
+
+              {editingPerson && (
+                <EditPersonModal
+                  person={editingPerson}
+                  onClose={() => setEditingPerson(null)}
+                  onSuccess={() => qc.invalidateQueries({ queryKey: ["people"] })}
+                />
+              )}
+
+              {importVisible && (
+                <ImportModal onClose={() => setImportVisible(false)} />
+              )}
+
+              {addPersonVisible && (
+                <AddPersonModal
+                  open={addPersonVisible}
+                  onClose={() => setAddPersonVisible(false)}
+                  onSuccess={(info) => {
+                    setCreatedAccountInfo(info);
+                    qc.invalidateQueries({ queryKey: ["people"] });
+                  }}
+                />
+              )}
+
+              {createdAccountInfo && (
+                <Modal
+                  open={!!createdAccountInfo}
+                  title="🎉 人员添加成功"
+                  onOk={() => setCreatedAccountInfo(null)}
+                  onCancel={() => setCreatedAccountInfo(null)}
+                  cancelButtonProps={{ style: { display: "none" } }}
+                  okText="我知道了"
                 >
-                  编辑
-                </Button>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<SettingOutlined />}
-                  onClick={() => setRulesPerson(r)}
-                  style={{ padding: "0 6px", fontSize: 13 }}
-                >
-                  规则
-                </Button>
-                <Popconfirm
-                  title="确定删除该人员及其关联账号？"
-                  description="该删除不可撤销，确定操作？"
-                  icon={<ExclamationCircleFilled style={{ color: "#ff4d4f" }} />}
-                  onConfirm={() => deletePersonM.mutate(r.id)}
-                  okText="确定删除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
-                >
-                  <Button
-                    type="link"
-                    danger
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    style={{ padding: "0 6px", fontSize: 13 }}
+                  <p style={{ fontSize: 14, marginBottom: 12 }}>
+                    已成功为 <b>{createdAccountInfo.name}</b> 创建人员档案并开通登录账号：
+                  </p>
+                  <div
+                    style={{
+                      background: "#fafafa",
+                      padding: 16,
+                      borderRadius: 8,
+                      border: "1px solid #f0f0f0",
+                    }}
                   >
-                    删除
-                  </Button>
-                </Popconfirm>
-              </div>
-            ),
-          },
-        ]}
-      />
+                    <p style={{ margin: "4px 0" }}>
+                      <b>登录账号（学号）：</b> {createdAccountInfo.username}
+                    </p>
+                    <p style={{ margin: "4px 0" }}>
+                      <b>初始密码：</b> <Tag color="blue">{createdAccountInfo.initialPassword}</Tag>
+                    </p>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#888", marginTop: 12 }}>
+                    * 提示：用户登录系统后可随时自行修改初始密码。
+                  </p>
+                </Modal>
+              )}
 
-      {editingPerson && (
-        <EditPersonModal
-          person={editingPerson}
-          onClose={() => setEditingPerson(null)}
-          onSuccess={() => qc.invalidateQueries({ queryKey: ["people"] })}
-        />
-      )}
-
-      {importVisible && (
-        <ImportModal onClose={() => setImportVisible(false)} />
-      )}
-
-      {addPersonVisible && (
-        <AddPersonModal
-          open={addPersonVisible}
-          onClose={() => setAddPersonVisible(false)}
-          onSuccess={(info) => {
-            setCreatedAccountInfo(info);
-            qc.invalidateQueries({ queryKey: ["people"] });
-          }}
-        />
-      )}
-
-      {createdAccountInfo && (
-        <Modal
-          open={!!createdAccountInfo}
-          title="🎉 人员添加成功"
-          onOk={() => setCreatedAccountInfo(null)}
-          onCancel={() => setCreatedAccountInfo(null)}
-          cancelButtonProps={{ style: { display: "none" } }}
-          okText="我知道了"
-        >
-          <p style={{ fontSize: 14, marginBottom: 12 }}>
-            已成功为 <b>{createdAccountInfo.name}</b> 创建人员档案并开通登录账号：
-          </p>
-          <div
-            style={{
-              background: "#fafafa",
-              padding: 16,
-              borderRadius: 8,
-              border: "1px solid #f0f0f0",
-            }}
-          >
-            <p style={{ margin: "4px 0" }}>
-              <b>登录账号（学号）：</b> {createdAccountInfo.username}
-            </p>
-            <p style={{ margin: "4px 0" }}>
-              <b>初始密码：</b> <Tag color="blue">{createdAccountInfo.initialPassword}</Tag>
-            </p>
-          </div>
-          <p style={{ fontSize: 12, color: "#888", marginTop: 12 }}>
-            * 提示：用户登录系统后可随时自行修改初始密码。
-          </p>
-        </Modal>
-      )}
-
-      {rulesPerson && (
-        <RulesModal
-          person={rulesPerson}
-          onClose={() => setRulesPerson(null)}
-          allPeople={data ?? []}
-        />
-      )}
-    </Card>
+              {rulesPerson && (
+                <RulesModal
+                  person={rulesPerson}
+                  onClose={() => setRulesPerson(null)}
+                  allPeople={data ?? []}
+                />
+              )}
+            </Card>
+          ),
+        },
+        {
+          key: "timetables",
+          label: "全员无课表管理",
+          children: <TimetablesPage />,
+        },
+      ]}
+    />
   );
 }
 

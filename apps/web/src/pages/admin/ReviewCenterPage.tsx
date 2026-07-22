@@ -44,23 +44,41 @@ const EXEC_COLOR: Record<string, string> = {
   leave: "orange",
 };
 
+import AdminOvertimePage from "@/pages/admin/AdminOvertimePage";
+
 export default function ReviewCenterPage() {
   return (
-    <Card
-      title={<span style={{ fontSize: 20, fontWeight: 600 }}>审核中心</span>}
-      bordered={false}
-      style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.05)", borderRadius: 12 }}
-    >
-      <Tabs
-        defaultActiveKey="availability"
-        items={[
-          { key: "availability", label: "不可值班申请", children: <AvailabilityTab /> },
-          { key: "leave", label: "请假", children: <LeaveTab /> },
-          { key: "swap", label: "换班终审", children: <SwapTab /> },
-          { key: "execution", label: "执行状态", children: <ExecutionTab /> },
-        ]}
-      />
-    </Card>
+    <Tabs
+      defaultActiveKey="review"
+      items={[
+        {
+          key: "review",
+          label: "假勤与换班审核",
+          children: (
+            <Card
+              title={<span style={{ fontSize: 18, fontWeight: 600 }}>假勤与换班审核</span>}
+              bordered={false}
+              style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.05)", borderRadius: 12 }}
+            >
+              <Tabs
+                defaultActiveKey="availability"
+                items={[
+                  { key: "availability", label: "不可值班申请", children: <AvailabilityTab /> },
+                  { key: "leave", label: "请假", children: <LeaveTab /> },
+                  { key: "swap", label: "换班终审", children: <SwapTab /> },
+                  { key: "execution", label: "执行状态", children: <ExecutionTab /> },
+                ]}
+              />
+            </Card>
+          ),
+        },
+        {
+          key: "overtime",
+          label: "加班申请审批",
+          children: <AdminOvertimePage />,
+        },
+      ]}
+    />
   );
 }
 

@@ -1,11 +1,9 @@
 import {
   AuditOutlined,
   CalendarOutlined,
-  FileTextOutlined,
   HomeOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
-  SettingOutlined,
   ShopOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
@@ -17,16 +15,11 @@ import { colors } from "@/theme";
 
 const items = [
   { key: "/admin/home", icon: <HomeOutlined />, label: "首页" },
-  { key: "/admin/schedule", icon: <CalendarOutlined />, label: "排班" },
-  { key: "/admin/roster", icon: <FileTextOutlined />, label: "值班表" },
-  { key: "/admin/people", icon: <TeamOutlined />, label: "人员" },
-  { key: "/admin/timetables", icon: <CalendarOutlined />, label: "全员课表" },
-  { key: "/admin/venues", icon: <ShopOutlined />, label: "场地管理" },
-  { key: "/admin/tasks", icon: <ShopOutlined />, label: "任务管理" },
-  { key: "/admin/review", icon: <SafetyCertificateOutlined />, label: "审核中心" },
-  { key: "/admin/overtime", icon: <AuditOutlined />, label: "加班审批" },
-  { key: "/admin/statistics", icon: <AuditOutlined />, label: "统计" },
-  { key: "/admin/settings", icon: <SettingOutlined />, label: "系统配置" },
+  { key: "/admin/schedule", icon: <CalendarOutlined />, label: "排班工作台" },
+  { key: "/admin/people", icon: <TeamOutlined />, label: "人员与课表" },
+  { key: "/admin/venues", icon: <ShopOutlined />, label: "场地与任务" },
+  { key: "/admin/review", icon: <SafetyCertificateOutlined />, label: "审批中心" },
+  { key: "/admin/statistics", icon: <AuditOutlined />, label: "统计与设置" },
 ];
 
 export default function AdminLayout() {
@@ -34,6 +27,15 @@ export default function AdminLayout() {
   const location = useLocation();
   const logout = useAuth((s) => s.logout);
   const user = useAuth((s) => s.user);
+
+  const getSelectedKey = (path: string) => {
+    if (path.startsWith("/admin/roster")) return "/admin/schedule";
+    if (path.startsWith("/admin/timetables")) return "/admin/people";
+    if (path.startsWith("/admin/tasks")) return "/admin/venues";
+    if (path.startsWith("/admin/overtime")) return "/admin/review";
+    if (path.startsWith("/admin/settings")) return "/admin/statistics";
+    return path;
+  };
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -60,7 +62,7 @@ export default function AdminLayout() {
         </div>
         <Menu
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[getSelectedKey(location.pathname)]}
           items={items}
           onClick={(e) => navigate(e.key)}
           style={{ borderInlineEnd: "none", padding: "8px 8px" }}

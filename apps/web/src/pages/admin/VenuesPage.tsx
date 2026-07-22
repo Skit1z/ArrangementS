@@ -16,11 +16,13 @@ import {
   Tag,
   TimePicker,
   Typography,
+  Tabs,
 } from "antd";
 import dayjs from "dayjs";
 import { useState } from "react";
 
 import { errorMessage } from "@/api/client";
+import TasksPage from "@/pages/admin/TasksPage";
 import {
   adminApi,
   VENUE_TYPE_LABEL,
@@ -126,114 +128,131 @@ function VenuesTab() {
   };
 
   return (
-    <>
-      <div style={{ marginBottom: 12 }}>
-        <Button type="primary" onClick={openCreate}>
-          新建场地
-        </Button>
-      </div>
-      <Table<Venue>
-        rowKey="id"
-        loading={isLoading}
-        dataSource={data}
-        pagination={false}
-        columns={[
-          { title: "名称", dataIndex: "name" },
-          { title: "代码", dataIndex: "code", width: 80 },
-          {
-            title: "类型",
-            dataIndex: "venue_type",
-            width: 100,
-            render: (v: VenueType) => <Tag>{VENUE_TYPE_LABEL[v]}</Tag>,
-          },
-          { title: "默认人数", dataIndex: "default_required_people", width: 90 },
-          { title: "提前(min)", dataIndex: "default_prep_minutes", width: 90 },
-          { title: "收尾(min)", dataIndex: "default_cleanup_minutes", width: 90 },
-          {
-            title: "状态",
-            dataIndex: "is_active",
-            width: 80,
-            render: (v: boolean) => (v ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>),
-          },
-          {
-            title: "操作",
-            width: 240,
-            render: (_, v) => (
-              <Space>
-                <Button size="small" onClick={() => openEdit(v)}>
-                  编辑
+    <Tabs
+      defaultActiveKey="venues"
+      items={[
+        {
+          key: "venues",
+          label: "场地维护",
+          children: (
+            <>
+              <div style={{ marginBottom: 12 }}>
+                <Button type="primary" onClick={openCreate}>
+                  新建场地
                 </Button>
-                {v.venue_type === "fixed_shift" && (
-                  <Button size="small" onClick={() => setTemplatesVenue(v)}>
-                    班次模板
-                  </Button>
-                )}
-                {v.is_active && (
-                  <Popconfirm
-                    title="停用后历史数据保留，不再用于新排班"
-                    onConfirm={() => disableM.mutate(v.id)}
-                  >
-                    <Button size="small" danger>
-                      停用
-                    </Button>
-                  </Popconfirm>
-                )}
-              </Space>
-            ),
-          },
-        ]}
-      />
+              </div>
 
-      <Modal
-        title={editing ? "编辑场地" : "新建场地"}
-        open={creating || !!editing}
-        onOk={submit}
-        onCancel={() => {
-          setCreating(false);
-          setEditing(null);
-        }}
-        confirmLoading={createM.isPending || updateM.isPending}
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item name="name" label="名称" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="code" label="代码" rules={[{ required: true }]}>
-            <Input disabled={!!editing} />
-          </Form.Item>
-          <Form.Item name="venue_type" label="类型" rules={[{ required: true }]}>
-            <Select
-              options={[
-                { value: "fixed_shift", label: VENUE_TYPE_LABEL.fixed_shift },
-                { value: "event_based", label: VENUE_TYPE_LABEL.event_based },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="address" label="地址">
-            <Input />
-          </Form.Item>
-          <Space wrap>
-            <Form.Item name="default_required_people" label="默认人数">
-              <InputNumber min={1} />
-            </Form.Item>
-            <Form.Item name="default_prep_minutes" label="提前到岗(min)">
-              <InputNumber min={0} />
-            </Form.Item>
-            <Form.Item name="default_cleanup_minutes" label="收尾(min)">
-              <InputNumber min={0} />
-            </Form.Item>
-            <Form.Item name="sort_order" label="排序">
-              <InputNumber />
-            </Form.Item>
-          </Space>
-        </Form>
-      </Modal>
+              <Table<Venue>
+                rowKey="id"
+                loading={isLoading}
+                dataSource={data}
+                pagination={false}
+                columns={[
+                  { title: "名称", dataIndex: "name" },
+                  { title: "代码", dataIndex: "code", width: 80 },
+                  {
+                    title: "类型",
+                    dataIndex: "venue_type",
+                    width: 100,
+                    render: (v: VenueType) => <Tag>{VENUE_TYPE_LABEL[v]}</Tag>,
+                  },
+                  { title: "默认人数", dataIndex: "default_required_people", width: 90 },
+                  { title: "提前(min)", dataIndex: "default_prep_minutes", width: 90 },
+                  { title: "收尾(min)", dataIndex: "default_cleanup_minutes", width: 90 },
+                  {
+                    title: "状态",
+                    dataIndex: "is_active",
+                    width: 80,
+                    render: (v: boolean) => (v ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>),
+                  },
+                  {
+                    title: "操作",
+                    width: 240,
+                    render: (_, v) => (
+                      <Space>
+                        <Button size="small" onClick={() => openEdit(v)}>
+                          编辑
+                        </Button>
+                        {v.venue_type === "fixed_shift" && (
+                          <Button size="small" onClick={() => setTemplatesVenue(v)}>
+                            班次模板
+                          </Button>
+                        )}
+                        {v.is_active && (
+                          <Popconfirm
+                            title="停用后历史数据保留，不再用于新排班"
+                            onConfirm={() => disableM.mutate(v.id)}
+                          >
+                            <Button size="small" danger>
+                              停用
+                            </Button>
+                          </Popconfirm>
+                        )}
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
 
-      {templatesVenue && (
-        <ShiftTemplatesDrawer venue={templatesVenue} onClose={() => setTemplatesVenue(null)} />
-      )}
-    </>
+              <Modal
+                title={editing ? "编辑场地" : "新建场地"}
+                open={creating || !!editing}
+                onOk={submit}
+                onCancel={() => {
+                  setCreating(false);
+                  setEditing(null);
+                }}
+                confirmLoading={createM.isPending || updateM.isPending}
+                destroyOnClose
+              >
+                <Form form={form} layout="vertical">
+                  <Form.Item name="name" label="名称" rules={[{ required: true }]}>
+                    <Input />
+                  </Form.Item>
+                  <Form.Item name="code" label="代码" rules={[{ required: true }]}>
+                    <Input disabled={!!editing} />
+                  </Form.Item>
+                  <Form.Item name="venue_type" label="类型" rules={[{ required: true }]}>
+                    <Select
+                      options={[
+                        { value: "fixed_shift", label: VENUE_TYPE_LABEL.fixed_shift },
+                        { value: "event_based", label: VENUE_TYPE_LABEL.event_based },
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item name="address" label="地址">
+                    <Input />
+                  </Form.Item>
+                  <Space wrap>
+                    <Form.Item name="default_required_people" label="默认人数">
+                      <InputNumber min={1} />
+                    </Form.Item>
+                    <Form.Item name="default_prep_minutes" label="提前到岗(min)">
+                      <InputNumber min={0} />
+                    </Form.Item>
+                    <Form.Item name="default_cleanup_minutes" label="收尾(min)">
+                      <InputNumber min={0} />
+                    </Form.Item>
+                    <Form.Item name="sort_order" label="排序">
+                      <InputNumber />
+                    </Form.Item>
+                  </Space>
+                </Form>
+              </Modal>
+
+              {templatesVenue && (
+                <ShiftTemplatesDrawer venue={templatesVenue} onClose={() => setTemplatesVenue(null)} />
+              )}
+            </>
+          ),
+        },
+        {
+          key: "tasks",
+          label: "临时/大型任务管理",
+          children: <TasksPage />,
+        },
+      ]}
+    />
   );
 }
 

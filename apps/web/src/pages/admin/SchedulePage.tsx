@@ -12,11 +12,13 @@ import {
   Space,
   Spin,
   Tag,
+  Tabs,
 } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 
 import { api, errorMessage } from "@/api/client";
+import DutyRosterPage from "@/pages/admin/DutyRosterPage";
 import ScheduleBoard from "@/features/schedule/ScheduleBoard";
 import {
   type Board,
@@ -207,72 +209,88 @@ export default function SchedulePage() {
   const data = weekQuery.data;
 
   return (
-    <Card
-      title="周排班"
-      extra={
-        <Space wrap>
-          <DatePicker
-            picker="week"
-            value={dayjs(week)}
-            onChange={(d) => d && setWeek(mondayOf(d))}
-            format={() =>
-              data?.week_label || computeWeekLabel(week, semestersQuery.data ?? [])
-            }
-            style={{ width: 280 }}
-          />
-          <Button onClick={() => setWeek(mondayOf(dayjs()))}>本周</Button>
-          <Button onClick={() => setCreatingManual(true)} disabled={!data}>
-            新增临时班次
-          </Button>
-          <Button onClick={() => generate.mutate()} loading={generate.isPending}>
-            自动生成
-          </Button>
-          {data?.status === "published" ? (
-            <Button danger onClick={() => unpublish.mutate()} loading={unpublish.isPending}>
-              撤销发布
-            </Button>
-          ) : (
-            <Button type="primary" onClick={() => publish.mutate()} loading={publish.isPending} disabled={!data}>
-              发布
-            </Button>
-          )}
-          {data && <Tag color={data.status === "published" ? "green" : "orange"}>{data.status}</Tag>}
-          {data && <span style={{ fontSize: 12 }}>修订号 {data.revision}</span>}
-        </Space>
-      }
-    >
-      {weekQuery.isLoading && <Spin style={{ display: "block", margin: "40px auto" }} />}
-      {data && data.slots.length === 0 && <Empty description="本周暂无岗位" />}
-      {data && data.slots.length > 0 && (
-        <ScheduleBoard
-          week={data}
-          people={peopleQuery.data ?? []}
-          venues={venuesQuery.data ?? []}
-          baseline={baseline}
-          board={board}
-          setBoard={setBoard}
-          conflicts={conflicts}
-          onSave={(ops) => save.mutate(ops)}
-          saving={save.isPending}
-          checkingConflicts={checkConflicts.isPending}
-          activeVenueId={activeVenueId}
-          setActiveVenueId={setActiveVenueId}
-        />
-      )}
+    <Tabs
+      defaultActiveKey="board"
+      items={[
+        {
+          key: "board",
+          label: "排班微调与生成",
+          children: (
+            <Card
+              title="周排班"
+              extra={
+                <Space wrap>
+                  <DatePicker
+                    picker="week"
+                    value={dayjs(week)}
+                    onChange={(d) => d && setWeek(mondayOf(d))}
+                    format={() =>
+                      data?.week_label || computeWeekLabel(week, semestersQuery.data ?? [])
+                    }
+                    style={{ width: 280 }}
+                  />
+                  <Button onClick={() => setWeek(mondayOf(dayjs()))}>本周</Button>
+                  <Button onClick={() => setCreatingManual(true)} disabled={!data}>
+                    新增临时班次
+                  </Button>
+                  <Button onClick={() => generate.mutate()} loading={generate.isPending}>
+                    自动生成
+                  </Button>
+                  {data?.status === "published" ? (
+                    <Button danger onClick={() => unpublish.mutate()} loading={unpublish.isPending}>
+                      撤销发布
+                    </Button>
+                  ) : (
+                    <Button type="primary" onClick={() => publish.mutate()} loading={publish.isPending} disabled={!data}>
+                      发布
+                    </Button>
+                  )}
+                  {data && <Tag color={data.status === "published" ? "green" : "orange"}>{data.status}</Tag>}
+                  {data && <span style={{ fontSize: 12 }}>修订号 {data.revision}</span>}
+                </Space>
+              }
+            >
+              {weekQuery.isLoading && <Spin style={{ display: "block", margin: "40px auto" }} />}
+              {data && data.slots.length === 0 && <Empty description="本周暂无岗位" />}
+              {data && data.slots.length > 0 && (
+                <ScheduleBoard
+                  week={data}
+                  people={peopleQuery.data ?? []}
+                  venues={venuesQuery.data ?? []}
+                  baseline={baseline}
+                  board={board}
+                  setBoard={setBoard}
+                  conflicts={conflicts}
+                  onSave={(ops) => save.mutate(ops)}
+                  saving={save.isPending}
+                  checkingConflicts={checkConflicts.isPending}
+                  activeVenueId={activeVenueId}
+                  setActiveVenueId={setActiveVenueId}
+                />
+              )}
 
-      {creatingManual && (
-        <ManualSlotModal
-          weekStart={week}
-          venues={venuesQuery.data ?? []}
-          defaultVenueId={activeVenueId}
-          onClose={() => setCreatingManual(false)}
-          onSuccess={() => {
-            setCreatingManual(false);
-            weekQuery.refetch();
-          }}
-        />
-      )}
-    </Card>
+              {creatingManual && (
+                <ManualSlotModal
+                  weekStart={week}
+                  venues={venuesQuery.data ?? []}
+                  defaultVenueId={activeVenueId}
+                  onClose={() => setCreatingManual(false)}
+                  onSuccess={() => {
+                    setCreatingManual(false);
+                    weekQuery.refetch();
+                  }}
+                />
+              )}
+            </Card>
+          ),
+        },
+        {
+          key: "roster",
+          label: "值班表导出与预览",
+          children: <DutyRosterPage />,
+        },
+      ]}
+    />
   );
 }
 
