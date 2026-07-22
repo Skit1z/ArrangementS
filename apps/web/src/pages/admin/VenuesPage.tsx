@@ -20,6 +20,7 @@ import {
 } from "antd";
 import dayjs from "dayjs";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { errorMessage } from "@/api/client";
 import TasksPage from "@/pages/admin/TasksPage";
@@ -43,6 +44,8 @@ export default function VenuesPage() {
 function VenuesTab() {
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "venues";
   const { data, isLoading } = useQuery<Venue[]>({
     queryKey: ["admin", "venues"],
     queryFn: adminApi.venues.list,
@@ -129,7 +132,10 @@ function VenuesTab() {
 
   return (
     <Tabs
-      defaultActiveKey="venues"
+      type="card"
+      activeKey={activeTab}
+      onChange={(k) => setSearchParams({ tab: k })}
+      style={{ marginBottom: 16 }}
       items={[
         {
           key: "venues",

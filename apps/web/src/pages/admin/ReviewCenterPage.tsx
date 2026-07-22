@@ -45,11 +45,18 @@ const EXEC_COLOR: Record<string, string> = {
 };
 
 import AdminOvertimePage from "@/pages/admin/AdminOvertimePage";
+import { useSearchParams } from "react-router-dom";
 
 export default function ReviewCenterPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "review";
+
   return (
     <Tabs
-      defaultActiveKey="review"
+      type="card"
+      activeKey={activeTab}
+      onChange={(k) => setSearchParams({ tab: k })}
+      style={{ marginBottom: 16 }}
       items={[
         {
           key: "review",

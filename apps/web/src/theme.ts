@@ -105,5 +105,14 @@ export const antdTheme = {
       headerBg: colors.bgContainer,
       siderBg: colors.bgContainer,
     },
+    Tabs: {
+      cardBg: "#F0F3F7",
+      cardActiveBg: "#FFFFFF",
+      itemColor: colors.textSecondary,
+      itemSelectedColor: colors.primary,
+      itemHoverColor: colors.primary,
+      cardGutter: 6,
+      titleFontSize: 14,
+    },
   },
 } as const;

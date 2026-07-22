@@ -16,6 +16,7 @@ import {
 } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { api, errorMessage } from "@/api/client";
 import DutyRosterPage from "@/pages/admin/DutyRosterPage";
@@ -85,6 +86,8 @@ function computeWeekLabel(weekStartStr: string, semesters: Semester[]): string {
 export default function SchedulePage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "board";
   const [week, setWeek] = useState<string>(mondayOf(dayjs()));
   const [board, setBoard] = useState<Board>({});
   const [baseline, setBaseline] = useState<Board>({});
@@ -210,7 +213,10 @@ export default function SchedulePage() {
 
   return (
     <Tabs
-      defaultActiveKey="board"
+      type="card"
+      activeKey={activeTab}
+      onChange={(k) => setSearchParams({ tab: k })}
+      style={{ marginBottom: 16 }}
       items={[
         {
           key: "board",

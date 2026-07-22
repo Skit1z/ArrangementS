@@ -451,6 +451,7 @@ export const adminApi = {
       if (semesterId) form.append("semester_id", semesterId);
       const res = await api.post<{
         student_no: string | null;
+        full_name: string | null;
         entries: {
           weekday: number;
           period_start: number;

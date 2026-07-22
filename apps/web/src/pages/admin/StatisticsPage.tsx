@@ -23,6 +23,7 @@ import {
 } from "antd";
 import dayjs from "dayjs";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { errorMessage } from "@/api/client";
 import SettingsPage from "@/pages/admin/SettingsPage";
@@ -37,6 +38,8 @@ import { hoursOf } from "@/features/me/api";
 export default function StatisticsPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "stats";
   const [month, setMonth] = useState(dayjs().format("YYYY-MM"));
 
   const query = useQuery({
@@ -81,7 +84,10 @@ export default function StatisticsPage() {
 
   return (
     <Tabs
-      defaultActiveKey="stats"
+      type="card"
+      activeKey={activeTab}
+      onChange={(k) => setSearchParams({ tab: k })}
+      style={{ marginBottom: 16 }}
       items={[
         {
           key: "stats",

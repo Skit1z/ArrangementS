@@ -145,7 +145,7 @@ export default function AdminHomePage() {
               block
               size="large"
               icon={<CalendarOutlined />}
-              onClick={() => navigate("/admin/schedule")}
+              onClick={() => navigate("/admin/schedule?tab=roster")}
               style={{
                 height: 60,
                 borderRadius: radius.inner,
@@ -157,7 +157,7 @@ export default function AdminHomePage() {
             >
               <div style={{ textAlign: "left" }}>
                 <div style={{ fontWeight: 600, fontSize: 14, color: colors.textPrimary }}>查看本周值班表</div>
-                <div style={{ fontSize: 12, color: colors.textTertiary }}>进入周排班大盘查看及调整值班安排</div>
+                <div style={{ fontSize: 12, color: colors.textTertiary }}>进入全员值班表界面查看及导出安排</div>
               </div>
               <RightOutlined style={{ color: colors.textTertiary }} />
             </Button>
@@ -168,7 +168,7 @@ export default function AdminHomePage() {
               block
               size="large"
               icon={<CalendarOutlined />}
-              onClick={() => navigate(currentWeek ? `/admin/timetables?week=${currentWeek.week}` : "/admin/timetables")}
+              onClick={() => navigate(currentWeek ? `/admin/people?tab=timetables&week=${currentWeek.week}` : "/admin/people?tab=timetables")}
               style={{
                 height: 60,
                 borderRadius: radius.inner,

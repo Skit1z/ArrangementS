@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, List, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TimePicker, Upload, Tabs } from "antd";
 import { DownloadOutlined, UploadOutlined, SettingOutlined, DeleteOutlined, UserAddOutlined, EditOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { adminApi } from "@/features/admin/api";
 import { api, errorMessage } from "@/api/client";
@@ -20,6 +21,8 @@ interface Person {
 export default function PeoplePage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "people";
   const [keyword, setKeyword] = useState("");
   const [rulesPerson, setRulesPerson] = useState<Person | null>(null);
   const [editingPerson, setEditingPerson] = useState<any | null>(null);
@@ -60,7 +63,10 @@ export default function PeoplePage() {
 
   return (
     <Tabs
-      defaultActiveKey="people"
+      type="card"
+      activeKey={activeTab}
+      onChange={(k) => setSearchParams({ tab: k })}
+      style={{ marginBottom: 16 }}
       items={[
         {
           key: "people",

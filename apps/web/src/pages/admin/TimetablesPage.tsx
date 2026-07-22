@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
-import { App, Button, Card, Modal, Select, Space, Spin, Tag } from "antd";
+import { App, Alert, Button, Card, Modal, Select, Space, Spin, Tag } from "antd";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { errorMessage } from "@/api/client";
@@ -98,32 +98,43 @@ export default function TimetablesPage() {
   const [proxyPersonId, setProxyPersonId] = useState<string | null>(null);
   const [proxyParsed, setProxyParsed] = useState<ParsedEntry[] | null>(null);
   const [proxyFileName, setProxyFileName] = useState("");
+  const [proxyMatchInfo, setProxyMatchInfo] = useState<{
+    matchedPerson: { full_name: string; student_no: string; class_name?: string } | null;
+    recognizedName: string;
+    errorMsg?: string;
+  } | null>(null);
 
   const parseMut = useMutation({
     mutationFn: (file: File) => adminApi.timetables.parsePdf(file),
     onSuccess: (d) => {
       if (!d.entries.length) {
-        message.error("未识别到课程");
+        message.error("未识别到有效的课程安排");
         return;
       }
       setProxyParsed(d.entries);
-      // 通过 PDF 解析出的学号自动匹配人员
-      if (d.student_no) {
-        const matched = (peopleQuery.data ?? []).find(
-          (p) => p.student_no === d.student_no,
-        );
-        if (matched) {
-          setProxyPersonId(matched.id);
-          message.success(
-            `解析出 ${d.entries.length} 条；已自动匹配学号 ${d.student_no} → ${matched.full_name}`,
-          );
-        } else {
-          message.warning(
-            `解析出 ${d.entries.length} 条；未在系统中找到学号 ${d.student_no}，请手动选择人员`,
-          );
-        }
+      const allP = peopleQuery.data ?? [];
+      const matched = allP.find(
+        (p) =>
+          (d.student_no && p.student_no === d.student_no) ||
+          (d.full_name && p.full_name === d.full_name),
+      );
+
+      if (matched) {
+        setProxyPersonId(matched.id);
+        setProxyMatchInfo({
+          matchedPerson: matched,
+          recognizedName: matched.full_name,
+        });
+        message.success(`已自动识别并匹配人员：${matched.full_name} (${matched.student_no})`);
       } else {
-        message.success(`解析出 ${d.entries.length} 条（未识别到学号，请手动选择人员）`);
+        const unrecognized = d.full_name || d.student_no || "未知人员";
+        setProxyPersonId(null);
+        setProxyMatchInfo({
+          matchedPerson: null,
+          recognizedName: unrecognized,
+          errorMsg: `课表识别到人员【${unrecognized}】，但系统人员库中不存在该档案`,
+        });
+        message.error(`识别到人员【${unrecognized}】，但在人员库中不存在`);
       }
     },
     onError: (e) => message.error(errorMessage(e)),
@@ -347,37 +358,31 @@ export default function TimetablesPage() {
 
       <Modal
         open={proxyOpen}
-        title="为某人代传课表"
+        title="代传 PDF 课表（自动识别对应人员）"
         width={780}
         onCancel={() => {
           setProxyOpen(false);
           setProxyParsed(null);
           setProxyPersonId(null);
+          setProxyMatchInfo(null);
           setProxyFileName("");
         }}
-        onOk={proxyParsed ? () => confirmMut.mutate() : undefined}
+        onOk={proxyParsed && proxyPersonId ? () => confirmMut.mutate() : undefined}
         okText={proxyParsed ? "确认生效" : undefined}
         confirmLoading={confirmMut.isPending}
-        okButtonProps={proxyParsed ? {} : { disabled: true }}
+        okButtonProps={proxyParsed && proxyPersonId ? {} : { disabled: true }}
         footer={proxyParsed ? undefined : null}
       >
         {!proxyParsed ? (
           <>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>选择人员：</label>
-              <Select
-                showSearch
-                placeholder="输入姓名或选择人员"
-                optionFilterProp="label"
-                style={{ width: "100%" }}
-                value={proxyPersonId}
-                onChange={setProxyPersonId}
-                options={selectablePeople.map((p) => ({ label: p.full_name, value: p.id }))}
+            <div style={{ marginBottom: 16 }}>
+              <Alert
+                type="info"
+                showIcon
+                message="无需选择人员：直接上传 PDF 课表文件，系统将自动识别课表对应的人员姓名与学号并自动绑定。"
               />
             </div>
             <PdfFilePicker
-              disabled={!proxyPersonId}
-              disabledReason="请先在上方选择人员"
               isPending={parseMut.isPending}
               onSelectFile={(file) => {
                 setProxyFileName(file.name);
@@ -386,7 +391,41 @@ export default function TimetablesPage() {
             />
           </>
         ) : (
-          <TimetableEntryEditor value={proxyParsed} onChange={setProxyParsed} maxHeight={340} />
+          <div>
+            {proxyMatchInfo?.matchedPerson ? (
+              <Alert
+                type="success"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={
+                  <span>
+                    已自动匹配人员：<b>{proxyMatchInfo.matchedPerson.full_name}</b>（学号：{proxyMatchInfo.matchedPerson.student_no}）
+                  </span>
+                }
+              />
+            ) : (
+              <Alert
+                type="error"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={proxyMatchInfo?.errorMsg || "未在系统人员库中查找到对应人员"}
+                description="请先在【人员管理】中创建该人员档案后再进行代传。"
+              />
+            )}
+            <TimetableEntryEditor value={proxyParsed} onChange={setProxyParsed} maxHeight={340} />
+            {!proxyPersonId && (
+              <div style={{ marginTop: 12, textAlign: "right" }}>
+                <Button
+                  onClick={() => {
+                    setProxyParsed(null);
+                    setProxyMatchInfo(null);
+                  }}
+                >
+                  重新选择文件
+                </Button>
+              </div>
+            )}
+          </div>
         )}
       </Modal>
     </Card>
