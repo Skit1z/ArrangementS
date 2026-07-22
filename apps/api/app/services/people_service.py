@@ -236,6 +236,10 @@ def update_person(
         prof.difficulty_level = patch["difficulty_level"]
     if "is_in_scheduling_pool" in patch and patch["is_in_scheduling_pool"] is not None:
         prof.is_in_scheduling_pool = patch["is_in_scheduling_pool"]
+    if "status" in patch and patch["status"] is not None:
+        prof.status = patch["status"]
+        if prof.user is not None:
+            prof.user.is_active = patch["status"] == PersonStatus.active
 
     if "id_card" in patch and patch["id_card"] is not None:
         raw_id = patch["id_card"].strip()

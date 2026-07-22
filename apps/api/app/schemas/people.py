@@ -69,6 +69,7 @@ class PersonUpdateIn(BaseModel):
     id_card: str | None = None
     bank_card: str | None = None
     is_in_scheduling_pool: bool | None = None
+    status: PersonStatus | None = None
 
 
 class PersonCreateOut(BaseModel):

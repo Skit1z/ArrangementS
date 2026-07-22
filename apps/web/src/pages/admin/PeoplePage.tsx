@@ -35,6 +35,17 @@ export default function PeoplePage() {
     initialPassword: string;
   } | null>(null);
 
+  const updateStatusM = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      await adminApi.people.update(id, { status });
+    },
+    onSuccess: () => {
+      message.success("人员状态已更新");
+      qc.invalidateQueries({ queryKey: ["people"] });
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  });
+
   const toggleSchedulingPool = useMutation({
     mutationFn: async ({ personIds, enabled }: { personIds: string[]; enabled: boolean }) => {
       await api.put("/people/scheduling-pool", { person_ids: personIds, enabled });
@@ -105,7 +116,20 @@ export default function PeoplePage() {
           {
             title: "状态",
             dataIndex: "status",
-            render: (v) => <Tag color={v === "active" ? "green" : "default"}>{v}</Tag>,
+            render: (v: string, r: Person) => (
+              <Select
+                value={v}
+                size="small"
+                variant="borderless"
+                onChange={(newStatus) => updateStatusM.mutate({ id: r.id, status: newStatus })}
+                loading={updateStatusM.isPending}
+                options={[
+                  { value: "active", label: <Tag color="green">active</Tag> },
+                  { value: "suspended", label: <Tag color="orange">suspended</Tag> },
+                  { value: "left", label: <Tag color="default">left</Tag> },
+                ]}
+              />
+            ),
           },
           {
             title: "自动排班",
@@ -775,10 +799,24 @@ function EditPersonModal({
           full_name: person.full_name,
           phone: person.phone,
           difficulty_level: person.difficulty_level,
+          status: person.status || "active",
           is_in_scheduling_pool: person.is_in_scheduling_pool,
         }}
         onFinish={(vals) => updateMut.mutate(vals)}
       >
+        <Form.Item name="status" label="人员状态">
+          <Select>
+            <Select.Option value="active">
+              <Tag color="green">active（正常在勤）</Tag>
+            </Select.Option>
+            <Select.Option value="suspended">
+              <Tag color="orange">suspended（暂停挂起）</Tag>
+            </Select.Option>
+            <Select.Option value="left">
+              <Tag color="default">left（退组/离班）</Tag>
+            </Select.Option>
+          </Select>
+        </Form.Item>
         <Form.Item
           name="student_no"
           label="学号"

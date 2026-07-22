@@ -429,6 +429,7 @@ export const adminApi = {
         difficulty_level: string | null;
         id_card: string | null;
         bank_card: string | null;
+        status: string;
         is_in_scheduling_pool: boolean;
       }>,
     ) => (await api.patch<AdminPerson>(`/people/${id}`, patch)).data,
